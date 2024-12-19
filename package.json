@@ -1,84 +1,44 @@
 {
-  "name": "defisaver-v3-contracts",
-  "version": "3.1.5",
-  "description": "All the contracts related to the Defi Saver ecosystem",
+  "name": "loan-product-use-case-2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
   "scripts": {
-    "compile": "npx hardhat compile",
-    "deploy": "cmd/run_deploy",
-    "test": "cmd/run_test",
-    "commit": "cz",
-    "verify": "cmd/run_verify",
-    "lint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
-    "pretty": "./node_modules/.bin/prettier --write contracts/**/*.sol"
+    "test": "npx hardhat test",
+    "run:balance": "npx hardhat run ./scripts/aaveBorrow.ts",
+    "run-script": "ts-node ./scripts/acrossAction.ts"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/DecenterApps/defisaver-v3-contracts.git"
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@0xsquid/sdk": "^2.8.25",
+    "@0xsquid/squid-types": "^0.1.112",
+    "@aave/core-v3": "^1.19.3",
+    "@openzeppelin/contracts": "^4.9.3",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "ethers-v5": "npm:ethers@5.7.2",
+    "hardhat": "^2.22.13"
   },
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/DecenterApps/defisaver-v3-contracts/issues"
-  },
-  "engines": {
-    "node": ">=10"
-  },
-  "homepage": "https://github.com/DecenterApps/defisaver-v3-contracts#readme",
   "devDependencies": {
-    "@commitlint/cli": "^12.1.1",
-    "@commitlint/config-conventional": "^12.1.1",
-    "@curvefi/api": "=2.52.1",
-    "@defisaver/automation-sdk": "^3.0.2",
-    "@defisaver/sdk": "^1.0.14",
-    "@defisaver/tokens": "^1.5.10",
-    "@nomicfoundation/hardhat-verify": "^2.0.11",
-    "@nomiclabs/hardhat-ethers": "^2.2.3",
-    "@nomiclabs/hardhat-waffle": "^2.0.0",
-    "@tenderly/hardhat-tenderly": "^1.3.2",
-    "@uniswap/sdk-core": "^3.1.1",
-    "@uniswap/smart-order-router": "^3.5.0",
-    "axios": "^0.28.0",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-ignition": "^0.15.0",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": ">=9.1.0",
+    "@types/node": ">=18.0.0",
     "chai": "^4.2.0",
-    "chai-as-promised": "^7.1.1",
-    "coingecko-api": "^1.0.10",
-    "commander": "^8.3.0",
-    "commitizen": "^4.2.3",
-    "cz-conventional-changelog": "^3.3.0",
-    "decimal.js": "^10.3.1",
-    "dotenv-safe": "^8.2.0",
-    "envfile": "^6.17.0",
-    "eslint": "^7.24.0",
-    "eslint-config-airbnb-base": "^14.2.1",
-    "eslint-plugin-import": "^2.22.1",
-    "ethers": "^5.4.0",
-    "ethereum-waffle": "^3.1.1",
-    "hardhat": "^2.22.2",
-    "hardhat-contract-sizer": "^2.0.1",
-    "hardhat-gas-reporter": "^2.2.1",
-    "hardhat-log-remover": "^2.0.0",
-    "hardhat-tracer": "3.1.0",
-    "husky": "^4.3.0",
-    "prettier": "^2.1.2",
-    "prettier-plugin-solidity": "^1.0.0-alpha.59",
-    "readline-sync": "^1.4.10",
-    "solhint": "^3.3.6",
-    "solhint-plugin-prettier": "0.0.5",
-    "solidity-coverage": "^0.7.13"
-  },
-  "husky": {
-    "hooks": {
-      "prepare-commit-msg": "exec < /dev/tty && git cz --hook || true",
-      "pre-commit": "npm run lint",
-      "commit-msg": "npx --no-install commitlint --edit $1"
-    }
-  },
-  "commitlint": {
-    "extends": [
-      "@commitlint/config-conventional"
-    ]
-  },
-  "config": {
-    "commitizen": {
-      "path": "./node_modules/cz-conventional-changelog"
-    }
+    "ethers": "^6.4.0",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.0",
+    "ts-node": ">=8.0.0",
+    "typechain": "^8.3.0",
+    "typescript": ">=4.5.0"
   }
 }
