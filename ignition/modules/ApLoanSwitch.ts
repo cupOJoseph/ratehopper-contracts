@@ -15,14 +15,9 @@ const ApLoanSwitchModule = buildModule("ApLoanSwitch", (m) => {
     "0xfb00ac187a8eb5afae4eace434f493eb62672df7"
   );
 
-  const comet = m.getParameter(
-    "compoundV3",
-    "0x2e44e174f7D53F0212823acC11C01A11d58c5bCB"
-  );
-
   const ApLoanSwitch = m.contract(
     "ApLoanSwitch",
-    [aaveV3PoolAddress, aaveV3DebtToken, comet],
+    [aaveV3PoolAddress, aaveV3DebtToken],
     {}
   );
 

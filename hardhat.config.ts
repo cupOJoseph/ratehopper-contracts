@@ -1,20 +1,29 @@
+import { base } from "./node_modules/acorn-walk/dist/walk.d";
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+
+const baseUrl = "https://base.llamarpc.com";
 
 const config: HardhatUserConfig = {
   solidity: "0.8.27",
   networks: {
+    base: {
+      url: baseUrl,
+      // timeout: 1000000,
+      gasPrice: 1700000000,
+      chainId: 8453,
+    },
     hardhat: {
       chains: {
-        137: {
+        8453: {
           hardforkHistory: {
-            london: 23850000,
+            london: 1,
           },
         },
       },
       forking: {
-        url: `https://polygon.meowrpc.com`,
-        blockNumber: 63332844,
+        url: baseUrl,
+        // blockNumber: 23901547,
       },
     },
   },

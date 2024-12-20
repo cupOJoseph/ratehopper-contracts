@@ -6,15 +6,6 @@ import { GPv2SafeERC20 } from './dependencies/GPv2SafeERC20.sol';
 import {IFlashLoanSimpleReceiver} from "@aave/core-v3/contracts/flashloan/interfaces/IFlashLoanSimpleReceiver.sol";
 
 interface IAaveV3Pool {
-    function getUserAccountData(address user) external view returns (
-        uint256 totalCollateralBase,
-        uint256 totalDebtBase,
-        uint256 availableBorrowsBase,
-        uint256 currentLiquidationThreshold,
-        uint256 ltv,
-        uint256 healthFactor
-    );
-
     function repay(address asset,uint256 amount,uint256 interestRateMode,address onBehalfOf) external returns (uint256);
 
     function borrow(
@@ -35,22 +26,8 @@ interface IAaveV3Pool {
     function withdraw(address asset, uint256 amount, address to) external returns (uint256);
 }
 
-interface IAaveV2Pool {
-    function deposit(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        uint16 referralCode
-    ) external;
-}
-
 interface IDebtToken {
     function approveDelegation(address delegatee, uint256 amount) external;
-}
-
-interface ICompoundV3 {
-    function withdrawFrom(address src, address to, address asset, uint amount) external;
-    function withdraw(address asset, uint amount) external;
 }
 
 contract ApLoanSwitch {
@@ -58,36 +35,13 @@ contract ApLoanSwitch {
 
     IAaveV3Pool public aaveV3Pool;
     IDebtToken public aaveV3DebtToken;
-    ICompoundV3 public compoundV3;
-    IAaveV2Pool public aaveV2Pool;
     
-    constructor(address _aaveV3PoolAddress, address _debtTokenAddress, address _compoundV3Address, address _aaveV2PoolAddress) {
+    constructor(address _aaveV3PoolAddress) {
         aaveV3Pool = IAaveV3Pool(_aaveV3PoolAddress);
-        aaveV3DebtToken = IDebtToken(_debtTokenAddress);
-        compoundV3 = ICompoundV3(_compoundV3Address);   
-        aaveV2Pool = IAaveV2Pool(_aaveV2PoolAddress); 
+    
     }
 
-    function getUserData(address user) public view returns (
-        uint256 totalCollateralBase,
-        uint256 totalDebtBase,
-        uint256 availableBorrowsBase,
-        uint256 currentLiquidationThreshold,
-        uint256 ltv,
-        uint256 healthFactor
-    ) {
-        return aaveV3Pool.getUserAccountData(user);
-    }
 
-    function aaveV2Supply(address asset,uint256 amount) public {
-        aaveV2SupplyInternal(asset,amount);
-    }
-
-    function aaveV2SupplyInternal(address asset,uint256 amount) internal {
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(asset).approve(address(aaveV2Pool), amount); 
-        aaveV2Pool.deposit(asset, amount, msg.sender, 0);
-    }
 
     function aaveV3Supply(address asset,uint256 amount) public {
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
@@ -100,32 +54,17 @@ contract ApLoanSwitch {
     }
 
     function aaveV3Repay(address asset,uint256 amount) public returns (uint256) {
-        return aaveV3RepayInternal(asset, amount);
-    }
-
-    function aaveV3RepayInternal(address asset,uint256 amount) internal returns (uint256) {
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(asset).approve(address(aaveV3Pool), amount); 
         return aaveV3Pool.repay(asset, amount, 2, msg.sender);
     }
 
+
     function aaveV3Borrow(address asset,uint256 amount) public {
         aaveV3Pool.borrow(asset, amount, 2, 0, msg.sender);
+        IERC20(asset).safeTransfer(msg.sender, amount);
     }
 
-
-    // repay debt and withdraw collateral in aaveV3, then deposit collateral in aaveV2
-    function aaveCollateralSwitch(address debtAsset, address collateralAsset, uint256 amount) public {
-        aaveV3RepayInternal(debtAsset, amount);
-
-        aaveV3Pool.withdraw(collateralAsset, amount, msg.sender);
-        
-        aaveV2SupplyInternal(collateralAsset, amount);
-    }
-    
-    function compoundV3Withdraw(address asset, uint amount) public {
-        compoundV3.withdrawFrom(msg.sender, msg.sender, asset, amount);
-    }
 
    // callback function we need to implement for aave v3 flashloan
    function executeOperation(
