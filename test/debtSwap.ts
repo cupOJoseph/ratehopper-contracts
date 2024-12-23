@@ -56,7 +56,7 @@ describe("Aave v3 DebtSwap", function () {
         const aaveDebtToken = new ethers.Contract(debtToken, aaveDebtTokenJson, impersonatedSigner);
         const approveDelegationTx = await aaveDebtToken.approveDelegation(
             deployedContractAddress,
-            inputAmount
+            inputAmount,
         );
         await approveDelegationTx.wait();
         // console.log("approveDelegationTx:", approveDelegationTx);
@@ -66,7 +66,7 @@ describe("Aave v3 DebtSwap", function () {
         const protocolDataProvider = new ethers.Contract(
             aaveV3ProtocolDataProvider,
             aaveProtocolDataProviderAbi,
-            impersonatedSigner
+            impersonatedSigner,
         );
 
         const response = await protocolDataProvider.getReserveTokensAddresses(assetAddress);
@@ -77,12 +77,12 @@ describe("Aave v3 DebtSwap", function () {
         const protocolDataProvider = new ethers.Contract(
             aaveV3ProtocolDataProvider,
             aaveProtocolDataProviderAbi,
-            impersonatedSigner
+            impersonatedSigner,
         );
 
         const result = await protocolDataProvider.getUserReserveData(
             assetAddress,
-            impersonatedSigner
+            impersonatedSigner,
         );
         return ethers.formatUnits(String(result.currentVariableDebt), 6);
     }
@@ -96,7 +96,7 @@ describe("Aave v3 DebtSwap", function () {
         myContract = await ethers.getContractAt(
             "DebtSwap",
             deployedContractAddress,
-            impersonatedSigner
+            impersonatedSigner,
         );
     });
 
@@ -110,7 +110,23 @@ describe("Aave v3 DebtSwap", function () {
         console.log("currentDebtAmount:", currentDebtAmount);
     });
 
-    it.only("should execute debt swap from USDC to USDbC", async function () {
+    it.only("should execute uniswap v3 flashloan", async function () {
+        const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
+        const transferTx = await usdc.transfer(deployedContractAddress, "1");
+        await transferTx.wait();
+        console.log("transferTx:", transferTx);
+
+        const tx = await myContract.flash(
+            "0x8f81b80d950e5996346530b76aba2962da5c9edb", // USDC/hyUSD
+            "1000",
+            0,
+            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "0xCc7FF230365bD730eE4B352cC2492CEdAC49383e",
+        );
+        await tx.wait();
+    });
+
+    it("should execute debt swap from USDC to USDbC", async function () {
         const beforeUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
         console.log("beforeUSDbCDebtAmount:", beforeUSDbCDebtAmount);
         const beforeUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
@@ -125,7 +141,7 @@ describe("Aave v3 DebtSwap", function () {
             USDbC_ADDRESS,
             inputAmount,
             getAmountOutMin(inputAmount),
-            deadline
+            deadline,
         );
 
         const result = await tx.wait();
@@ -159,7 +175,7 @@ describe("Aave v3 DebtSwap", function () {
         const aToken = new ethers.Contract(
             "0x625e7708f30ca75bfd92586e17077590c60eb4cd", // aPOLUSDC
             aaveATokenJson,
-            impersonatedSigner
+            impersonatedSigner,
         );
 
         const tx = await aToken.transfer(deployedContractAddress, "100");
@@ -211,7 +227,7 @@ describe("Aave v3 DebtSwap", function () {
             USDbC_ADDRESS,
             inputAmount,
             getAmountOutMin(inputAmount),
-            deadline
+            deadline,
         );
         const tx = await result.wait();
         console.log("tx:", tx);
@@ -220,33 +236,33 @@ describe("Aave v3 DebtSwap", function () {
         console.log("afterBalance:", afterBalance);
     });
 
-    it("Should call flashloan", async function () {
-        const aaveV3Pool = new ethers.Contract(
-            aaveV3PoolAddress,
-            aaveV3PoolJson,
-            impersonatedSigner
-        );
+    // it("Should call aave v3 flashloan", async function () {
+    //     const aaveV3Pool = new ethers.Contract(
+    //         aaveV3PoolAddress,
+    //         aaveV3PoolJson,
+    //         impersonatedSigner,
+    //     );
 
-        const usdt = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
+    //     const usdt = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
 
-        await approve();
+    //     await approve();
 
-        // send flashloan fee to contract
-        const tx = await usdt.transfer(deployedContractAddress, "50");
-        await tx.wait();
+    //     // send flashloan fee to contract
+    //     const tx = await usdt.transfer(deployedContractAddress, "50");
+    //     await tx.wait();
 
-        // encode DAI token address as example
-        const encodedParams = ethers.AbiCoder.defaultAbiCoder().encode(
-            ["address"],
-            ["0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063"]
-        );
+    //     // encode DAI token address as example
+    //     const encodedParams = ethers.AbiCoder.defaultAbiCoder().encode(
+    //         ["address"],
+    //         ["0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063"],
+    //     );
 
-        const result = await aaveV3Pool.flashLoanSimple(
-            deployedContractAddress,
-            USDC_ADDRESS,
-            "1000",
-            encodedParams,
-            0
-        );
-    });
+    //     const result = await aaveV3Pool.flashLoanSimple(
+    //         deployedContractAddress,
+    //         USDC_ADDRESS,
+    //         "1000",
+    //         encodedParams,
+    //         0,
+    //     );
+    // });
 });
