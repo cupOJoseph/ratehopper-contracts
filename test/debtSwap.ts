@@ -26,7 +26,7 @@ describe("Aave v3 DebtSwap", function () {
     // should be replaced by hardhat test account
     const testAddress = "0x50fe1109188A0B666c4d78908E3E539D73F97E33";
 
-    const inputAmount = ethers.parseUnits("0.1", 6);
+    const inputAmount = ethers.parseUnits("1", 6);
 
     this.timeout(3000000);
     // We define a fixture to reuse the same setup in every test.
@@ -110,131 +110,132 @@ describe("Aave v3 DebtSwap", function () {
         console.log("currentDebtAmount:", currentDebtAmount);
     });
 
-    it.only("should execute uniswap v3 flashloan", async function () {
+    it.only("should execute debt swap from USDC to USDbC", async function () {
+        const beforeUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
+        const beforeUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
+
+        await approve();
+        await approveDelegation(USDbC_ADDRESS);
+
         const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
-        const transferTx = await usdc.transfer(deployedContractAddress, "1");
+        const transferTx = await usdc.transfer(deployedContractAddress, "1000");
         await transferTx.wait();
         console.log("transferTx:", transferTx);
 
-        const tx = await myContract.flash(
-            "0x8f81b80d950e5996346530b76aba2962da5c9edb", // USDC/hyUSD
-            "1000",
-            0,
-            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-            "0xCc7FF230365bD730eE4B352cC2492CEdAC49383e",
-        );
-        await tx.wait();
-    });
-
-    it("should execute debt swap from USDC to USDbC", async function () {
-        const beforeUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
-        console.log("beforeUSDbCDebtAmount:", beforeUSDbCDebtAmount);
-        const beforeUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
-        console.log("beforeUSDCDebtAmount:", beforeUSDCDebtAmount);
-
-        await approve();
-        await approveDelegation(USDbC_ADDRESS);
-
-        const deadline = Math.floor(Date.now() / 1000) + 300; // current time + 5 minutes
-        const tx = await myContract.aaveV3Swap(
-            USDC_ADDRESS,
-            USDbC_ADDRESS,
-            inputAmount,
-            getAmountOutMin(inputAmount),
-            deadline,
-        );
-
-        const result = await tx.wait();
-
-        // console.log("result:", result);
-
-        const afterUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
-        console.log("afterUSDbCDebtAmount:", afterUSDbCDebtAmount);
-        const afterUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
-        console.log("afterUSDCDebtAmount:", afterUSDCDebtAmount);
-    });
-
-    it("should aave v3 supply", async function () {
-        const token = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
-
-        const balance = await token.balanceOf(testAddress);
-        console.log("before balance:", balance);
-
-        await approve();
-
-        const tx = await myContract.aaveV3Supply(USDC_ADDRESS, "1000");
-        console.log("tx:", tx);
-        const result = await tx.wait();
-        console.log("result:", result);
-
-        const afterbalance = await token.balanceOf(testAddress);
-        console.log("after balance:", afterbalance);
-    });
-
-    it("should aave v3 withdraw", async function () {
-        const aToken = new ethers.Contract(
-            "0x625e7708f30ca75bfd92586e17077590c60eb4cd", // aPOLUSDC
-            aaveATokenJson,
-            impersonatedSigner,
-        );
-
-        const tx = await aToken.transfer(deployedContractAddress, "100");
-        // const tx = await aToken.approve(deployedContractAddress, "1000");
-        await tx.wait();
-
-        const result = await myContract.aaveV3Withdraw(USDC_ADDRESS, "100");
-
-        console.log("result:", result);
-    });
-
-    it("should aave v3 borrow", async function () {
-        const token = new ethers.Contract(USDbC_ADDRESS, ERC20_ABI, impersonatedSigner);
-
-        const balance = await token.balanceOf(testAddress);
-        console.log("balance:", balance);
-
-        await approveDelegation(USDbC_ADDRESS);
-
-        const borrowTx = await myContract.aaveV3Borrow(USDbC_ADDRESS, inputAmount);
-        await borrowTx.wait();
-
-        console.log("borrowTx:", borrowTx);
-
-        const afterbalance = await token.balanceOf(testAddress);
-        console.log("after balance:", afterbalance);
-    });
-
-    it("should aave v3 repay", async function () {
-        await approve();
-
-        const result = await myContract.aaveV3Repay(USDC_ADDRESS, inputAmount);
-
-        const tx = await result.wait();
-        console.log("tx:", tx);
-    });
-
-    it("should swap on aerodrome", async function () {
-        const token = new ethers.Contract(USDbC_ADDRESS, ERC20_ABI, impersonatedSigner);
-
-        const balance = await token.balanceOf(testAddress);
-        console.log("balance:", balance);
-        await approve();
-
         const deadline = Math.floor(Date.now() / 1000) + 300;
 
-        const result = await myContract.swapToken(
+        const tx = await myContract.executeDebtSwap(
+            "0x8f81b80d950e5996346530b76aba2962da5c9edb", // USDC/hyUSD
+            inputAmount,
+            0,
             USDC_ADDRESS,
             USDbC_ADDRESS,
-            inputAmount,
             getAmountOutMin(inputAmount),
             deadline,
         );
-        const tx = await result.wait();
-        console.log("tx:", tx);
+        await tx.wait();
 
-        const afterBalance = await token.balanceOf(testAddress);
-        console.log("afterBalance:", afterBalance);
+        const afterUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
+        const afterUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
+
+        console.log("USDC DebtAmount:", beforeUSDCDebtAmount, " -> ", afterUSDCDebtAmount);
+        console.log("USDbC DebtAmount:", beforeUSDbCDebtAmount, " -> ", afterUSDbCDebtAmount);
+
+        // const deadline = Math.floor(Date.now() / 1000) + 300; // current time + 5 minutes
+        // const tx = await myContract.aaveV3Swap(
+        //     USDC_ADDRESS,
+        //     USDbC_ADDRESS,
+        //     inputAmount,
+        //     getAmountOutMin(inputAmount),
+        //     deadline,
+        // );
+
+        // const result = await tx.wait();
+
+        // console.log("result:", result);
     });
+
+    // it("should aave v3 supply", async function () {
+    //     const token = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
+
+    //     const balance = await token.balanceOf(testAddress);
+    //     console.log("before balance:", balance);
+
+    //     await approve();
+
+    //     const tx = await myContract.aaveV3Supply(USDC_ADDRESS, "1000");
+    //     console.log("tx:", tx);
+    //     const result = await tx.wait();
+    //     console.log("result:", result);
+
+    //     const afterbalance = await token.balanceOf(testAddress);
+    //     console.log("after balance:", afterbalance);
+    // });
+
+    // it("should aave v3 withdraw", async function () {
+    //     const aToken = new ethers.Contract(
+    //         "0x625e7708f30ca75bfd92586e17077590c60eb4cd", // aPOLUSDC
+    //         aaveATokenJson,
+    //         impersonatedSigner,
+    //     );
+
+    //     const tx = await aToken.transfer(deployedContractAddress, "100");
+    //     // const tx = await aToken.approve(deployedContractAddress, "1000");
+    //     await tx.wait();
+
+    //     const result = await myContract.aaveV3Withdraw(USDC_ADDRESS, "100");
+
+    //     console.log("result:", result);
+    // });
+
+    // it("should aave v3 borrow", async function () {
+    //     const token = new ethers.Contract(USDbC_ADDRESS, ERC20_ABI, impersonatedSigner);
+
+    //     const balance = await token.balanceOf(testAddress);
+    //     console.log("balance:", balance);
+
+    //     await approveDelegation(USDbC_ADDRESS);
+
+    //     const borrowTx = await myContract.aaveV3Borrow(USDbC_ADDRESS, inputAmount);
+    //     await borrowTx.wait();
+
+    //     console.log("borrowTx:", borrowTx);
+
+    //     const afterbalance = await token.balanceOf(testAddress);
+    //     console.log("after balance:", afterbalance);
+    // });
+
+    // it("should aave v3 repay", async function () {
+    //     await approve();
+
+    //     const result = await myContract.aaveV3Repay(USDC_ADDRESS, inputAmount);
+
+    //     const tx = await result.wait();
+    //     console.log("tx:", tx);
+    // });
+
+    // it("should swap on aerodrome", async function () {
+    //     const token = new ethers.Contract(USDbC_ADDRESS, ERC20_ABI, impersonatedSigner);
+
+    //     const balance = await token.balanceOf(testAddress);
+    //     console.log("balance:", balance);
+    //     await approve();
+
+    //     const deadline = Math.floor(Date.now() / 1000) + 300;
+
+    //     const result = await myContract.swapToken(
+    //         USDC_ADDRESS,
+    //         USDbC_ADDRESS,
+    //         inputAmount,
+    //         getAmountOutMin(inputAmount),
+    //         deadline,
+    //     );
+    //     const tx = await result.wait();
+    //     console.log("tx:", tx);
+
+    //     const afterBalance = await token.balanceOf(testAddress);
+    //     console.log("afterBalance:", afterBalance);
+    // });
 
     // it("Should call aave v3 flashloan", async function () {
     //     const aaveV3Pool = new ethers.Contract(

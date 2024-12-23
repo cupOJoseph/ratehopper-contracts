@@ -12,6 +12,7 @@ const config: HardhatUserConfig = {
         base: {
             url: baseUrl,
             chainId: 8453,
+            timeout: 10_000_000,
             accounts: [process.env.PRIVATE_KEY!],
         },
         baseSepolia: {
@@ -24,6 +25,10 @@ const config: HardhatUserConfig = {
             chainId: 11155111,
             accounts: [process.env.PRIVATE_KEY!],
         },
+        localhost: {
+            url: "http://localhost:8545",
+            timeout: 100_000_000,
+        },
         hardhat: {
             chains: {
                 8453: {
@@ -34,6 +39,7 @@ const config: HardhatUserConfig = {
             },
             forking: {
                 url: baseUrl,
+
                 // blockNumber: 23901547,
             },
         },

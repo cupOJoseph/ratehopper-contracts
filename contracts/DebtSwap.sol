@@ -41,18 +41,64 @@ contract DebtSwap {
         aerodromeRouter = IRouter(aerodromeRouterAddress);
     }
 
+    function executeDebtSwap(address _pool, uint256 amount0, uint256 amount1, address fromAsset, address toAsset, uint256 amountOutMin, uint256 deadline) public {
+        token0 = IERC20(fromAsset);
+        token1 = IERC20(toAsset);
+
+        bytes memory data = abi.encode(
+            FlashCallbackData({
+                amount0: amount0,
+                amount1: amount1,
+                caller: msg.sender,
+                fromAsset: fromAsset,
+                toAsset: toAsset,
+                amountOutMin: amountOutMin,
+                deadline: deadline
+            })
+        );
+        pool = IUniswapV3Pool(_pool);
+        pool.flash(address(this), amount0, amount1, data);   
+    }
+
+    function uniswapV3FlashCallback(
+        uint256 fee0,
+        uint256 fee1,
+        bytes calldata data
+    ) external {
+        FlashCallbackData memory decoded = abi.decode(
+            data,
+            (FlashCallbackData)
+        );
+    
+        // todo: implement this
+        //CallbackValidation.verifyCallback(factory, decoded.poolKey);
+
+        aaveV3Swap(address(decoded.fromAsset), address(decoded.toAsset), decoded.amount0, decoded.amountOutMin, decoded.deadline, decoded.caller);
+
+        console.log("tokenBalanceOnThisContract=",token0.balanceOf(address(this)));
+        console.log("fee0=", fee0);
+        console.log("fee1=", fee1);
+        console.log("borrowedAmount=", decoded.amount0);
+        // suppose either of fee0 or fee1 is 0
+        token0.transfer(address(pool), decoded.amount0 + fee0 + fee1);
+        
+
+    }
+
     function aaveV3Swap(
         address fromAsset,
         address toAsset,
         uint256 amount,
         uint256 amountOutMin,
-        uint256 deadline
+        uint256 deadline,
+        address caller
     ) public {
-        // TODO: implement flashloan
-
-        aaveV3Repay(address(fromAsset), amount);
-        aaveV3Borrow(address(toAsset), amount);
-        swapToken(address(fromAsset), address(toAsset), amount, amountOutMin, deadline);
+        aaveV3Repay(address(fromAsset), amount, caller);
+        console.log("repay done");
+        aaveV3Borrow(address(toAsset), amount, caller);
+        console.log("borrow done");
+        swapToken(address(toAsset), address(fromAsset), amount, amountOutMin, deadline);
+        console.log("swap done");
     }
 
     function swapToken(
@@ -62,7 +108,9 @@ contract DebtSwap {
         uint256 amountOutMin,
         uint256 deadline
     ) public {
-        IERC20(inputToken).safeTransferFrom(msg.sender, address(this), amountIn);
+        // IERC20(inputToken).safeTransferFrom(caller, address(this), amountIn);
+        IERC20 token = IERC20(inputToken);
+        console.log("inputTokenBorrowedOnThisContract=",token.balanceOf(address(this)));
         IERC20(inputToken).approve(address(aerodromeRouter), amountIn);
 
         IRouter.Route[] memory routes = new IRouter.Route[](1);
@@ -77,80 +125,31 @@ contract DebtSwap {
             amountIn,
             amountOutMin,
             routes,
-            msg.sender,
+            address(this),
             deadline
         );
     }
 
-    function executeDebtSwap(address _pool, uint256 amount0, uint256 amount1, address _token0, address _token1, uint256 amountOutMin, uint256 deadline) public {
-        token0 = IERC20(_token0);
-        token1 = IERC20(_token1);
 
-        bytes memory data = abi.encode(
-            FlashCallbackData({
-                amount0: amount0,
-                amount1: amount1,
-                caller: address(this),
-                fromAsset: _token0,
-                toAsset: _token1,
-                amountOutMin: amountOutMin,
-                deadline: deadline
-            })
-        );
-        pool = IUniswapV3Pool(_pool);
-        pool.flash(address(this), amount0, amount1, data);   
-    }
-
-    function aaveV3Supply(address asset, uint256 amount) public {
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+    function aaveV3Supply(address asset, uint256 amount, address caller) public {
+        IERC20(asset).safeTransferFrom(caller, address(this), amount);
         IERC20(asset).approve(address(aaveV3Pool), amount);
-        aaveV3Pool.supply(asset, amount, msg.sender, 0);
+        aaveV3Pool.supply(asset, amount, caller, 0);
     }
 
-    function aaveV3Withdraw(address asset, uint amount) public {
-        aaveV3Pool.withdraw(asset, amount, msg.sender);
+    function aaveV3Withdraw(address asset, uint amount, address caller) public {
+        aaveV3Pool.withdraw(asset, amount, caller);
     }
 
-    function aaveV3Repay(address asset, uint256 amount) public returns (uint256) {
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+    function aaveV3Repay(address asset, uint256 amount, address caller) public returns (uint256) {
         IERC20(asset).approve(address(aaveV3Pool), amount);
-        return aaveV3Pool.repay(asset, amount, 2, msg.sender);
+        return aaveV3Pool.repay(asset, amount, 2, caller);
     }
 
-    function aaveV3Borrow(address asset, uint256 amount) public {
-        aaveV3Pool.borrow(asset, amount, 2, 0, msg.sender);
-        IERC20(asset).safeTransfer(msg.sender, amount);
+    function aaveV3Borrow(address asset, uint256 amount, address caller) public {
+        aaveV3Pool.borrow(asset, amount, 2, 0, caller);
     }
 
-
-
-    function uniswapV3FlashCallback(
-        uint256 fee0,
-        uint256 fee1,
-        bytes calldata data
-    ) external {
-        FlashCallbackData memory decoded = abi.decode(
-            data,
-            (FlashCallbackData)
-        );
-        //  CallbackValidation.verifyCallback(factory, decoded.poolKey);
-
-        aaveV3Swap(address(decoded.fromAsset), address(decoded.toAsset), decoded.amount0, decoded.amountOutMin, decoded.deadline);
-
-        // Repay borrow
-        if (fee0 > 0) {
-            console.log("tokenBorrowed0OnThisContract=",token0.balanceOf(address(this)));
-            console.log("fee0=", fee0);
-            console.log("borrowedAmount=", decoded.amount0);
-            token0.transfer(address(pool), decoded.amount0 + fee0);
-        }
-        if (fee1 > 0) {
-            console.log("tokenBorrowed1OnThisContract=", token1.balanceOf(address(this)));
-            console.log("fee1=", fee1);
-            console.log("borrowedAmount=", decoded.amount1);
-            token1.transfer(address(pool), decoded.amount1 + fee1);
-        }
-    }
 
     // callback function we need to implement for aave v3 flashloan
     // function executeOperation(
