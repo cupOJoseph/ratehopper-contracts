@@ -75,7 +75,7 @@ describe("Aave v3 DebtSwap", function () {
         return response.variableDebtTokenAddress;
     }
 
-    async function getCurrentDebtAmount(assetAddress: string): Promise<string> {
+    async function getCurrentDebtAmount(assetAddress: string): Promise<bigint> {
         const protocolDataProvider = new ethers.Contract(
             aaveV3ProtocolDataProvider,
             aaveProtocolDataProviderAbi,
@@ -86,7 +86,8 @@ describe("Aave v3 DebtSwap", function () {
             assetAddress,
             impersonatedSigner,
         );
-        return ethers.formatUnits(String(result.currentVariableDebt), 6);
+        return result.currentVariableDebt;
+        // return ethers.formatUnits(String(result.currentVariableDebt), 6);
     }
 
     this.beforeEach(async () => {
@@ -112,7 +113,7 @@ describe("Aave v3 DebtSwap", function () {
         console.log("currentDebtAmount:", currentDebtAmount);
     });
 
-    it.only("should execute debt swap from USDC to USDbC", async function () {
+    it("should execute debt swap from USDC to USDbC", async function () {
         const beforeUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
         const beforeUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
 
@@ -123,18 +124,32 @@ describe("Aave v3 DebtSwap", function () {
             "0x8f81b80d950e5996346530b76aba2962da5c9edb", // USDC/hyUSD pool
             USDC_ADDRESS,
             USDbC_ADDRESS,
-            inputAmount,
+            beforeUSDCDebtAmount,
             true,
-            getAmountInMax(inputAmount),
+            getAmountInMax(beforeUSDCDebtAmount),
         );
         await tx.wait();
 
         const afterUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
         const afterUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
 
-        console.log("USDC DebtAmount:", beforeUSDCDebtAmount, " -> ", afterUSDCDebtAmount);
-        console.log("USDbC DebtAmount:", beforeUSDbCDebtAmount, " -> ", afterUSDbCDebtAmount);
+        console.log(
+            "USDC DebtAmount:",
+            formatAmount(beforeUSDCDebtAmount),
+            " -> ",
+            formatAmount(afterUSDCDebtAmount),
+        );
+        console.log(
+            "USDbC DebtAmount:",
+            formatAmount(beforeUSDbCDebtAmount),
+            " -> ",
+            formatAmount(afterUSDbCDebtAmount),
+        );
     });
+
+    function formatAmount(amount: bigint): string {
+        return ethers.formatUnits(String(amount), 6);
+    }
 
     // it("should aave v3 supply", async function () {
     //     const token = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);

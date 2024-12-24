@@ -69,17 +69,25 @@ contract DebtSwap {
         // todo: implement this
         //CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
+        // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
         aaveV3Swap(address(decoded.fromAsset), address(decoded.toAsset), decoded.amount, decoded.amountInMaximum, totalFee, decoded.caller);
 
         IERC20 fromToken = IERC20(decoded.fromAsset);
+        IERC20 toToken = IERC20(decoded.toAsset);
         console.log("tokenBalanceOnThisContract=",fromToken.balanceOf(address(this)));
         console.log("fee0=", fee0);
         console.log("fee1=", fee1);
         console.log("borrowedAmount=", decoded.amount + totalFee);
-        // suppose either of fee0 or fee1 is 0
+        
         fromToken.transfer(address(pool), decoded.amount + totalFee);
+
+        // console.log("remainingBalance=",fromToken.balanceOf(address(this)));
+        uint256 remainingBalance = toToken.balanceOf(address(this));
+        console.log("remainingBalanceOfToToken=", remainingBalance);
+
+        aaveV3Repay(decoded.toAsset, remainingBalance, decoded.caller);
     }
 
     function aaveV3Swap(
