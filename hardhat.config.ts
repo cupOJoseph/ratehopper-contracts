@@ -7,7 +7,16 @@ dotenv.config();
 const baseUrl = "https://base.llamarpc.com";
 
 const config: HardhatUserConfig = {
-    solidity: "0.8.27",
+    solidity: {
+        compilers: [
+            {
+                version: "0.7.6",
+            },
+            {
+                version: "0.8.27",
+            },
+        ],
+    },
     networks: {
         base: {
             url: baseUrl,
@@ -39,8 +48,7 @@ const config: HardhatUserConfig = {
             },
             forking: {
                 url: baseUrl,
-
-                // blockNumber: 23901547,
+                blockNumber: 24079832,
             },
         },
     },

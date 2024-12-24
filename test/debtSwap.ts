@@ -12,7 +12,7 @@ import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { getAmountOutMin } from "./utils";
+import { getAmountInMax } from "./utils";
 
 describe("Aave v3 DebtSwap", function () {
     let myContract: DebtSwap;
@@ -22,6 +22,7 @@ describe("Aave v3 DebtSwap", function () {
     const USDbC_ADDRESS = "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca"; // Coinbase
     const aaveV3PoolAddress = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
     const aaveV3ProtocolDataProvider = "0xd82a47fdebB5bf5329b09441C3DaB4b5df2153Ad";
+    const swapRouterAddress = "0x2626664c2603336E57B271c5C0b26F421741e481";
 
     // should be replaced by hardhat test account
     const testAddress = "0x50fe1109188A0B666c4d78908E3E539D73F97E33";
@@ -37,7 +38,7 @@ describe("Aave v3 DebtSwap", function () {
         // const [owner, otherAccount] = await hre.ethers.getSigners();
 
         const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
-        const debtSwap = await DebtSwap.deploy(aaveV3PoolAddress);
+        const debtSwap = await DebtSwap.deploy(aaveV3PoolAddress, swapRouterAddress);
 
         return {
             debtSwap,
@@ -56,7 +57,7 @@ describe("Aave v3 DebtSwap", function () {
         const aaveDebtToken = new ethers.Contract(debtToken, aaveDebtTokenJson, impersonatedSigner);
         const approveDelegationTx = await aaveDebtToken.approveDelegation(
             deployedContractAddress,
-            inputAmount,
+            getAmountInMax(inputAmount),
         );
         await approveDelegationTx.wait();
         // console.log("approveDelegationTx:", approveDelegationTx);
@@ -126,11 +127,11 @@ describe("Aave v3 DebtSwap", function () {
 
         const tx = await myContract.executeDebtSwap(
             "0x8f81b80d950e5996346530b76aba2962da5c9edb", // USDC/hyUSD
-            inputAmount,
-            0,
             USDC_ADDRESS,
             USDbC_ADDRESS,
-            getAmountOutMin(inputAmount),
+            inputAmount,
+            true,
+            getAmountInMax(inputAmount),
             deadline,
         );
         await tx.wait();
@@ -140,19 +141,6 @@ describe("Aave v3 DebtSwap", function () {
 
         console.log("USDC DebtAmount:", beforeUSDCDebtAmount, " -> ", afterUSDCDebtAmount);
         console.log("USDbC DebtAmount:", beforeUSDbCDebtAmount, " -> ", afterUSDbCDebtAmount);
-
-        // const deadline = Math.floor(Date.now() / 1000) + 300; // current time + 5 minutes
-        // const tx = await myContract.aaveV3Swap(
-        //     USDC_ADDRESS,
-        //     USDbC_ADDRESS,
-        //     inputAmount,
-        //     getAmountOutMin(inputAmount),
-        //     deadline,
-        // );
-
-        // const result = await tx.wait();
-
-        // console.log("result:", result);
     });
 
     // it("should aave v3 supply", async function () {
