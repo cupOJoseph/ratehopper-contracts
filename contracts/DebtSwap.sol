@@ -27,7 +27,6 @@ contract DebtSwap {
         address fromAsset;
         address toAsset;
         uint256 amountInMaximum;
-        uint256 deadline;
     }
     
     constructor(address _aaveV3PoolAddress, address _swapRouterAddress) {
@@ -35,12 +34,14 @@ contract DebtSwap {
         swapRouter = ISwapRouter02(_swapRouterAddress);
     }
 
-    function executeDebtSwap(address _flashloanPool, address fromAsset, address toAsset, uint256 amount, bool isToken0, uint256 amountInMaximum, uint256 deadline) public {
+    function executeDebtSwap(address _flashloanPool, address fromAsset, address toAsset, uint256 amount, bool isToken0, uint256 amountInMaximum) public {
         IERC20 fromToken = IERC20(fromAsset);
         
+        pool = IUniswapV3Pool(_flashloanPool);
+    
         // TODO: refactory by fetching from uniswap pool
-        uint256 amount0 = isToken0 ? amountInMaximum : 0;
-        uint256 amount1 = isToken0 ? 0 : amountInMaximum;
+        uint256 amount0 = isToken0 ? amount : 0;
+        uint256 amount1 = isToken0 ? 0 : amount;
 
         bytes memory data = abi.encode(
             FlashCallbackData({
@@ -48,11 +49,10 @@ contract DebtSwap {
                 caller: msg.sender,
                 fromAsset: fromAsset,
                 toAsset: toAsset,
-                amountInMaximum: amountInMaximum,
-                deadline: deadline
+                amountInMaximum: amountInMaximum
             })
         );
-        pool = IUniswapV3Pool(_flashloanPool);
+        
         pool.flash(address(this), amount0, amount1, data);   
     }
 
@@ -69,15 +69,17 @@ contract DebtSwap {
         // todo: implement this
         //CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
-        aaveV3Swap(address(decoded.fromAsset), address(decoded.toAsset), decoded.amount, decoded.amountInMaximum, decoded.deadline, decoded.caller);
+        uint totalFee = fee0 + fee1;
+
+        aaveV3Swap(address(decoded.fromAsset), address(decoded.toAsset), decoded.amount, decoded.amountInMaximum, totalFee, decoded.caller);
 
         IERC20 fromToken = IERC20(decoded.fromAsset);
         console.log("tokenBalanceOnThisContract=",fromToken.balanceOf(address(this)));
         console.log("fee0=", fee0);
         console.log("fee1=", fee1);
-        console.log("borrowedAmount=", decoded.amountInMaximum);
+        console.log("borrowedAmount=", decoded.amount + totalFee);
         // suppose either of fee0 or fee1 is 0
-        fromToken.transfer(address(pool), decoded.amountInMaximum + fee0 + fee1);
+        fromToken.transfer(address(pool), decoded.amount + totalFee);
     }
 
     function aaveV3Swap(
@@ -85,44 +87,42 @@ contract DebtSwap {
         address toAsset,
         uint256 amount,
         uint256 amountInMaximum,
-        uint256 deadline,
+        uint256 totalFee,
         address caller
     ) public {
         aaveV3Repay(address(fromAsset), amount, caller);
         console.log("repay done");
-        aaveV3Borrow(address(toAsset), amountInMaximum, caller);
+        console.log("borrow amount=", amountInMaximum + totalFee);
+        aaveV3Borrow(address(toAsset), amountInMaximum + totalFee, caller);
         console.log("borrow done");
-        swapToken(address(toAsset), address(fromAsset), amount, amountInMaximum, deadline);
+        swapToken(address(toAsset), address(fromAsset), amount + totalFee, amountInMaximum);
         console.log("swap done");
     }
 
     function swapToken(
         address inputToken,
         address outputToken,
-        uint256 amount,
-        uint256 amountInMaximum,
-        uint256 deadline
+        uint256 amountOut,
+        uint256 amountInMaximum
     ) public {
         IERC20(inputToken).approve(address(swapRouter), amountInMaximum);
         IERC20 fromTokenContract = IERC20(inputToken);
 
         console.log("input token balance=",fromTokenContract.balanceOf(address(this)));
         console.log("amountInMaximum=", amountInMaximum);
-        console.log("amount=", amount);
+        console.log("amount=", amountOut);
 
         IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter
             .ExactOutputSingleParams({
                 tokenIn: inputToken,
                 tokenOut: outputToken,
-                // TODO: make this dynamic
                 fee: 100,
                 recipient: address(this),
-                amountOut: amount,
+                amountOut: amountOut,
                 amountInMaximum: amountInMaximum,
                 sqrtPriceLimitX96: 0 
             });
 
-        // Execute the swap
         uint256 amountIn = swapRouter.exactOutputSingle(params);
     }
 

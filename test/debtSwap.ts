@@ -13,6 +13,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { getAmountInMax } from "./utils";
+import { MaxUint256 } from "ethers";
 
 describe("Aave v3 DebtSwap", function () {
     let myContract: DebtSwap;
@@ -57,7 +58,7 @@ describe("Aave v3 DebtSwap", function () {
         const aaveDebtToken = new ethers.Contract(debtToken, aaveDebtTokenJson, impersonatedSigner);
         const approveDelegationTx = await aaveDebtToken.approveDelegation(
             deployedContractAddress,
-            getAmountInMax(inputAmount),
+            MaxUint256,
         );
         await approveDelegationTx.wait();
         // console.log("approveDelegationTx:", approveDelegationTx);
@@ -118,21 +119,13 @@ describe("Aave v3 DebtSwap", function () {
         await approve();
         await approveDelegation(USDbC_ADDRESS);
 
-        const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
-        const transferTx = await usdc.transfer(deployedContractAddress, "1000");
-        await transferTx.wait();
-        console.log("transferTx:", transferTx);
-
-        const deadline = Math.floor(Date.now() / 1000) + 300;
-
         const tx = await myContract.executeDebtSwap(
-            "0x8f81b80d950e5996346530b76aba2962da5c9edb", // USDC/hyUSD
+            "0x8f81b80d950e5996346530b76aba2962da5c9edb", // USDC/hyUSD pool
             USDC_ADDRESS,
             USDbC_ADDRESS,
             inputAmount,
             true,
             getAmountInMax(inputAmount),
-            deadline,
         );
         await tx.wait();
 
