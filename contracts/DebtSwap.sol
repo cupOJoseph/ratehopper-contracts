@@ -7,9 +7,11 @@ import {IFlashLoanSimpleReceiver} from "@aave/core-v3/contracts/flashloan/interf
 import {IPoolV3} from "./interfaces/aaveV3/IPoolV3.sol";
 import {IDebtToken} from "./interfaces/aaveV3/IDebtToken.sol";
 import {IAaveProtocolDataProvider} from "./interfaces/aaveV3/IAaveProtocolDataProvider.sol";
-import {IUniswapV3Pool} from "./interfaces/uniswapV3/IUniswapV3Pool.sol";
+// import {IUniswapV3Pool} from "./interfaces/uniswapV3/IUniswapV3Pool.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {ISwapRouter02} from "./interfaces/uniswapV3/ISwapRouter02.sol";
 import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
+// import './dependencies/uniswapV3/CallbackValidation.sol';
 
 import "hardhat/console.sol";
 
@@ -20,8 +22,10 @@ contract DebtSwap {
     IAaveProtocolDataProvider public immutable aaveV3ProtocolDataProvider;
     IUniswapV3Pool public  pool;
     ISwapRouter02 public immutable swapRouter;
+    address public immutable uniswapV3Factory;
 
     struct FlashCallbackData {
+        address poolKey;
         uint256 amount;
         address caller;
         address fromAsset;
@@ -29,22 +33,24 @@ contract DebtSwap {
         uint256 amountInMaximum;
     }
     
-    constructor(address _aaveV3PoolAddress, address _swapRouterAddress) {
+    constructor(address _aaveV3PoolAddress, address _uniswapV3Factory, address _swapRouterAddress) {
         aaveV3Pool = IPoolV3(_aaveV3PoolAddress);
+        uniswapV3Factory = _uniswapV3Factory;
         swapRouter = ISwapRouter02(_swapRouterAddress);
     }
 
-    function executeDebtSwap(address _flashloanPool, address fromAsset, address toAsset, uint256 amount, bool isToken0, uint256 amountInMaximum) public {
+    function executeDebtSwap(address _flashloanPool, address fromAsset, address toAsset, uint256 amount, uint256 amountInMaximum) public {
         IERC20 fromToken = IERC20(fromAsset);
         
         pool = IUniswapV3Pool(_flashloanPool);
     
-        // TODO: refactory by fetching from uniswap pool
-        uint256 amount0 = isToken0 ? amount : 0;
-        uint256 amount1 = isToken0 ? 0 : amount;
+        address token0 = pool.token0();
+        uint256 amount0 = fromAsset == token0 ? amount : 0;
+        uint256 amount1 = fromAsset == token0 ? 0 : amount;
 
         bytes memory data = abi.encode(
             FlashCallbackData({
+                poolKey: _flashloanPool,
                 amount: amount,
                 caller: msg.sender,
                 fromAsset: fromAsset,
@@ -66,8 +72,8 @@ contract DebtSwap {
             (FlashCallbackData)
         );
     
-        // todo: implement this
-        //CallbackValidation.verifyCallback(factory, decoded.poolKey);
+        // TODO: implement this by fix import
+        // CallbackValidation.verifyCallback(uniswapV3Factory, decoded.poolKey);
 
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;

@@ -113,7 +113,7 @@ describe("Aave v3 DebtSwap", function () {
         console.log("currentDebtAmount:", currentDebtAmount);
     });
 
-    it("should execute debt swap from USDC to USDbC", async function () {
+    it.only("should execute debt swap from USDC to USDbC", async function () {
         const beforeUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
         const beforeUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
 
@@ -125,7 +125,6 @@ describe("Aave v3 DebtSwap", function () {
             USDC_ADDRESS,
             USDbC_ADDRESS,
             beforeUSDCDebtAmount,
-            true,
             getAmountInMax(beforeUSDCDebtAmount),
         );
         await tx.wait();

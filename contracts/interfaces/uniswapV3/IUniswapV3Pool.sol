@@ -19,4 +19,9 @@ interface IUniswapV3Pool {
         uint256 amount1,
         bytes calldata data
     ) external;
+
+    /// @notice Returns the contract address of token0
+    /// @return The address of token0
+    function token0() external view returns (address);
+
 }

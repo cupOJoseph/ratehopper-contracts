@@ -16,6 +16,12 @@ const config: HardhatUserConfig = {
                 version: "0.8.27",
             },
         ],
+        overrides: {
+            "contracts/dependencies/uniswapV3/PoolAddress.sol": {
+                version: "0.5.0",
+                settings: {},
+            },
+        },
     },
     networks: {
         base: {
