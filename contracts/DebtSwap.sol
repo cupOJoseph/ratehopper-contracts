@@ -12,7 +12,6 @@ import {ISwapRouter02} from "./interfaces/uniswapV3/ISwapRouter02.sol";
 import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
 import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 
-
 import "hardhat/console.sol";
 
 contract DebtSwap {
@@ -106,12 +105,8 @@ contract DebtSwap {
         address caller
     ) public {
         aaveV3Repay(address(fromAsset), amount, caller);
-        console.log("repay done");
-        console.log("borrow amount=", amountInMaximum + totalFee);
-        aaveV3Borrow(address(toAsset), amountInMaximum + totalFee, caller);
-        console.log("borrow done");
+        aaveV3Pool.borrow(address(toAsset), amountInMaximum + totalFee, 2, 0, caller);
         swapToken(address(toAsset), address(fromAsset), amount + totalFee, amountInMaximum);
-        console.log("swap done");
     }
 
     function swapToken(
@@ -126,15 +121,6 @@ contract DebtSwap {
         console.log("input token balance=",fromTokenContract.balanceOf(address(this)));
         console.log("amountInMaximum=", amountInMaximum);
         console.log("amount=", amountOut);
-        console.log("inputToken=", inputToken);
-        console.log("outputToken=", outputToken);
-
-        // address poolAddress = PoolAddress.computeAddress(uniswapV3Factory, poolKey);
-        // console.log("poolAddress=", poolAddress);
-
-        // (uint160 sqrtPriceX96, int24 tick,,,,, bool unlocked) = IUniswapV3Pool(poolAddress).slot0();
-        // console.log("sqrtPriceX96=", sqrtPriceX96);
-        // console.log("unlocked=", unlocked);
 
         IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter
             .ExactOutputSingleParams({
@@ -156,16 +142,8 @@ contract DebtSwap {
         aaveV3Pool.supply(asset, amount, caller, 0);
     }
 
-    function aaveV3Withdraw(address asset, uint amount, address caller) public {
-        aaveV3Pool.withdraw(asset, amount, caller);
-    }
-
     function aaveV3Repay(address asset, uint256 amount, address caller) public returns (uint256) {
         IERC20(asset).approve(address(aaveV3Pool), amount);
         return aaveV3Pool.repay(asset, amount, 2, caller);
-    }
-
-    function aaveV3Borrow(address asset, uint256 amount, address caller) public {
-        aaveV3Pool.borrow(asset, amount, 2, 0, caller);
     }
 }
