@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import IUniswapV3PoolABI from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json";
 const quoterAbi = require("../externalAbi/uniswapV3/quoterV2.json");
+import { computePoolAddress } from "@uniswap/v3-sdk";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -47,5 +48,12 @@ async function getQuoteExactOutput(amountOut: string, tokenIn: string, tokenOut:
 const amountOut = "10000";
 const tokenIn = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const tokenOut = "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca";
+
+// const currentPoolAddress = computePoolAddress({
+//     factoryAddress: "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+//     tokenA: tokenIn,
+//     tokenB: tokenOut,
+//     fee: 100,
+// });
 
 getQuoteExactOutput(amountOut, tokenIn, tokenOut);

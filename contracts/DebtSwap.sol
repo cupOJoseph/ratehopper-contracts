@@ -7,11 +7,11 @@ import {IFlashLoanSimpleReceiver} from "@aave/core-v3/contracts/flashloan/interf
 import {IPoolV3} from "./interfaces/aaveV3/IPoolV3.sol";
 import {IDebtToken} from "./interfaces/aaveV3/IDebtToken.sol";
 import {IAaveProtocolDataProvider} from "./interfaces/aaveV3/IAaveProtocolDataProvider.sol";
-// import {IUniswapV3Pool} from "./interfaces/uniswapV3/IUniswapV3Pool.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {ISwapRouter02} from "./interfaces/uniswapV3/ISwapRouter02.sol";
 import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
-// import './dependencies/uniswapV3/CallbackValidation.sol';
+import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
+
 
 import "hardhat/console.sol";
 
@@ -72,13 +72,11 @@ contract DebtSwap {
             (FlashCallbackData)
         );
     
-        // TODO: implement this by fix import
-        // CallbackValidation.verifyCallback(uniswapV3Factory, decoded.poolKey);
+        // implement the same logic as CallbackValidation.verifyCallback()
+        require(msg.sender == address(decoded.poolKey));
 
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
-
-        aaveV3Swap(address(decoded.fromAsset), address(decoded.toAsset), decoded.amount, decoded.amountInMaximum, totalFee, decoded.caller);
 
         IERC20 fromToken = IERC20(decoded.fromAsset);
         IERC20 toToken = IERC20(decoded.toAsset);
@@ -86,6 +84,9 @@ contract DebtSwap {
         console.log("fee0=", fee0);
         console.log("fee1=", fee1);
         console.log("borrowedAmount=", decoded.amount + totalFee);
+
+        aaveV3Swap(address(decoded.fromAsset), address(decoded.toAsset), decoded.amount, decoded.amountInMaximum, totalFee, decoded.caller);
+
         
         fromToken.transfer(address(pool), decoded.amount + totalFee);
 
@@ -125,6 +126,15 @@ contract DebtSwap {
         console.log("input token balance=",fromTokenContract.balanceOf(address(this)));
         console.log("amountInMaximum=", amountInMaximum);
         console.log("amount=", amountOut);
+        console.log("inputToken=", inputToken);
+        console.log("outputToken=", outputToken);
+
+        // address poolAddress = PoolAddress.computeAddress(uniswapV3Factory, poolKey);
+        // console.log("poolAddress=", poolAddress);
+
+        // (uint160 sqrtPriceX96, int24 tick,,,,, bool unlocked) = IUniswapV3Pool(poolAddress).slot0();
+        // console.log("sqrtPriceX96=", sqrtPriceX96);
+        // console.log("unlocked=", unlocked);
 
         IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter
             .ExactOutputSingleParams({

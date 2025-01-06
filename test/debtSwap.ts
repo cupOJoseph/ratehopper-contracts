@@ -23,6 +23,7 @@ describe("Aave v3 DebtSwap", function () {
     const USDbC_ADDRESS = "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca"; // Coinbase
     const aaveV3PoolAddress = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
     const aaveV3ProtocolDataProvider = "0xd82a47fdebB5bf5329b09441C3DaB4b5df2153Ad";
+    const uniswapV3FactoryAddress = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
     const swapRouterAddress = "0x2626664c2603336E57B271c5C0b26F421741e481";
 
     // should be replaced by hardhat test account
@@ -39,7 +40,11 @@ describe("Aave v3 DebtSwap", function () {
         // const [owner, otherAccount] = await hre.ethers.getSigners();
 
         const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
-        const debtSwap = await DebtSwap.deploy(aaveV3PoolAddress, swapRouterAddress);
+        const debtSwap = await DebtSwap.deploy(
+            aaveV3PoolAddress,
+            uniswapV3FactoryAddress,
+            swapRouterAddress,
+        );
 
         return {
             debtSwap,
@@ -113,7 +118,7 @@ describe("Aave v3 DebtSwap", function () {
         console.log("currentDebtAmount:", currentDebtAmount);
     });
 
-    it.only("should execute debt swap from USDC to USDbC", async function () {
+    it("should execute debt swap from USDC to USDbC", async function () {
         const beforeUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
         const beforeUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
 
@@ -126,6 +131,64 @@ describe("Aave v3 DebtSwap", function () {
             USDbC_ADDRESS,
             beforeUSDCDebtAmount,
             getAmountInMax(beforeUSDCDebtAmount),
+        );
+        await tx.wait();
+
+        const afterUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
+        const afterUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
+
+        console.log(
+            "USDC DebtAmount:",
+            formatAmount(beforeUSDCDebtAmount),
+            " -> ",
+            formatAmount(afterUSDCDebtAmount),
+        );
+        console.log(
+            "USDbC DebtAmount:",
+            formatAmount(beforeUSDbCDebtAmount),
+            " -> ",
+            formatAmount(afterUSDbCDebtAmount),
+        );
+    });
+
+    it.only("should execute debt swap from USDbC to USDC", async function () {
+        const usdbcToken = new ethers.Contract(USDbC_ADDRESS, ERC20_ABI, impersonatedSigner);
+
+        const approveTx = await usdbcToken.approve(aaveV3PoolAddress, ethers.parseUnits("1", 6));
+        await approveTx.wait();
+        console.log("approveTx:", approveTx);
+
+        const aaveV3Pool = new ethers.Contract(
+            aaveV3PoolAddress,
+            aaveV3PoolJson,
+            impersonatedSigner,
+        );
+        const borrowTx = await aaveV3Pool.borrow(
+            USDbC_ADDRESS,
+            ethers.parseUnits("1", 6),
+            2,
+            0,
+            testAddress,
+        );
+        await borrowTx.wait();
+
+        const usdbcBalance = await usdbcToken.balanceOf(testAddress);
+        console.log("USDbC wallet Balance:", formatAmount(usdbcBalance));
+
+        const beforeUSDbCDebtAmount = await getCurrentDebtAmount(USDbC_ADDRESS);
+        const beforeUSDCDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
+
+        await approve();
+        await approveDelegation(USDC_ADDRESS);
+
+        const tx = await myContract.executeDebtSwap(
+            // this does not work
+            // "0x06959273E9A65433De71F5A452D529544E07dDD0", // USDC/USDbC pool
+            "0x3B8000CD10625ABdC7370fb47eD4D4a9C6311fD5", // ETH/USDbC pool
+            USDbC_ADDRESS,
+            USDC_ADDRESS,
+            beforeUSDbCDebtAmount,
+            getAmountInMax(beforeUSDbCDebtAmount),
         );
         await tx.wait();
 
