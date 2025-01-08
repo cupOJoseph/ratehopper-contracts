@@ -8,6 +8,7 @@ import {IPoolV3} from "./interfaces/aaveV3/IPoolV3.sol";
 import {IDebtToken} from "./interfaces/aaveV3/IDebtToken.sol";
 import {IAaveProtocolDataProvider} from "./interfaces/aaveV3/IAaveProtocolDataProvider.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IMToken} from "./interfaces/moonwell/IMToken.sol";
 import {ISwapRouter02} from "./interfaces/uniswapV3/ISwapRouter02.sol";
 import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
 import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
@@ -19,7 +20,7 @@ contract DebtSwap {
 
     IPoolV3 public immutable aaveV3Pool;
     IAaveProtocolDataProvider public immutable aaveV3ProtocolDataProvider;
-    IUniswapV3Pool public  pool;
+    IUniswapV3Pool public pool;
     ISwapRouter02 public immutable swapRouter;
     address public immutable uniswapV3Factory;
 
@@ -31,18 +32,28 @@ contract DebtSwap {
         address toAsset;
         uint256 amountInMaximum;
     }
-    
-    constructor(address _aaveV3PoolAddress, address _uniswapV3Factory, address _swapRouterAddress) {
+
+    constructor(
+        address _aaveV3PoolAddress,
+        address _uniswapV3Factory,
+        address _swapRouterAddress
+    ) {
         aaveV3Pool = IPoolV3(_aaveV3PoolAddress);
         uniswapV3Factory = _uniswapV3Factory;
         swapRouter = ISwapRouter02(_swapRouterAddress);
     }
 
-    function executeDebtSwap(address _flashloanPool, address fromAsset, address toAsset, uint256 amount, uint256 amountInMaximum) public {
+    function executeDebtSwap(
+        address _flashloanPool,
+        address fromAsset,
+        address toAsset,
+        uint256 amount,
+        uint256 amountInMaximum
+    ) public {
         IERC20 fromToken = IERC20(fromAsset);
-        
+
         pool = IUniswapV3Pool(_flashloanPool);
-    
+
         address token0 = pool.token0();
         uint256 amount0 = fromAsset == token0 ? amount : 0;
         uint256 amount1 = fromAsset == token0 ? 0 : amount;
@@ -57,8 +68,8 @@ contract DebtSwap {
                 amountInMaximum: amountInMaximum
             })
         );
-        
-        pool.flash(address(this), amount0, amount1, data);   
+
+        pool.flash(address(this), amount0, amount1, data);
     }
 
     function uniswapV3FlashCallback(
@@ -70,7 +81,7 @@ contract DebtSwap {
             data,
             (FlashCallbackData)
         );
-    
+
         // implement the same logic as CallbackValidation.verifyCallback()
         require(msg.sender == address(decoded.poolKey));
 
@@ -79,14 +90,23 @@ contract DebtSwap {
 
         IERC20 fromToken = IERC20(decoded.fromAsset);
         IERC20 toToken = IERC20(decoded.toAsset);
-        console.log("tokenBalanceOnThisContract=",fromToken.balanceOf(address(this)));
+        console.log(
+            "tokenBalanceOnThisContract=",
+            fromToken.balanceOf(address(this))
+        );
         console.log("fee0=", fee0);
         console.log("fee1=", fee1);
         console.log("borrowedAmount=", decoded.amount + totalFee);
 
-        aaveV3Swap(address(decoded.fromAsset), address(decoded.toAsset), decoded.amount, decoded.amountInMaximum, totalFee, decoded.caller);
+        aaveV3Swap(
+            address(decoded.fromAsset),
+            address(decoded.toAsset),
+            decoded.amount,
+            decoded.amountInMaximum,
+            totalFee,
+            decoded.caller
+        );
 
-        
         fromToken.transfer(address(pool), decoded.amount + totalFee);
 
         // console.log("remainingBalance=",fromToken.balanceOf(address(this)));
@@ -105,8 +125,19 @@ contract DebtSwap {
         address caller
     ) public {
         aaveV3Repay(address(fromAsset), amount, caller);
-        aaveV3Pool.borrow(address(toAsset), amountInMaximum + totalFee, 2, 0, caller);
-        swapToken(address(toAsset), address(fromAsset), amount + totalFee, amountInMaximum);
+        aaveV3Pool.borrow(
+            address(toAsset),
+            amountInMaximum + totalFee,
+            2,
+            0,
+            caller
+        );
+        swapToken(
+            address(toAsset),
+            address(fromAsset),
+            amount + totalFee,
+            amountInMaximum
+        );
     }
 
     function swapToken(
@@ -118,7 +149,10 @@ contract DebtSwap {
         IERC20(inputToken).approve(address(swapRouter), amountInMaximum);
         IERC20 fromTokenContract = IERC20(inputToken);
 
-        console.log("input token balance=",fromTokenContract.balanceOf(address(this)));
+        console.log(
+            "input token balance=",
+            fromTokenContract.balanceOf(address(this))
+        );
         console.log("amountInMaximum=", amountInMaximum);
         console.log("amount=", amountOut);
 
@@ -130,20 +164,42 @@ contract DebtSwap {
                 recipient: address(this),
                 amountOut: amountOut,
                 amountInMaximum: amountInMaximum,
-                sqrtPriceLimitX96: 0 
+                sqrtPriceLimitX96: 0
             });
 
         uint256 amountIn = swapRouter.exactOutputSingle(params);
     }
 
-    function aaveV3Supply(address asset, uint256 amount, address caller) public {
+    function aaveV3Supply(
+        address asset,
+        uint256 amount,
+        address caller
+    ) public {
         IERC20(asset).safeTransferFrom(caller, address(this), amount);
         IERC20(asset).approve(address(aaveV3Pool), amount);
         aaveV3Pool.supply(asset, amount, caller, 0);
     }
 
-    function aaveV3Repay(address asset, uint256 amount, address caller) public returns (uint256) {
+    function aaveV3Repay(
+        address asset,
+        uint256 amount,
+        address caller
+    ) public returns (uint256) {
         IERC20(asset).approve(address(aaveV3Pool), amount);
         return aaveV3Pool.repay(asset, amount, 2, caller);
+    }
+
+    function moonwellBorrow(address mTokenAddress, uint256 amount) external {
+        IMToken mToken = IMToken(mTokenAddress);
+
+        uint256 result = mToken.borrow(amount);
+        console.log("borrowedAmount=", result);
+
+        address underlyingToken = mToken.underlying();
+
+        // require(
+        //     IERC20(underlyingToken).transfer(msg.sender, amount),
+        //     "Transfer to user failed"
+        // );
     }
 }
