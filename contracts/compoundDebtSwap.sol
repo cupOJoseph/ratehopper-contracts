@@ -16,11 +16,9 @@ import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 
 import "hardhat/console.sol";
 
-contract DebtSwap {
+contract CompoundDebtSwap {
     using GPv2SafeERC20 for IERC20;
 
-    IPoolV3 public immutable aaveV3Pool;
-    IAaveProtocolDataProvider public immutable aaveV3ProtocolDataProvider;
     IUniswapV3Pool public pool;
     ISwapRouter02 public immutable swapRouter;
     address public immutable uniswapV3Factory;
@@ -31,42 +29,52 @@ contract DebtSwap {
         address caller;
         address fromAsset;
         address toAsset;
+        address fromCContract;
+        address toCContract;
+        address collateralAsset;
+        uint256 collateralAmount;
         uint256 amountInMaximum;
     }
 
     constructor(
-        address _aaveV3PoolAddress,
         address _uniswapV3Factory,
         address _UNISWAP_V3_SWAP_ROUTER_ADDRESS
     ) {
-        aaveV3Pool = IPoolV3(_aaveV3PoolAddress);
         uniswapV3Factory = _uniswapV3Factory;
         swapRouter = ISwapRouter02(_UNISWAP_V3_SWAP_ROUTER_ADDRESS);
     }
 
     function executeDebtSwap(
         address _flashloanPool,
-        address fromAsset,
-        address toAsset,
-        uint256 amount,
-        uint256 amountInMaximum
+        address _fromAsset,
+        address _toAsset,
+        address _fromCContract,
+        address _toCContract,
+        address _collateralAsset,
+        uint256 _collateralAmount,
+        uint256 _amount,
+        uint256 _amountInMaximum
     ) public {
-        IERC20 fromToken = IERC20(fromAsset);
+        IERC20 fromToken = IERC20(_fromAsset);
 
         pool = IUniswapV3Pool(_flashloanPool);
 
         address token0 = pool.token0();
-        uint256 amount0 = fromAsset == token0 ? amount : 0;
-        uint256 amount1 = fromAsset == token0 ? 0 : amount;
+        uint256 amount0 = _fromAsset == token0 ? _amount : 0;
+        uint256 amount1 = _fromAsset == token0 ? 0 : _amount;
 
         bytes memory data = abi.encode(
             FlashCallbackData({
                 poolKey: _flashloanPool,
-                amount: amount,
+                amount: _amount,
                 caller: msg.sender,
-                fromAsset: fromAsset,
-                toAsset: toAsset,
-                amountInMaximum: amountInMaximum
+                fromAsset: _fromAsset,
+                toAsset: _toAsset,
+                fromCContract: _fromCContract,
+                toCContract: _toCContract,
+                collateralAsset: _collateralAsset,
+                collateralAmount: _collateralAmount,
+                amountInMaximum: _amountInMaximum
             })
         );
 
@@ -91,17 +99,14 @@ contract DebtSwap {
 
         IERC20 fromToken = IERC20(decoded.fromAsset);
         IERC20 toToken = IERC20(decoded.toAsset);
-        console.log(
-            "tokenBalanceOnThisContract=",
-            fromToken.balanceOf(address(this))
-        );
-        console.log("fee0=", fee0);
-        console.log("fee1=", fee1);
-        console.log("borrowedAmount=", decoded.amount + totalFee);
 
-        aaveV3Swap(
+        compoundSwap(
             address(decoded.fromAsset),
             address(decoded.toAsset),
+            decoded.fromCContract,
+            decoded.toCContract,
+            decoded.collateralAsset,
+            decoded.collateralAmount,
             decoded.amount,
             decoded.amountInMaximum,
             totalFee,
@@ -110,28 +115,58 @@ contract DebtSwap {
 
         fromToken.transfer(address(pool), decoded.amount + totalFee);
 
+        // repay remaining amount
         uint256 remainingBalance = toToken.balanceOf(address(this));
-        console.log("remainingBalanceOfToToken=", remainingBalance);
 
-        aaveV3Repay(decoded.toAsset, remainingBalance, decoded.caller);
+        IERC20(decoded.toAsset).approve(
+            address(decoded.toCContract),
+            remainingBalance
+        );
+        IComet toComet = IComet(decoded.toCContract);
+        toComet.supply(decoded.toAsset, remainingBalance);
     }
 
-    function aaveV3Swap(
+    function compoundSwap(
         address fromAsset,
         address toAsset,
+        address fromCContract,
+        address toCContract,
+        address collateralAsset,
+        uint256 collateralAmount,
         uint256 amount,
         uint256 amountInMaximum,
         uint256 totalFee,
         address caller
-    ) public {
-        aaveV3Repay(address(fromAsset), amount, caller);
-        aaveV3Pool.borrow(
-            address(toAsset),
-            amountInMaximum + totalFee,
-            2,
-            0,
-            caller
+    ) internal {
+        IComet fromComet = IComet(fromCContract);
+        IComet toComet = IComet(toCContract);
+
+        // repay
+        fromComet.supplyFrom(caller, caller, fromAsset, amount);
+        console.log("repay done");
+
+        // withdraw collateral
+        fromComet.withdrawFrom(
+            caller,
+            caller,
+            collateralAsset,
+            collateralAmount
         );
+        console.log("withdraw collateral done");
+
+        // // supply collateral
+        toComet.supplyFrom(caller, caller, collateralAsset, collateralAmount);
+        console.log("supply done");
+
+        // new borrow
+        toComet.withdrawFrom(
+            caller,
+            address(this),
+            toAsset,
+            amountInMaximum + totalFee
+        );
+        console.log("borrow done");
+
         swapToken(
             address(toAsset),
             address(fromAsset),
@@ -147,14 +182,6 @@ contract DebtSwap {
         uint256 amountInMaximum
     ) public {
         IERC20(inputToken).approve(address(swapRouter), amountInMaximum);
-        IERC20 fromTokenContract = IERC20(inputToken);
-
-        console.log(
-            "input token balance=",
-            fromTokenContract.balanceOf(address(this))
-        );
-        console.log("amountInMaximum=", amountInMaximum);
-        console.log("amount=", amountOut);
 
         IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter
             .ExactOutputSingleParams({
@@ -169,37 +196,4 @@ contract DebtSwap {
 
         uint256 amountIn = swapRouter.exactOutputSingle(params);
     }
-
-    function aaveV3Supply(
-        address asset,
-        uint256 amount,
-        address caller
-    ) public {
-        IERC20(asset).safeTransferFrom(caller, address(this), amount);
-        IERC20(asset).approve(address(aaveV3Pool), amount);
-        aaveV3Pool.supply(asset, amount, caller, 0);
-    }
-
-    function aaveV3Repay(
-        address asset,
-        uint256 amount,
-        address caller
-    ) public returns (uint256) {
-        IERC20(asset).approve(address(aaveV3Pool), amount);
-        return aaveV3Pool.repay(asset, amount, 2, caller);
-    }
-
-    // function moonwellBorrow(address mTokenAddress, uint256 amount) external {
-    //     IMToken mToken = IMToken(mTokenAddress);
-
-    //     uint256 result = mToken.borrow(amount);
-    //     console.log("borrowedAmount=", result);
-
-    //     address underlyingToken = mToken.underlying();
-
-    //     require(
-    //         IERC20(underlyingToken).transfer(msg.sender, amount),
-    //         "Transfer to user failed"
-    //     );
-    // }
 }

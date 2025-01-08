@@ -4,7 +4,8 @@ import "@nomicfoundation/hardhat-toolbox";
 import dotenv from "dotenv";
 dotenv.config();
 
-const baseUrl = "https://base.llamarpc.com";
+// const baseUrl = "https://base.llamarpc.com";
+const baseUrl = "https://mainnet.base.org";
 
 const config: HardhatUserConfig = {
     solidity: {
@@ -48,7 +49,7 @@ const config: HardhatUserConfig = {
             },
             forking: {
                 url: baseUrl,
-                blockNumber: 24722079,
+                blockNumber: 24765714,
             },
         },
     },

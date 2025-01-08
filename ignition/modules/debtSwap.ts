@@ -9,12 +9,16 @@ const DebtSwapModule = buildModule("DebtSwap", (m) => {
         "0x794a61358d6845594f94dc1db02a252b5b4814ad",
     );
 
-    const swapRouterAddress = m.getParameter(
-        "swapRouterAddress",
+    const UNISWAP_V3_SWAP_ROUTER_ADDRESS = m.getParameter(
+        "UNISWAP_V3_SWAP_ROUTER_ADDRESS",
         "0x2626664c2603336E57B271c5C0b26F421741e481",
     );
 
-    const DebtSwap = m.contract("DebtSwap", [aaveV3PoolAddress, swapRouterAddress], {});
+    const DebtSwap = m.contract(
+        "DebtSwap",
+        [aaveV3PoolAddress, UNISWAP_V3_SWAP_ROUTER_ADDRESS],
+        {},
+    );
 
     return { DebtSwap };
 });

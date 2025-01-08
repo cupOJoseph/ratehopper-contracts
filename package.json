@@ -21,7 +21,7 @@
         "axios": "^1.7.7",
         "dotenv": "^16.4.5",
         "ethers-v5": "npm:ethers@5.7.2",
-        "hardhat": "^2.22.13"
+        "hardhat": "^2.22.17"
     },
     "devDependencies": {
         "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",

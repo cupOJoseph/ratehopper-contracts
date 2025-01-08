@@ -14,41 +14,58 @@ import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { getAmountInMax } from "./utils";
 import { Contract, MaxUint256 } from "ethers";
+import {
+    USDC_ADDRESS,
+    USDbC_ADDRESS,
+    UNISWAP_V3_FACTORY_ADRESS,
+    UNISWAP_V3_SWAP_ROUTER_ADDRESS,
+    TEST_ADDRESS,
+    USDC_hyUSD_POOL,
+    ETH_USDbC_POOL,
+} from "./constants";
 
 describe("Aave v3 DebtSwap", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
     let aaveV3Pool: Contract;
     let deployedContractAddress: string;
-    const USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // Circle
-    const USDbC_ADDRESS = "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca"; // Coinbase
     const aaveV3PoolAddress = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
     const aaveV3ProtocolDataProvider = "0xd82a47fdebB5bf5329b09441C3DaB4b5df2153Ad";
-    const uniswapV3FactoryAddress = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
-    const swapRouterAddress = "0x2626664c2603336E57B271c5C0b26F421741e481";
-
-    // should be replaced by hardhat test account
-    const testAddress = "0x50fe1109188A0B666c4d78908E3E539D73F97E33";
 
     this.timeout(3000000);
     // We define a fixture to reuse the same setup in every test.
     // We use loadFixture to run this setup once, snapshot that state,
     // and reset Hardhat Network to that snapshot in every test.
-    async function deploAaveV3RouterFixture() {
+    async function deployContractFixture() {
         // Contracts are deployed using the first signer/account by default
         // const [owner, otherAccount] = await hre.ethers.getSigners();
 
         const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
         const debtSwap = await DebtSwap.deploy(
             aaveV3PoolAddress,
-            uniswapV3FactoryAddress,
-            swapRouterAddress,
+            UNISWAP_V3_FACTORY_ADRESS,
+            UNISWAP_V3_SWAP_ROUTER_ADDRESS,
         );
 
         return {
             debtSwap,
         };
     }
+
+    this.beforeEach(async () => {
+        impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
+
+        const { debtSwap } = await loadFixture(deployContractFixture);
+        deployedContractAddress = await debtSwap.getAddress();
+
+        myContract = await ethers.getContractAt(
+            "DebtSwap",
+            deployedContractAddress,
+            impersonatedSigner,
+        );
+
+        aaveV3Pool = new ethers.Contract(aaveV3PoolAddress, aaveV3PoolJson, impersonatedSigner);
+    });
 
     async function approve() {
         const token = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
@@ -102,15 +119,19 @@ describe("Aave v3 DebtSwap", function () {
         const oneUnit = ethers.parseUnits("1", 6);
 
         const aavePool = new ethers.Contract(aaveV3PoolAddress, aaveV3PoolJson, impersonatedSigner);
-        const borrowTx = await aavePool.borrow(tokenAddress, oneUnit, 2, 0, testAddress);
+        const borrowTx = await aavePool.borrow(tokenAddress, oneUnit, 2, 0, TEST_ADDRESS);
         await borrowTx.wait();
 
         const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, impersonatedSigner);
-        const walletBalance = await tokenContract.balanceOf(testAddress);
+        const walletBalance = await tokenContract.balanceOf(TEST_ADDRESS);
         console.log(`${tokenAddress} Wallet Balance:`, formatAmount(walletBalance));
     }
 
-    async function executeDebtSwapTest({ fromTokenAddress, toTokenAddress, flashloanPool }) {
+    async function executeDebtSwapTest(
+        fromTokenAddress: string,
+        toTokenAddress: string,
+        flashloanPool: string,
+    ) {
         const beforeFromTokenDebt = await getCurrentDebtAmount(fromTokenAddress);
         const beforeToTokenDebt = await getCurrentDebtAmount(toTokenAddress);
 
@@ -141,24 +162,9 @@ describe("Aave v3 DebtSwap", function () {
             " -> ",
             formatAmount(afterToTokenDebt),
         );
-        expect(afterFromTokenDebt).to.be.lessThan(BigInt(1));
-        expect(afterToTokenDebt).to.be.greaterThanOrEqual(BigInt(1));
+        expect(afterFromTokenDebt).to.be.lessThan(beforeFromTokenDebt);
+        expect(afterToTokenDebt).to.be.greaterThanOrEqual(beforeToTokenDebt);
     }
-
-    this.beforeEach(async () => {
-        impersonatedSigner = await ethers.getImpersonatedSigner(testAddress);
-
-        const { debtSwap } = await loadFixture(deploAaveV3RouterFixture);
-        deployedContractAddress = await debtSwap.getAddress();
-
-        myContract = await ethers.getContractAt(
-            "DebtSwap",
-            deployedContractAddress,
-            impersonatedSigner,
-        );
-
-        aaveV3Pool = new ethers.Contract(aaveV3PoolAddress, aaveV3PoolJson, impersonatedSigner);
-    });
 
     it("should return debt token address", async function () {
         const tokenAddress = await getDebtTokenAddress(USDbC_ADDRESS);
@@ -173,20 +179,12 @@ describe("Aave v3 DebtSwap", function () {
     it("should execute debt swap from USDC to USDbC", async function () {
         await borrowToken(USDC_ADDRESS);
 
-        await executeDebtSwapTest({
-            fromTokenAddress: USDC_ADDRESS,
-            toTokenAddress: USDbC_ADDRESS,
-            flashloanPool: "0x8f81b80d950e5996346530b76aba2962da5c9edb", // USDC/hyUSD pool
-        });
+        await executeDebtSwapTest(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL);
     });
 
     it("should execute debt swap from USDbC to USDC", async function () {
         await borrowToken(USDbC_ADDRESS);
 
-        await executeDebtSwapTest({
-            fromTokenAddress: USDbC_ADDRESS,
-            toTokenAddress: USDC_ADDRESS,
-            flashloanPool: "0x3B8000CD10625ABdC7370fb47eD4D4a9C6311fD5", // ETH/USDbC pool
-        });
+        await executeDebtSwapTest(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL);
     });
 });

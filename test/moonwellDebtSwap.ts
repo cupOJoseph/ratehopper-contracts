@@ -20,20 +20,20 @@ describe("Moonwell DebtSwap", function () {
     const mUSDC_ADDRESS = "0xedc817a28e8b93b03976fbd4a3ddbc9f7d176c22";
 
     const aaveV3PoolAddress = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
-    const uniswapV3FactoryAddress = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
-    const swapRouterAddress = "0x2626664c2603336E57B271c5C0b26F421741e481";
+    const UNISWAP_V3_FACTORY_ADRESS = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
+    const UNISWAP_V3_SWAP_ROUTER_ADDRESS = "0x2626664c2603336E57B271c5C0b26F421741e481";
 
     // should be replaced by hardhat test account
-    const testAddress = "0x50fe1109188A0B666c4d78908E3E539D73F97E33";
+    const TEST_ADDRESS = "0x50fe1109188A0B666c4d78908E3E539D73F97E33";
 
     this.timeout(3000000);
 
-    async function deploAaveV3RouterFixture() {
+    async function deployContractFixture() {
         const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
         const debtSwap = await DebtSwap.deploy(
             aaveV3PoolAddress,
-            uniswapV3FactoryAddress,
-            swapRouterAddress,
+            UNISWAP_V3_FACTORY_ADRESS,
+            UNISWAP_V3_SWAP_ROUTER_ADDRESS,
         );
 
         return {
@@ -51,7 +51,7 @@ describe("Moonwell DebtSwap", function () {
     async function getCurrentDebtAmount(assetAddress: string): Promise<bigint> {
         const mToken = new ethers.Contract(assetAddress, MErc20DelegatorAbi, impersonatedSigner);
 
-        const debtAmount = await mToken.borrowBalanceStored(testAddress);
+        const debtAmount = await mToken.borrowBalanceStored(TEST_ADDRESS);
         console.log(debtAmount);
         return debtAmount;
     }
@@ -69,9 +69,9 @@ describe("Moonwell DebtSwap", function () {
     }
 
     this.beforeEach(async () => {
-        impersonatedSigner = await ethers.getImpersonatedSigner(testAddress);
+        impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
 
-        const { debtSwap } = await loadFixture(deploAaveV3RouterFixture);
+        const { debtSwap } = await loadFixture(deployContractFixture);
         deployedContractAddress = await debtSwap.getAddress();
 
         myContract = await ethers.getContractAt(

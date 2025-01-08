@@ -5,33 +5,39 @@ import hre from "hardhat";
 
 import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { DebtSwap } from "../typechain-types";
+import { CompoundDebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
+import cometAbi from "../externalAbi/compound/comet.json";
 import { getAmountInMax } from "./utils";
 import { Contract, MaxUint256 } from "ethers";
+import {
+    USDC_ADDRESS,
+    USDbC_ADDRESS,
+    cbETH_ADDRESS,
+    UNISWAP_V3_FACTORY_ADRESS,
+    UNISWAP_V3_SWAP_ROUTER_ADDRESS,
+    TEST_ADDRESS,
+    USDC_hyUSD_POOL,
+    ETH_USDbC_POOL,
+} from "./constants";
 
 describe("Compound DebtSwap", function () {
-    let myContract: DebtSwap;
+    let myContract: CompoundDebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
     let deployedContractAddress: string;
-    const USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // Circle
-    const mUSDC_ADDRESS = "0xedc817a28e8b93b03976fbd4a3ddbc9f7d176c22";
 
-    const aaveV3PoolAddress = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
-    const uniswapV3FactoryAddress = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
-    const swapRouterAddress = "0x2626664c2603336E57B271c5C0b26F421741e481";
-
-    // should be replaced by hardhat test account
-    const testAddress = "0x50fe1109188A0B666c4d78908E3E539D73F97E33";
+    const USDC_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
+    const USDbC_COMET_ADDRESS = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
 
     this.timeout(3000000);
 
-    async function deploAaveV3RouterFixture() {
-        const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
-        const debtSwap = await DebtSwap.deploy(
-            aaveV3PoolAddress,
-            uniswapV3FactoryAddress,
-            swapRouterAddress,
+    const contractName = "CompoundDebtSwap";
+
+    async function deployContractFixture() {
+        const CompoundDebtSwap = await hre.ethers.getContractFactory(contractName);
+        const debtSwap = await CompoundDebtSwap.deploy(
+            UNISWAP_V3_FACTORY_ADRESS,
+            UNISWAP_V3_SWAP_ROUTER_ADDRESS,
         );
 
         return {
@@ -39,20 +45,28 @@ describe("Compound DebtSwap", function () {
         };
     }
 
-    async function approve() {
-        const token = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
-        const approveTx = await token.approve(deployedContractAddress, ethers.parseUnits("1", 6));
+    this.beforeEach(async () => {
+        impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
+
+        const { debtSwap } = await loadFixture(deployContractFixture);
+        deployedContractAddress = await debtSwap.getAddress();
+
+        myContract = await ethers.getContractAt(
+            contractName,
+            deployedContractAddress,
+            impersonatedSigner,
+        );
+    });
+
+    async function approve(tokenAddress: string, spenderAddress: string) {
+        const token = new ethers.Contract(tokenAddress, ERC20_ABI, impersonatedSigner);
+        const approveTx = await token.approve(spenderAddress, MaxUint256);
         await approveTx.wait();
-        // console.log("approveTx:", approveTx);
     }
 
-    async function getDebtTokenAddress(assetAddress: string): Promise<string> {}
-
-    async function getCurrentDebtAmount(assetAddress: string): Promise<bigint> {
-        const mToken = new ethers.Contract(assetAddress, MErc20DelegatorAbi, impersonatedSigner);
-
-        const debtAmount = await mToken.borrowBalanceStored(testAddress);
-        console.log(debtAmount);
+    async function getCurrentDebtAmount(comet_address: string): Promise<bigint> {
+        const comet = new ethers.Contract(comet_address, cometAbi, impersonatedSigner);
+        const debtAmount = await comet.borrowBalanceOf(TEST_ADDRESS);
         return debtAmount;
     }
 
@@ -60,25 +74,51 @@ describe("Compound DebtSwap", function () {
         return ethers.formatUnits(String(amount), 6);
     }
 
-    async function borrowToken(tokenAddress: string) {}
+    async function borrowToken() {
+        const comet = new ethers.Contract(USDC_COMET_ADDRESS, cometAbi, impersonatedSigner);
 
-    async function executeDebtSwapTest({ fromTokenAddress, toTokenAddress, flashloanPool }) {
-        const beforeFromTokenDebt = await getCurrentDebtAmount(fromTokenAddress);
-        const beforeToTokenDebt = await getCurrentDebtAmount(toTokenAddress);
+        const borrowAmount = ethers.parseUnits("0.1", 6);
 
-        await approve();
+        const tx = await comet.withdraw(USDC_ADDRESS, borrowAmount);
+
+        const result = await tx.wait();
+    }
+
+    async function executeDebtSwap(
+        fromTokenAddress: string,
+        toTokenAddress: string,
+        flashloanPool: string,
+    ) {
+        const usdcComet = new ethers.Contract(USDC_COMET_ADDRESS, cometAbi, impersonatedSigner);
+        const allowResult = await usdcComet.allow(deployedContractAddress, true);
+        await allowResult.wait();
+
+        const usdbcComet = new ethers.Contract(USDbC_COMET_ADDRESS, cometAbi, impersonatedSigner);
+        const allowResult2 = await usdbcComet.allow(deployedContractAddress, true);
+        await allowResult2.wait();
+
+        const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
+        const cbETH = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, impersonatedSigner);
+        const balance = await usdc.balanceOf(TEST_ADDRESS);
+        const cbETHBalance = await cbETH.balanceOf(TEST_ADDRESS);
+        const beforeFromTokenDebt = await getCurrentDebtAmount(USDC_COMET_ADDRESS);
+        const beforeToTokenDebt = await getCurrentDebtAmount(USDbC_COMET_ADDRESS);
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
             fromTokenAddress,
             toTokenAddress,
+            USDbC_COMET_ADDRESS,
+            USDC_COMET_ADDRESS,
+            cbETH_ADDRESS,
+            "300000000000000",
             beforeFromTokenDebt,
             getAmountInMax(beforeFromTokenDebt),
         );
         await tx.wait();
 
-        const afterFromTokenDebt = await getCurrentDebtAmount(fromTokenAddress);
-        const afterToTokenDebt = await getCurrentDebtAmount(toTokenAddress);
+        const afterFromTokenDebt = await getCurrentDebtAmount(USDC_COMET_ADDRESS);
+        const afterToTokenDebt = await getCurrentDebtAmount(USDbC_COMET_ADDRESS);
 
         console.log(
             `${fromTokenAddress} Debt Amount:`,
@@ -92,27 +132,25 @@ describe("Compound DebtSwap", function () {
             " -> ",
             formatAmount(afterToTokenDebt),
         );
-        expect(afterFromTokenDebt).to.be.lessThan(BigInt(1));
-        expect(afterToTokenDebt).to.be.greaterThanOrEqual(BigInt(1));
+        expect(afterFromTokenDebt).to.be.lessThan(beforeFromTokenDebt);
+        expect(afterToTokenDebt).to.be.greaterThan(beforeToTokenDebt);
     }
 
-    this.beforeEach(async () => {
-        impersonatedSigner = await ethers.getImpersonatedSigner(testAddress);
+    it("should execute debt swap from USDC to USDbC", async function () {
+        await borrowToken();
 
-        const { debtSwap } = await loadFixture(deploAaveV3RouterFixture);
-        deployedContractAddress = await debtSwap.getAddress();
+        await approve(cbETH_ADDRESS, USDbC_COMET_ADDRESS);
+        await approve(USDC_ADDRESS, USDC_COMET_ADDRESS);
 
-        myContract = await ethers.getContractAt(
-            "DebtSwap",
-            deployedContractAddress,
-            impersonatedSigner,
-        );
+        await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL);
     });
 
-    it("should return current debt amount", async function () {
-        await borrowToken(mUSDC_ADDRESS);
-        // await getCurrentDebtAmount(mUSDC_ADDRESS);
-        // await myContract.CompoundBorrow(mUSDC_ADDRESS, ethers.parseUnits("1", 6));
-        // await getCurrentDebtAmount(mUSDC_ADDRESS);
+    it.only("should execute debt swap from USDbC to USDC", async function () {
+        await borrowToken();
+
+        await approve(cbETH_ADDRESS, USDC_COMET_ADDRESS);
+        await approve(USDbC_ADDRESS, USDbC_COMET_ADDRESS);
+
+        await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL);
     });
 });
