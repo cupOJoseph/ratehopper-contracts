@@ -9,3 +9,8 @@ export const TEST_ADDRESS = "0x50fe1109188A0B666c4d78908E3E539D73F97E33";
 
 export const USDC_hyUSD_POOL = "0x8f81b80d950e5996346530b76aba2962da5c9edb";
 export const ETH_USDbC_POOL = "0x3B8000CD10625ABdC7370fb47eD4D4a9C6311fD5";
+
+export enum Protocols {
+    AAVE_V3 = 0,
+    Compound = 1,
+}

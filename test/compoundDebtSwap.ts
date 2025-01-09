@@ -17,6 +17,7 @@ import {
     TEST_ADDRESS,
     USDC_hyUSD_POOL,
     ETH_USDbC_POOL,
+    Protocols,
 } from "./constants";
 
 describe("Compound DebtSwap", function () {
@@ -115,7 +116,7 @@ describe("Compound DebtSwap", function () {
         );
 
         const tx = await myContract.executeDebtSwap(
-            1,
+            Protocols.Compound,
             flashloanPool,
             fromTokenAddress,
             toTokenAddress,

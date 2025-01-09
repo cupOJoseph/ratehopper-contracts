@@ -2,7 +2,7 @@ pragma solidity =0.8.27;
 
 import "../interfaces/IProtocolHandler.sol";
 import {IComet} from "../interfaces/compound/IComet.sol";
-
+import {IERC20} from "../dependencies/IERC20.sol";
 import "hardhat/console.sol";
 
 contract CompoundHandler is IProtocolHandler {
@@ -55,5 +55,21 @@ contract CompoundHandler is IProtocolHandler {
             amountInMaximum + totalFee
         );
         console.log("borrow done");
+    }
+
+    function repayRemainingBalance(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        (, address toCContract, , ) = abi.decode(
+            extraData,
+            (address, address, address, uint256)
+        );
+
+        IERC20(asset).approve(address(toCContract), amount);
+        IComet toComet = IComet(toCContract);
+        toComet.supply(asset, amount);
     }
 }

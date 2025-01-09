@@ -11,4 +11,11 @@ interface IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData
     ) external;
+
+    function repayRemainingBalance(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external;
 }

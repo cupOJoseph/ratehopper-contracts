@@ -20,6 +20,7 @@ import {
     USDC_hyUSD_POOL,
     ETH_USDbC_POOL,
     AAVE_V3_POOL_ADDRESS,
+    Protocols,
 } from "./constants";
 
 describe("Aave v3 DebtSwap", function () {
@@ -105,7 +106,7 @@ describe("Aave v3 DebtSwap", function () {
         console.log(`${tokenAddress} Wallet Balance:`, formatAmount(walletBalance));
     }
 
-    async function executeDebtSwapTest(
+    async function executeDebtSwap(
         fromTokenAddress: string,
         toTokenAddress: string,
         flashloanPool: string,
@@ -117,7 +118,7 @@ describe("Aave v3 DebtSwap", function () {
         await approveDelegation(toTokenAddress);
 
         const tx = await myContract.executeDebtSwap(
-            0,
+            Protocols.AAVE_V3,
             flashloanPool,
             fromTokenAddress,
             toTokenAddress,
@@ -159,12 +160,12 @@ describe("Aave v3 DebtSwap", function () {
     it("should execute debt swap from USDC to USDbC", async function () {
         await borrowToken(USDC_ADDRESS);
 
-        await executeDebtSwapTest(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL);
+        await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL);
     });
 
     it("should execute debt swap from USDbC to USDC", async function () {
         await borrowToken(USDbC_ADDRESS);
 
-        await executeDebtSwapTest(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL);
+        await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL);
     });
 });

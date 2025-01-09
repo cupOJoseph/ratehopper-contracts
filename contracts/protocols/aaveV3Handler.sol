@@ -34,11 +34,20 @@ contract AaveV3Handler is IProtocolHandler {
         );
     }
 
+    function repayRemainingBalance(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external {
+        aaveV3Repay(asset, amount, onBehalfOf);
+    }
+
     function aaveV3Supply(
         address asset,
         uint256 amount,
         address onBehalfOf
-    ) public {
+    ) internal {
         IERC20(asset).safeTransferFrom(onBehalfOf, address(this), amount);
         IERC20(asset).approve(address(aaveV3Pool), amount);
         aaveV3Pool.supply(asset, amount, onBehalfOf, 0);
@@ -48,7 +57,7 @@ contract AaveV3Handler is IProtocolHandler {
         address asset,
         uint256 amount,
         address onBehalfOf
-    ) public returns (uint256) {
+    ) internal returns (uint256) {
         IERC20(asset).approve(address(aaveV3Pool), amount);
         return aaveV3Pool.repay(asset, amount, 2, onBehalfOf);
     }

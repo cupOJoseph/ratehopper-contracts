@@ -43,13 +43,13 @@ contract DebtSwap {
     }
 
     constructor(
-        address _registry,
-        address _uniswapV3Factory,
-        address _UNISWAP_V3_SWAP_ROUTER_ADDRESS
+        address registry,
+        address uniswap_v3_factory,
+        address uniswap_v3_swap_router
     ) {
-        protocolRegistry = ProtocolRegistry(_registry);
-        uniswapV3Factory = _uniswapV3Factory;
-        swapRouter = ISwapRouter02(_UNISWAP_V3_SWAP_ROUTER_ADDRESS);
+        protocolRegistry = ProtocolRegistry(registry);
+        uniswapV3Factory = uniswap_v3_factory;
+        swapRouter = ISwapRouter02(uniswap_v3_swap_router);
     }
 
     function executeDebtSwap(
@@ -131,20 +131,21 @@ contract DebtSwap {
         // repay remaining amount
         uint256 remainingBalance = toToken.balanceOf(address(this));
 
-        // if (decoded.protocol == Protocol.COMPOUND) {
-        //     (, address toCContract, , ) = abi.decode(
-        //         decoded.extraData,
-        //         (address, address, address, uint256)
-        //     );
-        //     IERC20(decoded.toAsset).approve(
-        //         address(toCContract),
-        //         remainingBalance
-        //     );
-        //     IComet toComet = IComet(toCContract);
-        //     toComet.supply(decoded.toAsset, remainingBalance);
-        // } else if (decoded.protocol == Protocol.AAVE_V3) {
-        //     aaveV3Repay(decoded.toAsset, remainingBalance, decoded.onBehalfOf);
-        // }
+        if (remainingBalance > 0) {
+            handler.delegatecall(
+                abi.encodeWithSignature(
+                    "repayRemainingBalance(address,uint256,address,bytes)",
+                    decoded.toAsset,
+                    remainingBalance,
+                    decoded.onBehalfOf,
+                    decoded.extraData
+                )
+            );
+        }
+
+        //
+        uint256 remainingBalanceAfter = toToken.balanceOf(address(this));
+        console.log("remainingBalanceAfter:", remainingBalanceAfter);
     }
 
     function swapToken(
@@ -152,7 +153,7 @@ contract DebtSwap {
         address outputToken,
         uint256 amountOut,
         uint256 amountInMaximum
-    ) public {
+    ) internal {
         IERC20(inputToken).approve(address(swapRouter), amountInMaximum);
 
         IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter
