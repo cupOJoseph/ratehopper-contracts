@@ -139,11 +139,13 @@ describe("Aave v3 DebtSwap", function () {
         await approveDelegation(toTokenAddress);
 
         const tx = await myContract.executeDebtSwap(
+            0,
             flashloanPool,
             fromTokenAddress,
             toTokenAddress,
             beforeFromTokenDebt,
             getAmountInMax(beforeFromTokenDebt),
+            "0x",
         );
         await tx.wait();
 

@@ -5,7 +5,7 @@ import hre from "hardhat";
 
 import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { CompoundDebtSwap } from "../typechain-types";
+import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import cometAbi from "../externalAbi/compound/comet.json";
 import { getAmountInMax } from "./utils";
@@ -22,20 +22,23 @@ import {
 } from "./constants";
 
 describe("Compound DebtSwap", function () {
-    let myContract: CompoundDebtSwap;
+    let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
     let deployedContractAddress: string;
+
+    const aaveV3PoolAddress = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
 
     const USDC_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
     const USDbC_COMET_ADDRESS = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
 
     this.timeout(3000000);
 
-    const contractName = "CompoundDebtSwap";
+    const contractName = "DebtSwap";
 
     async function deployContractFixture() {
-        const CompoundDebtSwap = await hre.ethers.getContractFactory(contractName);
-        const debtSwap = await CompoundDebtSwap.deploy(
+        const DebtSwap = await hre.ethers.getContractFactory(contractName);
+        const debtSwap = await DebtSwap.deploy(
+            aaveV3PoolAddress,
             UNISWAP_V3_FACTORY_ADRESS,
             UNISWAP_V3_SWAP_ROUTER_ADDRESS,
         );
@@ -129,16 +132,19 @@ describe("Compound DebtSwap", function () {
 
         const collateralAmount = await getCollateralAmount(fromCContract);
 
+        const extraData = ethers.AbiCoder.defaultAbiCoder().encode(
+            ["address", "address", "address", "uint256"],
+            [fromCContract, toCContract, cbETH_ADDRESS, collateralAmount],
+        );
+
         const tx = await myContract.executeDebtSwap(
+            1,
             flashloanPool,
             fromTokenAddress,
             toTokenAddress,
-            fromCContract,
-            toCContract,
-            cbETH_ADDRESS,
-            collateralAmount,
             beforeFromTokenDebt,
             getAmountInMax(beforeFromTokenDebt),
+            extraData,
         );
         await tx.wait();
 
