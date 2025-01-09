@@ -62,26 +62,48 @@ describe("Compound DebtSwap", function () {
         const token = new ethers.Contract(tokenAddress, ERC20_ABI, impersonatedSigner);
         const approveTx = await token.approve(spenderAddress, MaxUint256);
         await approveTx.wait();
+        console.log("approve:" + tokenAddress + "token to " + spenderAddress);
     }
 
-    async function getCurrentDebtAmount(comet_address: string): Promise<bigint> {
-        const comet = new ethers.Contract(comet_address, cometAbi, impersonatedSigner);
-        const debtAmount = await comet.borrowBalanceOf(TEST_ADDRESS);
-        return debtAmount;
+    async function getDebtAmount(cometAddress: string): Promise<bigint> {
+        const comet = new ethers.Contract(cometAddress, cometAbi, impersonatedSigner);
+        return await comet.borrowBalanceOf(TEST_ADDRESS);
+    }
+
+    async function getCollateralAmount(cometAddress: string): Promise<bigint> {
+        const comet = new ethers.Contract(cometAddress, cometAbi, impersonatedSigner);
+        const response = await comet.userCollateral(TEST_ADDRESS, cbETH_ADDRESS);
+        return response.balance;
     }
 
     function formatAmount(amount: bigint): string {
         return ethers.formatUnits(String(amount), 6);
     }
 
-    async function borrowToken() {
-        const comet = new ethers.Contract(USDC_COMET_ADDRESS, cometAbi, impersonatedSigner);
+    async function borrowToken(cometAddress: string, assetAddress: string) {
+        const comet = new ethers.Contract(cometAddress, cometAbi, impersonatedSigner);
 
         const borrowAmount = ethers.parseUnits("0.1", 6);
 
-        const tx = await comet.withdraw(USDC_ADDRESS, borrowAmount);
+        const tx = await comet.withdraw(assetAddress, borrowAmount);
 
         const result = await tx.wait();
+        const borrowedAmount = await getDebtAmount(cometAddress);
+        console.log(`Borrowed ${formatAmount(borrowedAmount)} ${assetAddress}`);
+    }
+
+    async function supplyToken(cometAddress: string) {
+        await approve(cbETH_ADDRESS, cometAddress);
+
+        const comet = new ethers.Contract(cometAddress, cometAbi, impersonatedSigner);
+
+        const supplyAmount = ethers.parseEther("0.001");
+
+        const tx = await comet.supply(cbETH_ADDRESS, supplyAmount);
+
+        const result = await tx.wait();
+        const suppliedAmount = await getCollateralAmount(cometAddress);
+        console.log(`Supplied ${ethers.formatEther(suppliedAmount)} cbETH`);
     }
 
     async function executeDebtSwap(
@@ -97,28 +119,31 @@ describe("Compound DebtSwap", function () {
         const allowResult2 = await usdbcComet.allow(deployedContractAddress, true);
         await allowResult2.wait();
 
-        const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
-        const cbETH = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, impersonatedSigner);
-        const balance = await usdc.balanceOf(TEST_ADDRESS);
-        const cbETHBalance = await cbETH.balanceOf(TEST_ADDRESS);
-        const beforeFromTokenDebt = await getCurrentDebtAmount(USDC_COMET_ADDRESS);
-        const beforeToTokenDebt = await getCurrentDebtAmount(USDbC_COMET_ADDRESS);
+        const fromCContract =
+            fromTokenAddress == USDC_ADDRESS ? USDC_COMET_ADDRESS : USDbC_COMET_ADDRESS;
+        const toCContract =
+            fromCContract == USDC_COMET_ADDRESS ? USDbC_COMET_ADDRESS : USDC_COMET_ADDRESS;
+
+        const beforeFromTokenDebt = await getDebtAmount(fromCContract);
+        const beforeToTokenDebt = await getDebtAmount(toCContract);
+
+        const collateralAmount = await getCollateralAmount(fromCContract);
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
             fromTokenAddress,
             toTokenAddress,
-            USDbC_COMET_ADDRESS,
-            USDC_COMET_ADDRESS,
+            fromCContract,
+            toCContract,
             cbETH_ADDRESS,
-            "300000000000000",
+            collateralAmount,
             beforeFromTokenDebt,
             getAmountInMax(beforeFromTokenDebt),
         );
         await tx.wait();
 
-        const afterFromTokenDebt = await getCurrentDebtAmount(USDC_COMET_ADDRESS);
-        const afterToTokenDebt = await getCurrentDebtAmount(USDbC_COMET_ADDRESS);
+        const afterFromTokenDebt = await getDebtAmount(fromCContract);
+        const afterToTokenDebt = await getDebtAmount(toCContract);
 
         console.log(
             `${fromTokenAddress} Debt Amount:`,
@@ -136,8 +161,14 @@ describe("Compound DebtSwap", function () {
         expect(afterToTokenDebt).to.be.greaterThan(beforeToTokenDebt);
     }
 
+    it("should return collateral amount for cbETH", async function () {
+        const collateralAmount = await getCollateralAmount(USDC_COMET_ADDRESS);
+        console.log("collateralAmount:", ethers.formatEther(collateralAmount));
+    });
+
     it("should execute debt swap from USDC to USDbC", async function () {
-        await borrowToken();
+        await supplyToken(USDC_COMET_ADDRESS);
+        await borrowToken(USDC_COMET_ADDRESS, USDC_ADDRESS);
 
         await approve(cbETH_ADDRESS, USDbC_COMET_ADDRESS);
         await approve(USDC_ADDRESS, USDC_COMET_ADDRESS);
@@ -145,8 +176,9 @@ describe("Compound DebtSwap", function () {
         await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL);
     });
 
-    it.only("should execute debt swap from USDbC to USDC", async function () {
-        await borrowToken();
+    it("should execute debt swap from USDbC to USDC", async function () {
+        await supplyToken(USDbC_COMET_ADDRESS);
+        await borrowToken(USDbC_COMET_ADDRESS, USDbC_ADDRESS);
 
         await approve(cbETH_ADDRESS, USDC_COMET_ADDRESS);
         await approve(USDbC_ADDRESS, USDbC_COMET_ADDRESS);

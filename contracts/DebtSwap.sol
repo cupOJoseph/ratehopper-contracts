@@ -91,13 +91,6 @@ contract DebtSwap {
 
         IERC20 fromToken = IERC20(decoded.fromAsset);
         IERC20 toToken = IERC20(decoded.toAsset);
-        console.log(
-            "tokenBalanceOnThisContract=",
-            fromToken.balanceOf(address(this))
-        );
-        console.log("fee0=", fee0);
-        console.log("fee1=", fee1);
-        console.log("borrowedAmount=", decoded.amount + totalFee);
 
         aaveV3Swap(
             address(decoded.fromAsset),
@@ -147,14 +140,6 @@ contract DebtSwap {
         uint256 amountInMaximum
     ) public {
         IERC20(inputToken).approve(address(swapRouter), amountInMaximum);
-        IERC20 fromTokenContract = IERC20(inputToken);
-
-        console.log(
-            "input token balance=",
-            fromTokenContract.balanceOf(address(this))
-        );
-        console.log("amountInMaximum=", amountInMaximum);
-        console.log("amount=", amountOut);
 
         IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter
             .ExactOutputSingleParams({

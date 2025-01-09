@@ -96,7 +96,7 @@ describe("Aave v3 DebtSwap", function () {
         return response.variableDebtTokenAddress;
     }
 
-    async function getCurrentDebtAmount(assetAddress: string): Promise<bigint> {
+    async function getDebtAmount(assetAddress: string): Promise<bigint> {
         const protocolDataProvider = new ethers.Contract(
             aaveV3ProtocolDataProvider,
             aaveProtocolDataProviderAbi,
@@ -132,8 +132,8 @@ describe("Aave v3 DebtSwap", function () {
         toTokenAddress: string,
         flashloanPool: string,
     ) {
-        const beforeFromTokenDebt = await getCurrentDebtAmount(fromTokenAddress);
-        const beforeToTokenDebt = await getCurrentDebtAmount(toTokenAddress);
+        const beforeFromTokenDebt = await getDebtAmount(fromTokenAddress);
+        const beforeToTokenDebt = await getDebtAmount(toTokenAddress);
 
         await approve();
         await approveDelegation(toTokenAddress);
@@ -147,8 +147,8 @@ describe("Aave v3 DebtSwap", function () {
         );
         await tx.wait();
 
-        const afterFromTokenDebt = await getCurrentDebtAmount(fromTokenAddress);
-        const afterToTokenDebt = await getCurrentDebtAmount(toTokenAddress);
+        const afterFromTokenDebt = await getDebtAmount(fromTokenAddress);
+        const afterToTokenDebt = await getDebtAmount(toTokenAddress);
 
         console.log(
             `${fromTokenAddress} Debt Amount:`,
@@ -172,7 +172,7 @@ describe("Aave v3 DebtSwap", function () {
     });
 
     it("should return current debt amount", async function () {
-        const currentDebtAmount = await getCurrentDebtAmount(USDC_ADDRESS);
+        const currentDebtAmount = await getDebtAmount(USDC_ADDRESS);
         console.log("currentDebtAmount:", currentDebtAmount);
     });
 
