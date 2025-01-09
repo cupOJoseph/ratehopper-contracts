@@ -8,14 +8,12 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import cometAbi from "../externalAbi/compound/comet.json";
-import { getAmountInMax } from "./utils";
+import { deployContractFixture, formatAmount, getAmountInMax } from "./utils";
 import { Contract, MaxUint256 } from "ethers";
 import {
     USDC_ADDRESS,
     USDbC_ADDRESS,
     cbETH_ADDRESS,
-    UNISWAP_V3_FACTORY_ADRESS,
-    UNISWAP_V3_SWAP_ROUTER_ADDRESS,
     TEST_ADDRESS,
     USDC_hyUSD_POOL,
     ETH_USDbC_POOL,
@@ -26,27 +24,10 @@ describe("Compound DebtSwap", function () {
     let impersonatedSigner: HardhatEthersSigner;
     let deployedContractAddress: string;
 
-    const aaveV3PoolAddress = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
-
     const USDC_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
     const USDbC_COMET_ADDRESS = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
 
     this.timeout(3000000);
-
-    const contractName = "DebtSwap";
-
-    async function deployContractFixture() {
-        const DebtSwap = await hre.ethers.getContractFactory(contractName);
-        const debtSwap = await DebtSwap.deploy(
-            aaveV3PoolAddress,
-            UNISWAP_V3_FACTORY_ADRESS,
-            UNISWAP_V3_SWAP_ROUTER_ADDRESS,
-        );
-
-        return {
-            debtSwap,
-        };
-    }
 
     this.beforeEach(async () => {
         impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
@@ -55,7 +36,7 @@ describe("Compound DebtSwap", function () {
         deployedContractAddress = await debtSwap.getAddress();
 
         myContract = await ethers.getContractAt(
-            contractName,
+            "DebtSwap",
             deployedContractAddress,
             impersonatedSigner,
         );
@@ -77,10 +58,6 @@ describe("Compound DebtSwap", function () {
         const comet = new ethers.Contract(cometAddress, cometAbi, impersonatedSigner);
         const response = await comet.userCollateral(TEST_ADDRESS, cbETH_ADDRESS);
         return response.balance;
-    }
-
-    function formatAmount(amount: bigint): string {
-        return ethers.formatUnits(String(amount), 6);
     }
 
     async function borrowToken(cometAddress: string, assetAddress: string) {

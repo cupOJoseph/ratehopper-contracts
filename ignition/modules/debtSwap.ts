@@ -4,8 +4,8 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 const DebtSwapModule = buildModule("DebtSwap", (m) => {
-    const aaveV3PoolAddress = m.getParameter(
-        "aaveV3PoolAddress",
+    const AAVE_V3_POOL_ADDRESS = m.getParameter(
+        "AAVE_V3_POOL_ADDRESS",
         "0x794a61358d6845594f94dc1db02a252b5b4814ad",
     );
 
@@ -16,7 +16,7 @@ const DebtSwapModule = buildModule("DebtSwap", (m) => {
 
     const DebtSwap = m.contract(
         "DebtSwap",
-        [aaveV3PoolAddress, UNISWAP_V3_SWAP_ROUTER_ADDRESS],
+        [AAVE_V3_POOL_ADDRESS, UNISWAP_V3_SWAP_ROUTER_ADDRESS],
         {},
     );
 

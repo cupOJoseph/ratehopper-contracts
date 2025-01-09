@@ -19,7 +19,7 @@
 //     const USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // Circle
 //     const mUSDC_ADDRESS = "0xedc817a28e8b93b03976fbd4a3ddbc9f7d176c22";
 
-//     const aaveV3PoolAddress = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
+//     const AAVE_V3_POOL_ADDRESS = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
 //     const UNISWAP_V3_FACTORY_ADRESS = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
 //     const UNISWAP_V3_SWAP_ROUTER_ADDRESS = "0x2626664c2603336E57B271c5C0b26F421741e481";
 
@@ -31,7 +31,7 @@
 //     async function deployContractFixture() {
 //         const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
 //         const debtSwap = await DebtSwap.deploy(
-//             aaveV3PoolAddress,
+//             AAVE_V3_POOL_ADDRESS,
 //             UNISWAP_V3_FACTORY_ADRESS,
 //             UNISWAP_V3_SWAP_ROUTER_ADDRESS,
 //         );

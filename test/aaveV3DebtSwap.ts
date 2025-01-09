@@ -11,16 +11,15 @@ import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { getAmountInMax } from "./utils";
+import { deployContractFixture, formatAmount, getAmountInMax } from "./utils";
 import { Contract, MaxUint256 } from "ethers";
 import {
     USDC_ADDRESS,
     USDbC_ADDRESS,
-    UNISWAP_V3_FACTORY_ADRESS,
-    UNISWAP_V3_SWAP_ROUTER_ADDRESS,
     TEST_ADDRESS,
     USDC_hyUSD_POOL,
     ETH_USDbC_POOL,
+    AAVE_V3_POOL_ADDRESS,
 } from "./constants";
 
 describe("Aave v3 DebtSwap", function () {
@@ -28,39 +27,9 @@ describe("Aave v3 DebtSwap", function () {
     let impersonatedSigner: HardhatEthersSigner;
     let aaveV3Pool: Contract;
     let deployedContractAddress: string;
-    const aaveV3PoolAddress = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
     const aaveV3ProtocolDataProvider = "0xd82a47fdebB5bf5329b09441C3DaB4b5df2153Ad";
 
     this.timeout(3000000);
-    // We define a fixture to reuse the same setup in every test.
-    // We use loadFixture to run this setup once, snapshot that state,
-    // and reset Hardhat Network to that snapshot in every test.
-    async function deployContractFixture() {
-        // Contracts are deployed using the first signer/account by default
-        // const [owner, otherAccount] = await hre.ethers.getSigners();
-        const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
-        const aaveV3Handler = await AaveV3Handler.deploy(aaveV3PoolAddress);
-
-        const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
-        const compoundHandler = await CompoundHandler.deploy();
-
-        const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
-        const protocolRegistry = await ProtocolRegistry.deploy(
-            aaveV3Handler.getAddress(),
-            compoundHandler.getAddress(),
-        );
-
-        const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
-        const debtSwap = await DebtSwap.deploy(
-            protocolRegistry.getAddress(),
-            UNISWAP_V3_FACTORY_ADRESS,
-            UNISWAP_V3_SWAP_ROUTER_ADDRESS,
-        );
-
-        return {
-            debtSwap,
-        };
-    }
 
     this.beforeEach(async () => {
         impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
@@ -74,7 +43,7 @@ describe("Aave v3 DebtSwap", function () {
             impersonatedSigner,
         );
 
-        aaveV3Pool = new ethers.Contract(aaveV3PoolAddress, aaveV3PoolJson, impersonatedSigner);
+        aaveV3Pool = new ethers.Contract(AAVE_V3_POOL_ADDRESS, aaveV3PoolJson, impersonatedSigner);
     });
 
     async function approve() {
@@ -120,15 +89,14 @@ describe("Aave v3 DebtSwap", function () {
         return result.currentVariableDebt;
         // return ethers.formatUnits(String(result.currentVariableDebt), 6);
     }
-
-    function formatAmount(amount: bigint): string {
-        return ethers.formatUnits(String(amount), 6);
-    }
-
     async function borrowToken(tokenAddress: string) {
         const oneUnit = ethers.parseUnits("1", 6);
 
-        const aavePool = new ethers.Contract(aaveV3PoolAddress, aaveV3PoolJson, impersonatedSigner);
+        const aavePool = new ethers.Contract(
+            AAVE_V3_POOL_ADDRESS,
+            aaveV3PoolJson,
+            impersonatedSigner,
+        );
         const borrowTx = await aavePool.borrow(tokenAddress, oneUnit, 2, 0, TEST_ADDRESS);
         await borrowTx.wait();
 

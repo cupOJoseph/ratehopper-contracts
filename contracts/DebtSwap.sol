@@ -22,9 +22,6 @@ contract DebtSwap {
     using GPv2SafeERC20 for IERC20;
     ProtocolRegistry private protocolRegistry;
 
-    // TODO: extract this to another registry contract
-    // IPoolV3 public immutable aaveV3Pool;
-
     IUniswapV3Pool public pool;
     ISwapRouter02 public immutable swapRouter;
     address public immutable uniswapV3Factory;
@@ -109,35 +106,18 @@ contract DebtSwap {
             uint(decoded.protocol)
         );
         address handler = protocolRegistry.getHandler(protocol);
-        IProtocolHandler(handler).debtSwap(
-            decoded.fromAsset,
-            decoded.toAsset,
-            decoded.amount,
-            decoded.amountInMaximum,
-            totalFee,
-            decoded.onBehalfOf,
-            decoded.extraData
+        handler.delegatecall(
+            abi.encodeWithSignature(
+                "debtSwap(address,address,uint256,uint256,uint256,address,bytes)",
+                decoded.fromAsset,
+                decoded.toAsset,
+                decoded.amount,
+                decoded.amountInMaximum,
+                totalFee,
+                decoded.onBehalfOf,
+                decoded.extraData
+            )
         );
-        // if (decoded.protocol == Protocol.COMPOUND) {
-        //     compoundSwap(
-        //         address(decoded.fromAsset),
-        //         address(decoded.toAsset),
-        //         decoded.amount,
-        //         decoded.amountInMaximum,
-        //         totalFee,
-        //         decoded.onBehalfOf,
-        //         decoded.extraData
-        //     );
-        // } else if (decoded.protocol == Protocol.AAVE_V3) {
-        //     aaveV3Swap(
-        //         address(decoded.fromAsset),
-        //         address(decoded.toAsset),
-        //         decoded.amount,
-        //         decoded.amountInMaximum,
-        //         totalFee,
-        //         decoded.onBehalfOf
-        //     );
-        // }
 
         swapToken(
             address(decoded.toAsset),
@@ -166,94 +146,6 @@ contract DebtSwap {
         //     aaveV3Repay(decoded.toAsset, remainingBalance, decoded.onBehalfOf);
         // }
     }
-
-    function compoundSwap(
-        address fromAsset,
-        address toAsset,
-        uint256 amount,
-        uint256 amountInMaximum,
-        uint256 totalFee,
-        address onBehalfOf,
-        bytes memory extraData
-    ) internal {
-        (
-            address fromCContract,
-            address toCContract,
-            address collateralAsset,
-            uint256 collateralAmount
-        ) = abi.decode(extraData, (address, address, address, uint256));
-
-        IComet fromComet = IComet(fromCContract);
-        IComet toComet = IComet(toCContract);
-
-        // repay
-        fromComet.supplyFrom(onBehalfOf, onBehalfOf, fromAsset, amount);
-        console.log("repay done");
-
-        // withdraw collateral
-        fromComet.withdrawFrom(
-            onBehalfOf,
-            onBehalfOf,
-            collateralAsset,
-            collateralAmount
-        );
-        console.log("withdraw collateral done");
-
-        // // supply collateral
-        toComet.supplyFrom(
-            onBehalfOf,
-            onBehalfOf,
-            collateralAsset,
-            collateralAmount
-        );
-        console.log("supply done");
-
-        // new borrow
-        toComet.withdrawFrom(
-            onBehalfOf,
-            address(this),
-            toAsset,
-            amountInMaximum + totalFee
-        );
-        console.log("borrow done");
-    }
-
-    // function aaveV3Swap(
-    //     address fromAsset,
-    //     address toAsset,
-    //     uint256 amount,
-    //     uint256 amountInMaximum,
-    //     uint256 totalFee,
-    //     address onBehalfOf
-    // ) public {
-    //     aaveV3Repay(address(fromAsset), amount, onBehalfOf);
-    //     aaveV3Pool.borrow(
-    //         address(toAsset),
-    //         amountInMaximum + totalFee,
-    //         2,
-    //         0,
-    //         onBehalfOf
-    //     );
-    // }
-
-    // function aaveV3Supply(
-    //     address asset,
-    //     uint256 amount,
-    //     address onBehalfOf
-    // ) public {
-    //     IERC20(asset).safeTransferFrom(onBehalfOf, address(this), amount);
-    //     IERC20(asset).approve(address(aaveV3Pool), amount);
-    //     aaveV3Pool.supply(asset, amount, onBehalfOf, 0);
-    // }
-
-    // function aaveV3Repay(
-    //     address asset,
-    //     uint256 amount,
-    //     address onBehalfOf
-    // ) public returns (uint256) {
-    //     IERC20(asset).approve(address(aaveV3Pool), amount);
-    //     return aaveV3Pool.repay(asset, amount, 2, onBehalfOf);
-    // }
 
     function swapToken(
         address inputToken,

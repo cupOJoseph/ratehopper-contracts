@@ -11,8 +11,8 @@ contract AaveV3Handler is IProtocolHandler {
 
     IPoolV3 public immutable aaveV3Pool;
 
-    constructor(address _aaveV3PoolAddress) {
-        aaveV3Pool = IPoolV3(_aaveV3PoolAddress);
+    constructor(address _AAVE_V3_POOL_ADDRESS) {
+        aaveV3Pool = IPoolV3(_AAVE_V3_POOL_ADDRESS);
     }
 
     function debtSwap(
