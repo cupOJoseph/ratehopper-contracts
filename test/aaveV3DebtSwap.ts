@@ -5,7 +5,6 @@ import { ethers } from "hardhat";
 import hre from "hardhat";
 const aaveDebtTokenJson = require("../externalAbi/aaveV3/aaveDebtToken.json");
 const aaveV3PoolJson = require("../externalAbi/aaveV3/aaveV3Pool.json");
-const aaveATokenJson = require("../externalAbi/aaveV3/aaveV3AToken.json");
 const aaveProtocolDataProviderAbi = require("../externalAbi/aaveV3/aaveProtocolDataProvider.json");
 
 import "dotenv/config";
@@ -39,10 +38,21 @@ describe("Aave v3 DebtSwap", function () {
     async function deployContractFixture() {
         // Contracts are deployed using the first signer/account by default
         // const [owner, otherAccount] = await hre.ethers.getSigners();
+        const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
+        const aaveV3Handler = await AaveV3Handler.deploy(aaveV3PoolAddress);
+
+        const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
+        const compoundHandler = await CompoundHandler.deploy();
+
+        const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
+        const protocolRegistry = await ProtocolRegistry.deploy(
+            aaveV3Handler.getAddress(),
+            compoundHandler.getAddress(),
+        );
 
         const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
         const debtSwap = await DebtSwap.deploy(
-            aaveV3PoolAddress,
+            protocolRegistry.getAddress(),
             UNISWAP_V3_FACTORY_ADRESS,
             UNISWAP_V3_SWAP_ROUTER_ADDRESS,
         );
