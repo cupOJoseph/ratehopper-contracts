@@ -6,7 +6,7 @@ import {IERC20} from "../dependencies/IERC20.sol";
 import "hardhat/console.sol";
 
 contract CompoundHandler is IProtocolHandler {
-    function debtSwap(
+    function debtSwitch(
         address fromAsset,
         address toAsset,
         uint256 amount,
@@ -55,6 +55,38 @@ contract CompoundHandler is IProtocolHandler {
             amountInMaximum + totalFee
         );
         console.log("borrow done");
+    }
+
+    function switchFrom(
+        address fromAsset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        (address fromCContract, , , ) = abi.decode(
+            extraData,
+            (address, address, address, uint256)
+        );
+
+        IComet fromComet = IComet(fromCContract);
+        fromComet.supplyFrom(onBehalfOf, onBehalfOf, fromAsset, amount);
+        console.log("switchFrom done");
+    }
+
+    function switchTo(
+        address toAsset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        (, address toCContract, , ) = abi.decode(
+            extraData,
+            (address, address, address, uint256)
+        );
+
+        IComet toComet = IComet(toCContract);
+        toComet.withdrawFrom(onBehalfOf, address(this), toAsset, amount);
+        console.log("switchTo done");
     }
 
     function repayRemainingBalance(

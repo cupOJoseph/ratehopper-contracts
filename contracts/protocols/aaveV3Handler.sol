@@ -15,7 +15,7 @@ contract AaveV3Handler is IProtocolHandler {
         aaveV3Pool = IPoolV3(_AAVE_V3_POOL_ADDRESS);
     }
 
-    function debtSwap(
+    function debtSwitch(
         address fromAsset,
         address toAsset,
         uint256 amount,
@@ -32,6 +32,28 @@ contract AaveV3Handler is IProtocolHandler {
             0,
             onBehalfOf
         );
+    }
+
+    function switchFrom(
+        address fromAsset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        aaveV3Repay(address(fromAsset), amount, onBehalfOf);
+        // TODO: get aToken address
+        IERC20(fromAsset).safeTransferFrom(onBehalfOf, address(this), amount);
+        aaveV3Pool.withdraw(fromAsset, amount, onBehalfOf);
+    }
+
+    function switchTo(
+        address toAsset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        aaveV3Supply(address(toAsset), amount, onBehalfOf);
+        aaveV3Pool.borrow(toAsset, amount, 2, 0, onBehalfOf);
     }
 
     function repayRemainingBalance(

@@ -32,8 +32,9 @@ contract DebtSwap {
     }
 
     struct FlashCallbackData {
-        Protocol protocol;
         address flashloanPool;
+        Protocol fromProtocol;
+        Protocol toProtocol;
         address fromAsset;
         address toAsset;
         uint256 amount;
@@ -53,8 +54,9 @@ contract DebtSwap {
     }
 
     function executeDebtSwap(
-        Protocol _protocol,
         address _flashloanPool,
+        Protocol _fromProtocol,
+        Protocol _toProtocol,
         address _fromAsset,
         address _toAsset,
         uint256 _amount,
@@ -69,8 +71,9 @@ contract DebtSwap {
 
         bytes memory data = abi.encode(
             FlashCallbackData({
-                protocol: _protocol,
                 flashloanPool: _flashloanPool,
+                fromProtocol: _fromProtocol,
+                toProtocol: _toProtocol,
                 fromAsset: _fromAsset,
                 toAsset: _toAsset,
                 amount: _amount,
@@ -99,32 +102,67 @@ contract DebtSwap {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
+        if (decoded.fromProtocol == decoded.toProtocol) {
+            ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
+                uint(decoded.fromProtocol)
+            );
+
+            address handler = protocolRegistry.getHandler(protocol);
+            handler.delegatecall(
+                abi.encodeWithSignature(
+                    "debtSwitch(address,address,uint256,uint256,uint256,address,bytes)",
+                    decoded.fromAsset,
+                    decoded.toAsset,
+                    decoded.amount,
+                    decoded.amountInMaximum,
+                    totalFee,
+                    decoded.onBehalfOf,
+                    decoded.extraData
+                )
+            );
+        } else {
+            ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
+                uint(decoded.fromProtocol)
+            );
+
+            address fromHandler = protocolRegistry.getHandler(protocol);
+            fromHandler.delegatecall(
+                abi.encodeWithSignature(
+                    "switchFrom(address,uint256,address,bytes)",
+                    decoded.fromAsset,
+                    decoded.amount,
+                    decoded.onBehalfOf,
+                    decoded.extraData
+                )
+            );
+
+            ProtocolRegistry.Protocol ToProtocol = ProtocolRegistry.Protocol(
+                uint(decoded.toProtocol)
+            );
+
+            address toHandler = protocolRegistry.getHandler(ToProtocol);
+            toHandler.delegatecall(
+                abi.encodeWithSignature(
+                    "switchTo(address,uint256,address,bytes)",
+                    decoded.toAsset,
+                    decoded.amount,
+                    decoded.onBehalfOf,
+                    decoded.extraData
+                )
+            );
+        }
+
+        if (decoded.fromAsset != decoded.toAsset) {
+            swapToken(
+                address(decoded.toAsset),
+                address(decoded.fromAsset),
+                decoded.amount + totalFee,
+                decoded.amountInMaximum
+            );
+        }
+
         IERC20 fromToken = IERC20(decoded.fromAsset);
         IERC20 toToken = IERC20(decoded.toAsset);
-
-        ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
-            uint(decoded.protocol)
-        );
-        address handler = protocolRegistry.getHandler(protocol);
-        handler.delegatecall(
-            abi.encodeWithSignature(
-                "debtSwap(address,address,uint256,uint256,uint256,address,bytes)",
-                decoded.fromAsset,
-                decoded.toAsset,
-                decoded.amount,
-                decoded.amountInMaximum,
-                totalFee,
-                decoded.onBehalfOf,
-                decoded.extraData
-            )
-        );
-
-        swapToken(
-            address(decoded.toAsset),
-            address(decoded.fromAsset),
-            decoded.amount + totalFee,
-            decoded.amountInMaximum
-        );
 
         fromToken.transfer(address(pool), decoded.amount + totalFee);
 
@@ -132,6 +170,12 @@ contract DebtSwap {
         uint256 remainingBalance = toToken.balanceOf(address(this));
 
         if (remainingBalance > 0) {
+            ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
+                uint(decoded.toProtocol)
+            );
+
+            address handler = protocolRegistry.getHandler(protocol);
+
             handler.delegatecall(
                 abi.encodeWithSignature(
                     "repayRemainingBalance(address,uint256,address,bytes)",

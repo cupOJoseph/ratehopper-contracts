@@ -5,6 +5,9 @@ import {
     UNISWAP_V3_FACTORY_ADRESS,
     UNISWAP_V3_SWAP_ROUTER_ADDRESS,
 } from "./constants";
+import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
+import { Contract, MaxUint256 } from "ethers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 // We define a fixture to reuse the same setup in every test.
 // We use loadFixture to run this setup once, snapshot that state,
@@ -34,6 +37,17 @@ export async function deployContractFixture() {
     return {
         debtSwap,
     };
+}
+
+export async function approve(
+    tokenAddress: string,
+    spenderAddress: string,
+    signer: HardhatEthersSigner,
+) {
+    const token = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+    const approveTx = await token.approve(spenderAddress, MaxUint256);
+    await approveTx.wait();
+    console.log("approve:" + tokenAddress + "token to " + spenderAddress);
 }
 
 export function getAmountInMax(amountOut: bigint): bigint {

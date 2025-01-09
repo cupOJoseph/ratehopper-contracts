@@ -1,17 +1,13 @@
-import { time, loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 const { expect } = require("chai");
 import { ethers } from "hardhat";
-import hre from "hardhat";
-const aaveDebtTokenJson = require("../externalAbi/aaveV3/aaveDebtToken.json");
 const aaveV3PoolJson = require("../externalAbi/aaveV3/aaveV3Pool.json");
-const aaveProtocolDataProviderAbi = require("../externalAbi/aaveV3/aaveProtocolDataProvider.json");
 
 import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { deployContractFixture, formatAmount, getAmountInMax } from "./utils";
+import { approve, deployContractFixture, formatAmount, getAmountInMax } from "./utils";
 import { Contract, MaxUint256 } from "ethers";
 import {
     USDC_ADDRESS,
@@ -22,18 +18,18 @@ import {
     AAVE_V3_POOL_ADDRESS,
     Protocols,
 } from "./constants";
+import { AaveV3DebtManager } from "./protocols/aaveV3";
 
 describe("Aave v3 DebtSwap", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
     let aaveV3Pool: Contract;
     let deployedContractAddress: string;
-    const aaveV3ProtocolDataProvider = "0xd82a47fdebB5bf5329b09441C3DaB4b5df2153Ad";
-
-    this.timeout(3000000);
+    let aaveV3DebtManager: AaveV3DebtManager;
 
     this.beforeEach(async () => {
         impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
+        aaveV3DebtManager = new AaveV3DebtManager(impersonatedSigner);
 
         const { debtSwap } = await loadFixture(deployContractFixture);
         deployedContractAddress = await debtSwap.getAddress();
@@ -47,49 +43,6 @@ describe("Aave v3 DebtSwap", function () {
         aaveV3Pool = new ethers.Contract(AAVE_V3_POOL_ADDRESS, aaveV3PoolJson, impersonatedSigner);
     });
 
-    async function approve() {
-        const token = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
-        const approveTx = await token.approve(deployedContractAddress, ethers.parseUnits("1", 6));
-        await approveTx.wait();
-        // console.log("approveTx:", approveTx);
-    }
-
-    async function approveDelegation(tokenAddress: string) {
-        const debtToken = await getDebtTokenAddress(tokenAddress);
-        const aaveDebtToken = new ethers.Contract(debtToken, aaveDebtTokenJson, impersonatedSigner);
-        const approveDelegationTx = await aaveDebtToken.approveDelegation(
-            deployedContractAddress,
-            MaxUint256,
-        );
-        await approveDelegationTx.wait();
-        // console.log("approveDelegationTx:", approveDelegationTx);
-    }
-
-    async function getDebtTokenAddress(assetAddress: string): Promise<string> {
-        const protocolDataProvider = new ethers.Contract(
-            aaveV3ProtocolDataProvider,
-            aaveProtocolDataProviderAbi,
-            impersonatedSigner,
-        );
-
-        const response = await protocolDataProvider.getReserveTokensAddresses(assetAddress);
-        return response.variableDebtTokenAddress;
-    }
-
-    async function getDebtAmount(assetAddress: string): Promise<bigint> {
-        const protocolDataProvider = new ethers.Contract(
-            aaveV3ProtocolDataProvider,
-            aaveProtocolDataProviderAbi,
-            impersonatedSigner,
-        );
-
-        const result = await protocolDataProvider.getUserReserveData(
-            assetAddress,
-            impersonatedSigner,
-        );
-        return result.currentVariableDebt;
-        // return ethers.formatUnits(String(result.currentVariableDebt), 6);
-    }
     async function borrowToken(tokenAddress: string) {
         const oneUnit = ethers.parseUnits("1", 6);
 
@@ -111,15 +64,16 @@ describe("Aave v3 DebtSwap", function () {
         toTokenAddress: string,
         flashloanPool: string,
     ) {
-        const beforeFromTokenDebt = await getDebtAmount(fromTokenAddress);
-        const beforeToTokenDebt = await getDebtAmount(toTokenAddress);
+        const beforeFromTokenDebt = await aaveV3DebtManager.getDebtAmount(fromTokenAddress);
+        const beforeToTokenDebt = await aaveV3DebtManager.getDebtAmount(toTokenAddress);
 
-        await approve();
-        await approveDelegation(toTokenAddress);
+        await approve(USDC_ADDRESS, deployedContractAddress, impersonatedSigner);
+        await aaveV3DebtManager.approveDelegation(toTokenAddress, deployedContractAddress);
 
         const tx = await myContract.executeDebtSwap(
-            Protocols.AAVE_V3,
             flashloanPool,
+            Protocols.AAVE_V3,
+            Protocols.AAVE_V3,
             fromTokenAddress,
             toTokenAddress,
             beforeFromTokenDebt,
@@ -128,8 +82,8 @@ describe("Aave v3 DebtSwap", function () {
         );
         await tx.wait();
 
-        const afterFromTokenDebt = await getDebtAmount(fromTokenAddress);
-        const afterToTokenDebt = await getDebtAmount(toTokenAddress);
+        const afterFromTokenDebt = await aaveV3DebtManager.getDebtAmount(fromTokenAddress);
+        const afterToTokenDebt = await aaveV3DebtManager.getDebtAmount(toTokenAddress);
 
         console.log(
             `${fromTokenAddress} Debt Amount:`,
@@ -148,22 +102,22 @@ describe("Aave v3 DebtSwap", function () {
     }
 
     it("should return debt token address", async function () {
-        const tokenAddress = await getDebtTokenAddress(USDbC_ADDRESS);
+        const tokenAddress = await aaveV3DebtManager.getDebtTokenAddress(USDbC_ADDRESS);
         expect(tokenAddress).to.be.equal("0x7376b2F323dC56fCd4C191B34163ac8a84702DAB");
     });
 
     it("should return current debt amount", async function () {
-        const currentDebtAmount = await getDebtAmount(USDC_ADDRESS);
+        const currentDebtAmount = await aaveV3DebtManager.getDebtAmount(USDC_ADDRESS);
         console.log("currentDebtAmount:", currentDebtAmount);
     });
 
-    it("should execute debt swap from USDC to USDbC", async function () {
+    it("should switch from USDC to USDbC", async function () {
         await borrowToken(USDC_ADDRESS);
 
         await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL);
     });
 
-    it("should execute debt swap from USDbC to USDC", async function () {
+    it("should switch from USDbC to USDC", async function () {
         await borrowToken(USDbC_ADDRESS);
 
         await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL);

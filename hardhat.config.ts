@@ -1,6 +1,8 @@
 import { base } from "./node_modules/acorn-walk/dist/walk.d";
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import "hardhat-contract-sizer";
+import "hardhat-gas-reporter";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -24,6 +26,10 @@ const config: HardhatUserConfig = {
                 },
             },
         ],
+    },
+    mocha: {
+        timeout: 3000000,
+        parallel: true,
     },
     networks: {
         base: {
