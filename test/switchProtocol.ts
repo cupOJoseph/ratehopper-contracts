@@ -4,7 +4,7 @@ const { expect } = require("chai");
 import { ethers } from "hardhat";
 
 const aaveV3PoolJson = require("../externalAbi/aaveV3/aaveV3Pool.json");
-
+import cometAbi from "../externalAbi/compound/comet.json";
 import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
@@ -50,7 +50,12 @@ describe("Protocol Switch", function () {
         aaveV3Pool = new ethers.Contract(AAVE_V3_POOL_ADDRESS, aaveV3PoolJson, impersonatedSigner);
     });
 
-    async function executeDebtSwap(fromTokenAddress: string, flashloanPool: string) {
+    async function executeDebtSwap(
+        fromTokenAddress: string,
+        flashloanPool: string,
+        fromProtocol: Protocols,
+        toProtocol: Protocols,
+    ) {
         const beforeAaveDebt = await aaveV3DebtManager.getDebtAmount(fromTokenAddress);
         const beforeCompoundDebt = await compoundDebtManager.getDebtAmount(USDC_COMET_ADDRESS);
 
@@ -64,6 +69,10 @@ describe("Protocol Switch", function () {
         console.log("aTokenAddress:", aTokenAddress);
         await approve(aTokenAddress, deployedContractAddress, impersonatedSigner);
 
+        const usdcComet = new ethers.Contract(USDC_COMET_ADDRESS, cometAbi, impersonatedSigner);
+        const allowResult = await usdcComet.allow(deployedContractAddress, true);
+        await allowResult.wait();
+
         const extraData = ethers.AbiCoder.defaultAbiCoder().encode(
             ["address", "address", "address", "uint256"],
             [aTokenAddress, USDC_COMET_ADDRESS, cbETH_ADDRESS, collateralAmount],
@@ -71,12 +80,13 @@ describe("Protocol Switch", function () {
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
-            Protocols.AAVE_V3,
-            Protocols.Compound,
+            fromProtocol,
+            toProtocol,
             fromTokenAddress,
             fromTokenAddress,
             beforeAaveDebt,
             getAmountInMax(beforeAaveDebt),
+            extraData,
             extraData,
         );
         await tx.wait();
@@ -104,6 +114,13 @@ describe("Protocol Switch", function () {
         await aaveV3DebtManager.supply(cbETH_ADDRESS);
         await aaveV3DebtManager.borrow(USDC_ADDRESS);
 
-        await executeDebtSwap(USDC_ADDRESS, USDC_hyUSD_POOL);
+        await executeDebtSwap(USDC_ADDRESS, USDC_hyUSD_POOL, Protocols.AAVE_V3, Protocols.COMPOUND);
+    });
+
+    it("should switch USDC debt from Compound to Aave", async function () {
+        await compoundDebtManager.supply(USDC_COMET_ADDRESS);
+        await compoundDebtManager.borrow(USDC_COMET_ADDRESS, USDC_ADDRESS);
+
+        await executeDebtSwap(USDC_ADDRESS, USDC_hyUSD_POOL, Protocols.COMPOUND, Protocols.AAVE_V3);
     });
 });

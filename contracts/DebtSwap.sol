@@ -148,7 +148,7 @@ contract DebtSwap {
                 abi.encodeWithSignature(
                     "switchTo(address,uint256,address,bytes)",
                     decoded.toAsset,
-                    decoded.amount,
+                    decoded.amountInMaximum + totalFee,
                     decoded.onBehalfOf,
                     decoded.toExtraData
                 )

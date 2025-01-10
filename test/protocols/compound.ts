@@ -32,7 +32,7 @@ export class CompoundDebtManager {
         console.log(`Borrowed ${formatAmount(borrowedAmount)} ${assetAddress}`);
     }
 
-    async supplyToken(cometAddress: string) {
+    async supply(cometAddress: string) {
         await approve(cbETH_ADDRESS, cometAddress, this.signer);
         const supplyAmount = ethers.parseEther("0.001");
         const comet = new ethers.Contract(cometAddress, cometAbi, this.signer);

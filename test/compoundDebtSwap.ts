@@ -71,8 +71,8 @@ describe("Compound DebtSwap", function () {
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
-            Protocols.Compound,
-            Protocols.Compound,
+            Protocols.COMPOUND,
+            Protocols.COMPOUND,
             fromTokenAddress,
             toTokenAddress,
             beforeFromTokenDebt,
@@ -107,7 +107,7 @@ describe("Compound DebtSwap", function () {
     });
 
     it("should switch from USDC to USDbC", async function () {
-        await compoundDebtManager.supplyToken(USDC_COMET_ADDRESS);
+        await compoundDebtManager.supply(USDC_COMET_ADDRESS);
         await compoundDebtManager.borrow(USDC_COMET_ADDRESS, USDC_ADDRESS);
 
         await approve(cbETH_ADDRESS, USDbC_COMET_ADDRESS, impersonatedSigner);
@@ -117,7 +117,7 @@ describe("Compound DebtSwap", function () {
     });
 
     it("should switch from USDbC to USDC", async function () {
-        await compoundDebtManager.supplyToken(USDbC_COMET_ADDRESS);
+        await compoundDebtManager.supply(USDbC_COMET_ADDRESS);
         await compoundDebtManager.borrow(USDbC_COMET_ADDRESS, USDbC_ADDRESS);
 
         await approve(cbETH_ADDRESS, USDC_COMET_ADDRESS, impersonatedSigner);

@@ -12,5 +12,5 @@ export const ETH_USDbC_POOL = "0x3B8000CD10625ABdC7370fb47eD4D4a9C6311fD5";
 
 export enum Protocols {
     AAVE_V3 = 0,
-    Compound = 1,
+    COMPOUND = 1,
 }

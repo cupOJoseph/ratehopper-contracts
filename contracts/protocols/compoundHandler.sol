@@ -85,11 +85,7 @@ contract CompoundHandler is IProtocolHandler {
             address collateralAsset,
             uint256 collateralAmount
         ) = abi.decode(extraData, (address, address, address, uint256));
-        console.log("start switchTo");
-        uint balance = IERC20(collateralAsset).balanceOf(address(this));
-        console.log("balance:", balance);
 
-        console.log("collateralAmount:", collateralAmount);
         IComet toComet = IComet(toCContract);
 
         IERC20(collateralAsset).approve(address(toCContract), collateralAmount);
