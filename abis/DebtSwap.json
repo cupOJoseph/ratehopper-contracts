@@ -23,14 +23,19 @@
     {
         "inputs": [
             {
-                "internalType": "enum DebtSwap.Protocol",
-                "name": "_protocol",
-                "type": "uint8"
-            },
-            {
                 "internalType": "address",
                 "name": "_flashloanPool",
                 "type": "address"
+            },
+            {
+                "internalType": "enum DebtSwap.Protocol",
+                "name": "_fromProtocol",
+                "type": "uint8"
+            },
+            {
+                "internalType": "enum DebtSwap.Protocol",
+                "name": "_toProtocol",
+                "type": "uint8"
             },
             {
                 "internalType": "address",
@@ -54,7 +59,12 @@
             },
             {
                 "internalType": "bytes",
-                "name": "_extraData",
+                "name": "_fromExtraData",
+                "type": "bytes"
+            },
+            {
+                "internalType": "bytes",
+                "name": "_toExtraData",
                 "type": "bytes"
             }
         ],

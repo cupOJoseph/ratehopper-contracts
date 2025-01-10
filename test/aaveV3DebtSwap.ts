@@ -17,6 +17,7 @@ import {
     ETH_USDbC_POOL,
     AAVE_V3_POOL_ADDRESS,
     Protocols,
+    cbETH_ADDRESS,
 } from "./constants";
 import { AaveV3DebtManager } from "./protocols/aaveV3";
 
@@ -43,22 +44,6 @@ describe("Aave v3 DebtSwap", function () {
         aaveV3Pool = new ethers.Contract(AAVE_V3_POOL_ADDRESS, aaveV3PoolJson, impersonatedSigner);
     });
 
-    async function borrowToken(tokenAddress: string) {
-        const oneUnit = ethers.parseUnits("1", 6);
-
-        const aavePool = new ethers.Contract(
-            AAVE_V3_POOL_ADDRESS,
-            aaveV3PoolJson,
-            impersonatedSigner,
-        );
-        const borrowTx = await aavePool.borrow(tokenAddress, oneUnit, 2, 0, TEST_ADDRESS);
-        await borrowTx.wait();
-
-        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, impersonatedSigner);
-        const walletBalance = await tokenContract.balanceOf(TEST_ADDRESS);
-        console.log(`${tokenAddress} Wallet Balance:`, formatAmount(walletBalance));
-    }
-
     async function executeDebtSwap(
         fromTokenAddress: string,
         toTokenAddress: string,
@@ -78,6 +63,7 @@ describe("Aave v3 DebtSwap", function () {
             toTokenAddress,
             beforeFromTokenDebt,
             getAmountInMax(beforeFromTokenDebt),
+            "0x",
             "0x",
         );
         await tx.wait();
@@ -112,13 +98,15 @@ describe("Aave v3 DebtSwap", function () {
     });
 
     it("should switch from USDC to USDbC", async function () {
-        await borrowToken(USDC_ADDRESS);
+        await aaveV3DebtManager.supply(cbETH_ADDRESS);
+        await aaveV3DebtManager.borrow(USDC_ADDRESS);
 
         await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL);
     });
 
     it("should switch from USDbC to USDC", async function () {
-        await borrowToken(USDbC_ADDRESS);
+        await aaveV3DebtManager.supply(cbETH_ADDRESS);
+        await aaveV3DebtManager.borrow(USDbC_ADDRESS);
 
         await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL);
     });

@@ -5,6 +5,9 @@ import cometAbi from "../../externalAbi/compound/comet.json";
 import { approve, formatAmount } from "../utils";
 import { cbETH_ADDRESS, TEST_ADDRESS } from "../constants";
 
+export const USDC_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
+export const USDbC_COMET_ADDRESS = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
+
 export class CompoundDebtManager {
     constructor(private signer: HardhatEthersSigner) {}
 
@@ -19,7 +22,7 @@ export class CompoundDebtManager {
         return response.balance;
     }
 
-    async borrowToken(cometAddress: string, assetAddress: string) {
+    async borrow(cometAddress: string, assetAddress: string) {
         const comet = new ethers.Contract(cometAddress, cometAbi, this.signer);
 
         const borrowAmount = ethers.parseUnits("0.1", 6);

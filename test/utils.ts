@@ -15,8 +15,13 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 export async function deployContractFixture() {
     // Contracts are deployed using the first signer/account by default
     // const [owner, otherAccount] = await hre.ethers.getSigners();
+    const feeData = await ethers.provider.getFeeData();
+    const gasPrice = feeData.gasPrice!;
+
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
-    const aaveV3Handler = await AaveV3Handler.deploy(AAVE_V3_POOL_ADDRESS);
+    const aaveV3Handler = await AaveV3Handler.deploy(AAVE_V3_POOL_ADDRESS, {
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
 
     const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
     const compoundHandler = await CompoundHandler.deploy();
@@ -28,11 +33,16 @@ export async function deployContractFixture() {
     );
 
     const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
+
     const debtSwap = await DebtSwap.deploy(
         protocolRegistry.getAddress(),
         UNISWAP_V3_FACTORY_ADRESS,
         UNISWAP_V3_SWAP_ROUTER_ADDRESS,
+        {
+            maxFeePerGas: gasPrice * BigInt(5),
+        },
     );
+    console.log("DebtSwap deployed to:", await debtSwap.getAddress());
 
     return {
         debtSwap,

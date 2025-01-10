@@ -40,7 +40,8 @@ contract DebtSwap {
         uint256 amount;
         uint256 amountInMaximum;
         address onBehalfOf;
-        bytes extraData;
+        bytes fromExtraData;
+        bytes toExtraData;
     }
 
     constructor(
@@ -61,7 +62,8 @@ contract DebtSwap {
         address _toAsset,
         uint256 _amount,
         uint256 _amountInMaximum,
-        bytes calldata _extraData
+        bytes calldata _fromExtraData,
+        bytes calldata _toExtraData
     ) public {
         pool = IUniswapV3Pool(_flashloanPool);
 
@@ -79,7 +81,8 @@ contract DebtSwap {
                 amount: _amount,
                 amountInMaximum: _amountInMaximum,
                 onBehalfOf: msg.sender,
-                extraData: _extraData
+                fromExtraData: _fromExtraData,
+                toExtraData: _toExtraData
             })
         );
 
@@ -117,7 +120,7 @@ contract DebtSwap {
                     decoded.amountInMaximum,
                     totalFee,
                     decoded.onBehalfOf,
-                    decoded.extraData
+                    decoded.fromExtraData
                 )
             );
         } else {
@@ -132,7 +135,7 @@ contract DebtSwap {
                     decoded.fromAsset,
                     decoded.amount,
                     decoded.onBehalfOf,
-                    decoded.extraData
+                    decoded.fromExtraData
                 )
             );
 
@@ -147,7 +150,7 @@ contract DebtSwap {
                     decoded.toAsset,
                     decoded.amount,
                     decoded.onBehalfOf,
-                    decoded.extraData
+                    decoded.toExtraData
                 )
             );
         }
@@ -182,7 +185,7 @@ contract DebtSwap {
                     decoded.toAsset,
                     remainingBalance,
                     decoded.onBehalfOf,
-                    decoded.extraData
+                    decoded.toExtraData
                 )
             );
         }

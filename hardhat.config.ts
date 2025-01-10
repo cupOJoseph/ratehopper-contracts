@@ -29,7 +29,7 @@ const config: HardhatUserConfig = {
     },
     mocha: {
         timeout: 3000000,
-        parallel: true,
+        parallel: false,
     },
     networks: {
         base: {
@@ -62,7 +62,7 @@ const config: HardhatUserConfig = {
             },
             forking: {
                 url: baseUrl,
-                blockNumber: 24799805,
+                blockNumber: 24847010,
             },
         },
     },

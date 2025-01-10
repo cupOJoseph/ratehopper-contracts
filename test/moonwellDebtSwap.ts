@@ -60,7 +60,7 @@
 //         return ethers.formatUnits(String(amount), 6);
 //     }
 
-//     async function borrowToken(tokenAddress: string) {
+//     async function borrow(tokenAddress: string) {
 //         const mToken = new ethers.Contract(tokenAddress, MErc20DelegatorAbi, impersonatedSigner);
 //         const tx = await mToken.borrow(ethers.parseUnits("1", 6));
 //         const result = await tx.wait();

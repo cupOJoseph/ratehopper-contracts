@@ -40,10 +40,23 @@ contract AaveV3Handler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData
     ) external override {
+        (
+            address aToken,
+            ,
+            address collateralAsset,
+            uint256 collateralAmount
+        ) = abi.decode(extraData, (address, address, address, uint256));
+
         aaveV3Repay(address(fromAsset), amount, onBehalfOf);
+        console.log("repay done");
         // TODO: get aToken address
-        IERC20(fromAsset).safeTransferFrom(onBehalfOf, address(this), amount);
-        aaveV3Pool.withdraw(fromAsset, amount, onBehalfOf);
+        IERC20(aToken).safeTransferFrom(
+            onBehalfOf,
+            address(this),
+            collateralAmount
+        );
+        aaveV3Pool.withdraw(collateralAsset, collateralAmount, address(this));
+        console.log("withdraw done");
     }
 
     function switchTo(
