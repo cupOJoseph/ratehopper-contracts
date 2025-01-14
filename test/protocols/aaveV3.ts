@@ -9,7 +9,7 @@ import { approve, formatAmount } from "../utils";
 const aaveDebtTokenJson = require("../../externalAbi/aaveV3/aaveDebtToken.json");
 const aaveV3PoolJson = require("../../externalAbi/aaveV3/aaveV3Pool.json");
 
-export class AaveV3DebtManager {
+export class AaveV3Helper {
     private protocolDataProvider;
     private pool;
 

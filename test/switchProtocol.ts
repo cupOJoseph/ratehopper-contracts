@@ -23,21 +23,21 @@ import {
     cbETH_ADDRESS,
 } from "./constants";
 
-import { AaveV3DebtManager } from "./protocols/aaveV3";
-import { cometAddressMap, CompoundDebtManager, USDC_COMET_ADDRESS } from "./protocols/compound";
+import { AaveV3Helper } from "./protocols/aaveV3";
+import { cometAddressMap, CompoundHelper, USDC_COMET_ADDRESS } from "./protocols/compound";
 
 describe("Protocol Switch", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
 
     let deployedContractAddress: string;
-    let aaveV3DebtManager: AaveV3DebtManager;
-    let compoundDebtManager: CompoundDebtManager;
+    let aaveV3Helper: AaveV3Helper;
+    let compoundHelper: CompoundHelper;
 
     this.beforeEach(async () => {
         impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
-        aaveV3DebtManager = new AaveV3DebtManager(impersonatedSigner);
-        compoundDebtManager = new CompoundDebtManager(impersonatedSigner);
+        aaveV3Helper = new AaveV3Helper(impersonatedSigner);
+        compoundHelper = new CompoundHelper(impersonatedSigner);
 
         const { debtSwap } = await loadFixture(deployContractFixture);
         deployedContractAddress = await debtSwap.getAddress();
@@ -56,8 +56,8 @@ describe("Protocol Switch", function () {
         fromProtocol: Protocols,
         toProtocol: Protocols,
     ) {
-        const beforeAaveDebt = await aaveV3DebtManager.getDebtAmount(fromTokenAddress);
-        const beforeCompoundDebt = await compoundDebtManager.getDebtAmount(fromTokenAddress);
+        const beforeAaveDebt = await aaveV3Helper.getDebtAmount(fromTokenAddress);
+        const beforeCompoundDebt = await compoundHelper.getDebtAmount(fromTokenAddress);
 
         const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
         const usdcBalance = await usdcContract.balanceOf(TEST_ADDRESS);
@@ -73,16 +73,16 @@ describe("Protocol Switch", function () {
 
         const collateralAmount =
             fromProtocol == Protocols.AAVE_V3
-                ? await aaveV3DebtManager.getCollateralAmount(cbETH_ADDRESS)
-                : await compoundDebtManager.getCollateralAmount(USDC_COMET_ADDRESS);
+                ? await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS)
+                : await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS);
         console.log("collateralAmount:", ethers.formatEther(collateralAmount));
 
-        await compoundDebtManager.allow(fromTokenAddress, deployedContractAddress);
+        await compoundHelper.allow(fromTokenAddress, deployedContractAddress);
 
         let fromExtraData = "0x";
         let toExtraData = "0x";
         if (fromProtocol == Protocols.AAVE_V3) {
-            const aTokenAddress = await aaveV3DebtManager.getATokenAddress(cbETH_ADDRESS);
+            const aTokenAddress = await aaveV3Helper.getATokenAddress(cbETH_ADDRESS);
             console.log("aTokenAddress:", aTokenAddress);
             await approve(aTokenAddress, deployedContractAddress, impersonatedSigner);
 
@@ -99,7 +99,7 @@ describe("Protocol Switch", function () {
 
         if (toProtocol == Protocols.AAVE_V3) {
             await approve(cbETH_ADDRESS, deployedContractAddress, impersonatedSigner);
-            await aaveV3DebtManager.approveDelegation(USDC_ADDRESS, deployedContractAddress);
+            await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
 
             toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
                 ["address", "uint256"],
@@ -125,8 +125,8 @@ describe("Protocol Switch", function () {
         );
         await tx.wait();
 
-        const afterAaveDebt = await aaveV3DebtManager.getDebtAmount(fromTokenAddress);
-        const afterCompoundDebt = await compoundDebtManager.getDebtAmount(fromTokenAddress);
+        const afterAaveDebt = await aaveV3Helper.getDebtAmount(fromTokenAddress);
+        const afterCompoundDebt = await compoundHelper.getDebtAmount(fromTokenAddress);
 
         const usdcBalanceAfter = await usdcContract.balanceOf(TEST_ADDRESS);
         const cbethBalanceAfter = await cbethContract.balanceOf(TEST_ADDRESS);
@@ -149,8 +149,8 @@ describe("Protocol Switch", function () {
     }
 
     it("should switch USDC debt from Aave to Compound", async function () {
-        await aaveV3DebtManager.supply(cbETH_ADDRESS);
-        await aaveV3DebtManager.borrow(USDC_ADDRESS);
+        await aaveV3Helper.supply(cbETH_ADDRESS);
+        await aaveV3Helper.borrow(USDC_ADDRESS);
 
         await executeDebtSwap(
             USDC_hyUSD_POOL,
@@ -162,8 +162,8 @@ describe("Protocol Switch", function () {
     });
 
     it("should switch USDC debt from Compound to Aave", async function () {
-        await compoundDebtManager.supply(USDC_COMET_ADDRESS);
-        await compoundDebtManager.borrow(USDC_ADDRESS);
+        await compoundHelper.supply(USDC_COMET_ADDRESS);
+        await compoundHelper.borrow(USDC_ADDRESS);
 
         await approve(USDC_ADDRESS, USDC_COMET_ADDRESS, impersonatedSigner);
 
@@ -177,8 +177,8 @@ describe("Protocol Switch", function () {
     });
 
     // it("should switch USDC debt on Aave to USDbC on Compound", async function () {
-    //     await aaveV3DebtManager.supply(cbETH_ADDRESS);
-    //     await aaveV3DebtManager.borrow(USDC_ADDRESS);
+    //     await aaveV3Helper.supply(cbETH_ADDRESS);
+    //     await aaveV3Helper.borrow(USDC_ADDRESS);
 
     //     await approve(USDC_ADDRESS, USDC_COMET_ADDRESS, impersonatedSigner);
 

@@ -13,7 +13,7 @@ export const cometAddressMap = new Map<string, string>([
     [USDbC_ADDRESS, USDbC_COMET_ADDRESS],
 ]);
 
-export class CompoundDebtManager {
+export class CompoundHelper {
     constructor(private signer: HardhatEthersSigner) {}
 
     async getDebtAmount(tokenAddress: string): Promise<bigint> {
