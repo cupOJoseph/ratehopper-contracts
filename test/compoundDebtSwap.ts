@@ -46,21 +46,21 @@ describe("Compound DebtSwap", function () {
         toTokenAddress: string,
         flashloanPool: string,
     ) {
-        const usdcComet = new ethers.Contract(USDC_COMET_ADDRESS, cometAbi, impersonatedSigner);
-        const allowResult = await usdcComet.allow(deployedContractAddress, true);
-        await allowResult.wait();
-
-        const usdbcComet = new ethers.Contract(USDbC_COMET_ADDRESS, cometAbi, impersonatedSigner);
-        const allowResult2 = await usdbcComet.allow(deployedContractAddress, true);
-        await allowResult2.wait();
-
         const fromCContract =
             fromTokenAddress == USDC_ADDRESS ? USDC_COMET_ADDRESS : USDbC_COMET_ADDRESS;
         const toCContract =
             fromCContract == USDC_COMET_ADDRESS ? USDbC_COMET_ADDRESS : USDC_COMET_ADDRESS;
 
+        await compoundDebtManager.allow(fromCContract, deployedContractAddress);
+        await compoundDebtManager.allow(toCContract, deployedContractAddress);
+
         const beforeFromTokenDebt = await compoundDebtManager.getDebtAmount(fromCContract);
         const beforeToTokenDebt = await compoundDebtManager.getDebtAmount(toCContract);
+        const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
+        const usdcBalance = await usdcContract.balanceOf(TEST_ADDRESS);
+
+        const cbethContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, impersonatedSigner);
+        const cbethBalance = await cbethContract.balanceOf(TEST_ADDRESS);
 
         const collateralAmount = await compoundDebtManager.getCollateralAmount(fromCContract);
 
@@ -85,6 +85,9 @@ describe("Compound DebtSwap", function () {
         const afterFromTokenDebt = await compoundDebtManager.getDebtAmount(fromCContract);
         const afterToTokenDebt = await compoundDebtManager.getDebtAmount(toCContract);
 
+        const usdcBalanceAfter = await usdcContract.balanceOf(TEST_ADDRESS);
+        const cbethBalanceAfter = await cbethContract.balanceOf(TEST_ADDRESS);
+
         console.log(
             `${fromTokenAddress} Debt Amount:`,
             formatAmount(beforeFromTokenDebt),
@@ -97,6 +100,9 @@ describe("Compound DebtSwap", function () {
             " -> ",
             formatAmount(afterToTokenDebt),
         );
+
+        expect(usdcBalanceAfter).to.be.equal(usdcBalance);
+        expect(cbethBalanceAfter).to.be.equal(cbethBalance);
         expect(afterFromTokenDebt).to.be.lessThan(beforeFromTokenDebt);
         expect(afterToTokenDebt).to.be.greaterThan(beforeToTokenDebt);
     }

@@ -26,7 +26,8 @@ contract CompoundHandler is IProtocolHandler {
         IComet toComet = IComet(toCContract);
 
         // repay
-        fromComet.supplyFrom(onBehalfOf, onBehalfOf, fromAsset, amount);
+        IERC20(fromAsset).approve(address(fromCContract), amount);
+        fromComet.supplyTo(onBehalfOf, fromAsset, amount);
         console.log("repay done");
 
         // withdraw collateral

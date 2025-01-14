@@ -52,6 +52,12 @@ describe("Aave v3 DebtSwap", function () {
         const beforeFromTokenDebt = await aaveV3DebtManager.getDebtAmount(fromTokenAddress);
         const beforeToTokenDebt = await aaveV3DebtManager.getDebtAmount(toTokenAddress);
 
+        const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
+        const usdcBalance = await usdcContract.balanceOf(TEST_ADDRESS);
+
+        const cbethContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, impersonatedSigner);
+        const cbethBalance = await cbethContract.balanceOf(TEST_ADDRESS);
+
         await approve(USDC_ADDRESS, deployedContractAddress, impersonatedSigner);
         await aaveV3DebtManager.approveDelegation(toTokenAddress, deployedContractAddress);
 
@@ -71,6 +77,9 @@ describe("Aave v3 DebtSwap", function () {
         const afterFromTokenDebt = await aaveV3DebtManager.getDebtAmount(fromTokenAddress);
         const afterToTokenDebt = await aaveV3DebtManager.getDebtAmount(toTokenAddress);
 
+        const usdcBalanceAfter = await usdcContract.balanceOf(TEST_ADDRESS);
+        const cbethBalanceAfter = await cbethContract.balanceOf(TEST_ADDRESS);
+
         console.log(
             `${fromTokenAddress} Debt Amount:`,
             formatAmount(beforeFromTokenDebt),
@@ -83,6 +92,9 @@ describe("Aave v3 DebtSwap", function () {
             " -> ",
             formatAmount(afterToTokenDebt),
         );
+
+        expect(usdcBalanceAfter).to.be.equal(usdcBalance);
+        expect(cbethBalanceAfter).to.be.equal(cbethBalance);
         expect(afterFromTokenDebt).to.be.lessThan(beforeFromTokenDebt);
         expect(afterToTokenDebt).to.be.greaterThanOrEqual(beforeToTokenDebt);
     }
