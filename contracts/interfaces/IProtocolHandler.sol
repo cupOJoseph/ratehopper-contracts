@@ -2,7 +2,7 @@
 pragma solidity =0.8.27;
 
 interface IProtocolHandler {
-    function debtSwitch(
+    function switchIn(
         address fromAsset,
         address toAsset,
         uint256 amount,

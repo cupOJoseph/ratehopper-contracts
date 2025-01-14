@@ -56,6 +56,7 @@ export class AaveV3DebtManager {
             MaxUint256,
         );
         await approveDelegationTx.wait();
+        console.log("approveDelegation:", debtTokenAddress);
     }
 
     async supply(tokenAddress: string) {

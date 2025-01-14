@@ -15,7 +15,7 @@ contract AaveV3Handler is IProtocolHandler {
         aaveV3Pool = IPoolV3(_AAVE_V3_POOL_ADDRESS);
     }
 
-    function debtSwitch(
+    function switchIn(
         address fromAsset,
         address toAsset,
         uint256 amount,
@@ -42,10 +42,9 @@ contract AaveV3Handler is IProtocolHandler {
     ) external override {
         (
             address aToken,
-            ,
             address collateralAsset,
             uint256 collateralAmount
-        ) = abi.decode(extraData, (address, address, address, uint256));
+        ) = abi.decode(extraData, (address, address, uint256));
 
         aaveV3Repay(address(fromAsset), amount, onBehalfOf);
         console.log("repay done");
@@ -65,8 +64,22 @@ contract AaveV3Handler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData
     ) external override {
-        aaveV3Supply(address(toAsset), amount, onBehalfOf);
+        (address collateralAsset, uint256 collateralAmount) = abi.decode(
+            extraData,
+            (address, uint256)
+        );
+
+        uint256 collateralTokenBalance = IERC20(collateralAsset).balanceOf(
+            address(this)
+        );
+
+        IERC20(collateralAsset).approve(address(aaveV3Pool), collateralAmount);
+        aaveV3Pool.supply(collateralAsset, collateralAmount, onBehalfOf, 0);
+
+        console.log("aave v3 supply done");
+
         aaveV3Pool.borrow(toAsset, amount, 2, 0, onBehalfOf);
+        console.log("aave v3 borrow done");
     }
 
     function repayRemainingBalance(
@@ -78,15 +91,15 @@ contract AaveV3Handler is IProtocolHandler {
         aaveV3Repay(asset, amount, onBehalfOf);
     }
 
-    function aaveV3Supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf
-    ) internal {
-        IERC20(asset).safeTransferFrom(onBehalfOf, address(this), amount);
-        IERC20(asset).approve(address(aaveV3Pool), amount);
-        aaveV3Pool.supply(asset, amount, onBehalfOf, 0);
-    }
+    // function aaveV3Supply(
+    //     address asset,
+    //     uint256 amount,
+    //     address onBehalfOf
+    // ) internal {
+    //     IERC20(asset).safeTransferFrom(onBehalfOf, address(this), amount);
+    //     IERC20(asset).approve(address(aaveV3Pool), amount);
+    //     aaveV3Pool.supply(asset, amount, onBehalfOf, 0);
+    // }
 
     function aaveV3Repay(
         address asset,

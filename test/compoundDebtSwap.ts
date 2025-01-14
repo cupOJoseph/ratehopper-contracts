@@ -78,7 +78,7 @@ describe("Compound DebtSwap", function () {
             beforeFromTokenDebt,
             getAmountInMax(beforeFromTokenDebt),
             extraData,
-            extraData,
+            "0x",
         );
         await tx.wait();
 

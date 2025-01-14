@@ -105,6 +105,11 @@ contract DebtSwap {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
+        uint256 fromTokenBalance = IERC20(decoded.fromAsset).balanceOf(
+            address(this)
+        );
+        console.log("fromTokenBalance1:", fromTokenBalance);
+
         if (decoded.fromProtocol == decoded.toProtocol) {
             ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
                 uint(decoded.fromProtocol)
@@ -113,7 +118,7 @@ contract DebtSwap {
             address handler = protocolRegistry.getHandler(protocol);
             handler.delegatecall(
                 abi.encodeWithSignature(
-                    "debtSwitch(address,address,uint256,uint256,uint256,address,bytes)",
+                    "switchIn(address,address,uint256,uint256,uint256,address,bytes)",
                     decoded.fromAsset,
                     decoded.toAsset,
                     decoded.amount,
@@ -138,6 +143,11 @@ contract DebtSwap {
                     decoded.fromExtraData
                 )
             );
+
+            uint256 fromTokenBalance2 = IERC20(decoded.fromAsset).balanceOf(
+                address(this)
+            );
+            console.log("fromTokenBalance2:", fromTokenBalance2);
 
             ProtocolRegistry.Protocol ToProtocol = ProtocolRegistry.Protocol(
                 uint(decoded.toProtocol)
@@ -167,10 +177,17 @@ contract DebtSwap {
         IERC20 fromToken = IERC20(decoded.fromAsset);
         IERC20 toToken = IERC20(decoded.toAsset);
 
+        uint256 fromTokenBalance3 = fromToken.balanceOf(address(this));
+
+        console.log("fromTokenBalance3:", fromTokenBalance);
+        console.log("amount:", decoded.amount);
+        console.log("totalFee:", totalFee);
+
         fromToken.transfer(address(pool), decoded.amount + totalFee);
 
         // repay remaining amount
         uint256 remainingBalance = toToken.balanceOf(address(this));
+        console.log("remainingBalance:", remainingBalance);
 
         if (remainingBalance > 0) {
             ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
@@ -213,6 +230,8 @@ contract DebtSwap {
                 amountInMaximum: amountInMaximum,
                 sqrtPriceLimitX96: 0
             });
+
+        console.log("swap from ", inputToken, " to ", outputToken);
 
         uint256 amountIn = swapRouter.exactOutputSingle(params);
     }

@@ -22,16 +22,6 @@ export class CompoundDebtManager {
         return response.balance;
     }
 
-    async borrow(cometAddress: string, assetAddress: string) {
-        const comet = new ethers.Contract(cometAddress, cometAbi, this.signer);
-
-        const borrowAmount = ethers.parseUnits("0.1", 6);
-        const tx = await comet.withdraw(assetAddress, borrowAmount);
-        await tx.wait();
-        const borrowedAmount = await this.getDebtAmount(cometAddress);
-        console.log(`Borrowed ${formatAmount(borrowedAmount)} ${assetAddress}`);
-    }
-
     async supply(cometAddress: string) {
         await approve(cbETH_ADDRESS, cometAddress, this.signer);
         const supplyAmount = ethers.parseEther("0.001");
@@ -41,5 +31,21 @@ export class CompoundDebtManager {
         await tx.wait();
         const suppliedAmount = await this.getCollateralAmount(cometAddress);
         console.log(`Supplied ${ethers.formatEther(suppliedAmount)} cbETH`);
+    }
+
+    async borrow(cometAddress: string, assetAddress: string) {
+        const comet = new ethers.Contract(cometAddress, cometAbi, this.signer);
+
+        const borrowAmount = ethers.parseUnits("1", 6);
+        const tx = await comet.withdraw(assetAddress, borrowAmount);
+        await tx.wait();
+        const borrowedAmount = await this.getDebtAmount(cometAddress);
+        console.log(`Borrowed ${formatAmount(borrowedAmount)} ${assetAddress}`);
+    }
+
+    async allow(cometAddress: string, targetAddress: string) {
+        const comet = new ethers.Contract(cometAddress, cometAbi, this.signer);
+        const tx = await comet.allow(targetAddress, true);
+        await tx.wait();
     }
 }

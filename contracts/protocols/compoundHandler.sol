@@ -6,7 +6,7 @@ import {IERC20} from "../dependencies/IERC20.sol";
 import "hardhat/console.sol";
 
 contract CompoundHandler is IProtocolHandler {
-    function debtSwitch(
+    function switchIn(
         address fromAsset,
         address toAsset,
         uint256 amount,
@@ -63,14 +63,26 @@ contract CompoundHandler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData
     ) external override {
-        (address fromCContract, , , ) = abi.decode(
-            extraData,
-            (address, address, address, uint256)
-        );
+        (
+            address fromCContract,
+            address collateralAsset,
+            uint256 collateralAmount
+        ) = abi.decode(extraData, (address, address, uint256));
 
         IComet fromComet = IComet(fromCContract);
-        fromComet.supplyFrom(onBehalfOf, onBehalfOf, fromAsset, amount);
-        console.log("switchFrom done");
+
+        IERC20(fromAsset).approve(address(fromCContract), amount);
+        fromComet.supplyTo(onBehalfOf, fromAsset, amount);
+        console.log("repay done");
+
+        // withdraw collateral
+        fromComet.withdrawFrom(
+            onBehalfOf,
+            address(this),
+            collateralAsset,
+            collateralAmount
+        );
+        console.log("withdraw collateral done");
     }
 
     function switchTo(
@@ -80,11 +92,10 @@ contract CompoundHandler is IProtocolHandler {
         bytes calldata extraData
     ) external override {
         (
-            ,
             address toCContract,
             address collateralAsset,
             uint256 collateralAmount
-        ) = abi.decode(extraData, (address, address, address, uint256));
+        ) = abi.decode(extraData, (address, address, uint256));
 
         IComet toComet = IComet(toCContract);
 
@@ -92,7 +103,7 @@ contract CompoundHandler is IProtocolHandler {
 
         // supply collateral
         toComet.supplyFrom(
-            onBehalfOf,
+            address(this),
             onBehalfOf,
             collateralAsset,
             collateralAmount
@@ -110,13 +121,13 @@ contract CompoundHandler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData
     ) external override {
-        (, address toCContract, , ) = abi.decode(
+        (address toCContract, , ) = abi.decode(
             extraData,
-            (address, address, address, uint256)
+            (address, address, uint256)
         );
 
         IERC20(asset).approve(address(toCContract), amount);
         IComet toComet = IComet(toCContract);
-        toComet.supply(asset, amount);
+        toComet.supplyFrom(address(this), onBehalfOf, asset, amount);
     }
 }
