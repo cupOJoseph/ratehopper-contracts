@@ -5,6 +5,7 @@ import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import {IPoolV3} from "../interfaces/aaveV3/IPoolV3.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import "hardhat/console.sol";
+import {DataTypes} from "../interfaces/aaveV3/DataTypes.sol";
 
 contract AaveV3Handler is IProtocolHandler {
     using GPv2SafeERC20 for IERC20;
@@ -40,16 +41,18 @@ contract AaveV3Handler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData
     ) external override {
-        (
-            address aToken,
-            address collateralAsset,
-            uint256 collateralAmount
-        ) = abi.decode(extraData, (address, address, uint256));
+        (address collateralAsset, uint256 collateralAmount) = abi.decode(
+            extraData,
+            (address, uint256)
+        );
 
         aaveV3Repay(address(fromAsset), amount, onBehalfOf);
         console.log("repay done");
-        // TODO: get aToken address
-        IERC20(aToken).safeTransferFrom(
+
+        DataTypes.ReserveData memory reserveData = aaveV3Pool.getReserveData(
+            collateralAsset
+        );
+        IERC20(reserveData.aTokenAddress).safeTransferFrom(
             onBehalfOf,
             address(this),
             collateralAmount

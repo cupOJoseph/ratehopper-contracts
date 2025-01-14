@@ -15,47 +15,8 @@ contract CompoundHandler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData
     ) external override {
-        (
-            address fromCContract,
-            address toCContract,
-            address collateralAsset,
-            uint256 collateralAmount
-        ) = abi.decode(extraData, (address, address, address, uint256));
-
-        IComet fromComet = IComet(fromCContract);
-        IComet toComet = IComet(toCContract);
-
-        // repay
-        IERC20(fromAsset).approve(address(fromCContract), amount);
-        fromComet.supplyTo(onBehalfOf, fromAsset, amount);
-        console.log("repay done");
-
-        // withdraw collateral
-        fromComet.withdrawFrom(
-            onBehalfOf,
-            onBehalfOf,
-            collateralAsset,
-            collateralAmount
-        );
-        console.log("withdraw collateral done");
-
-        // supply collateral
-        toComet.supplyFrom(
-            onBehalfOf,
-            onBehalfOf,
-            collateralAsset,
-            collateralAmount
-        );
-        console.log("supply done");
-
-        // new borrow
-        toComet.withdrawFrom(
-            onBehalfOf,
-            address(this),
-            toAsset,
-            amountInMaximum + totalFee
-        );
-        console.log("borrow done");
+        switchFrom(fromAsset, amount, onBehalfOf, extraData);
+        switchTo(toAsset, amountInMaximum + totalFee, onBehalfOf, extraData);
     }
 
     function switchFrom(
@@ -63,18 +24,19 @@ contract CompoundHandler is IProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         bytes calldata extraData
-    ) external override {
+    ) public override {
         (
             address fromCContract,
+            ,
             address collateralAsset,
             uint256 collateralAmount
-        ) = abi.decode(extraData, (address, address, uint256));
+        ) = abi.decode(extraData, (address, address, address, uint256));
 
         IComet fromComet = IComet(fromCContract);
 
         IERC20(fromAsset).approve(address(fromCContract), amount);
         fromComet.supplyTo(onBehalfOf, fromAsset, amount);
-        console.log("repay done");
+        console.log("compound repay done");
 
         // withdraw collateral
         fromComet.withdrawFrom(
@@ -83,7 +45,7 @@ contract CompoundHandler is IProtocolHandler {
             collateralAsset,
             collateralAmount
         );
-        console.log("withdraw collateral done");
+        console.log("compound withdraw collateral done");
     }
 
     function switchTo(
@@ -91,12 +53,13 @@ contract CompoundHandler is IProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         bytes calldata extraData
-    ) external override {
+    ) public override {
         (
+            ,
             address toCContract,
             address collateralAsset,
             uint256 collateralAmount
-        ) = abi.decode(extraData, (address, address, uint256));
+        ) = abi.decode(extraData, (address, address, address, uint256));
 
         IComet toComet = IComet(toCContract);
 
@@ -109,11 +72,11 @@ contract CompoundHandler is IProtocolHandler {
             collateralAsset,
             collateralAmount
         );
-        console.log("supply done");
+        console.log("compound supply done");
 
         // borrow
         toComet.withdrawFrom(onBehalfOf, address(this), toAsset, amount);
-        console.log("switchTo done");
+        console.log("compound borrow done");
     }
 
     function repayRemainingBalance(

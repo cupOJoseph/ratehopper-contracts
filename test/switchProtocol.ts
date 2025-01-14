@@ -1,24 +1,19 @@
 import { time, loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 const { expect } = require("chai");
 import { ethers } from "hardhat";
 
-const aaveV3PoolJson = require("../externalAbi/aaveV3/aaveV3Pool.json");
-import cometAbi from "../externalAbi/compound/comet.json";
 import "dotenv/config";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 
 import { approve, deployContractFixture, formatAmount, getAmountInMax } from "./utils";
-import { Contract, MaxUint256 } from "ethers";
 import {
     USDC_ADDRESS,
     USDbC_ADDRESS,
     TEST_ADDRESS,
     USDC_hyUSD_POOL,
     ETH_USDbC_POOL,
-    AAVE_V3_POOL_ADDRESS,
     Protocols,
     cbETH_ADDRESS,
 } from "./constants";
@@ -70,8 +65,6 @@ describe("Protocol Switch", function () {
             fromProtocol == Protocols.AAVE_V3 ? beforeAaveDebt : beforeCompoundDebt;
         console.log(`${fromProtocol} Debt Amount:`, debtAmountSwitchedFrom);
 
-        await approve(cbETH_ADDRESS, USDC_COMET_ADDRESS, impersonatedSigner);
-
         const collateralAmount =
             fromProtocol == Protocols.AAVE_V3
                 ? await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS)
@@ -81,31 +74,30 @@ describe("Protocol Switch", function () {
         let fromExtraData = "0x";
         let toExtraData = "0x";
 
+        const fromCometAddress = await cometAddressMap.get(fromTokenAddress);
         const toCometAddress = await cometAddressMap.get(toTokenAddress);
         switch (fromProtocol) {
             case Protocols.AAVE_V3:
                 const aTokenAddress = await aaveV3Helper.getATokenAddress(cbETH_ADDRESS);
-                console.log("aTokenAddress:", aTokenAddress);
                 await approve(aTokenAddress, deployedContractAddress, impersonatedSigner);
 
                 fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "address", "uint256"],
-                    [aTokenAddress, cbETH_ADDRESS, collateralAmount],
+                    ["address", "uint256"],
+                    [cbETH_ADDRESS, collateralAmount],
                 );
                 break;
             case Protocols.COMPOUND:
                 await compoundHelper.allow(fromTokenAddress, deployedContractAddress);
 
                 fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "address", "uint256"],
-                    [toCometAddress, cbETH_ADDRESS, collateralAmount],
+                    ["address", "address", "address", "uint256"],
+                    [fromCometAddress, toCometAddress, cbETH_ADDRESS, collateralAmount],
                 );
                 break;
         }
 
         switch (toProtocol) {
             case Protocols.AAVE_V3:
-                await approve(cbETH_ADDRESS, deployedContractAddress, impersonatedSigner);
                 await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
 
                 toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
@@ -118,8 +110,8 @@ describe("Protocol Switch", function () {
                 await compoundHelper.allow(toTokenAddress, deployedContractAddress);
 
                 toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "address", "uint256"],
-                    [toCometAddress, cbETH_ADDRESS, collateralAmount],
+                    ["address", "address", "address", "uint256"],
+                    [fromCometAddress, toCometAddress, cbETH_ADDRESS, collateralAmount],
                 );
                 break;
         }

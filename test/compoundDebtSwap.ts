@@ -1,15 +1,14 @@
 import { time, loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 const { expect } = require("chai");
 import { ethers } from "hardhat";
-import hre from "hardhat";
 
 import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import cometAbi from "../externalAbi/compound/comet.json";
+
 import { approve, deployContractFixture, formatAmount, getAmountInMax } from "./utils";
-import { Contract, MaxUint256 } from "ethers";
+
 import {
     USDC_ADDRESS,
     USDbC_ADDRESS,
@@ -19,7 +18,12 @@ import {
     ETH_USDbC_POOL,
     Protocols,
 } from "./constants";
-import { CompoundHelper, USDbC_COMET_ADDRESS, USDC_COMET_ADDRESS } from "./protocols/compound";
+import {
+    cometAddressMap,
+    CompoundHelper,
+    USDbC_COMET_ADDRESS,
+    USDC_COMET_ADDRESS,
+} from "./protocols/compound";
 
 describe("Compound DebtSwap", function () {
     let myContract: DebtSwap;
@@ -46,10 +50,8 @@ describe("Compound DebtSwap", function () {
         toTokenAddress: string,
         flashloanPool: string,
     ) {
-        const fromCContract =
-            fromTokenAddress == USDC_ADDRESS ? USDC_COMET_ADDRESS : USDbC_COMET_ADDRESS;
-        const toCContract =
-            fromCContract == USDC_COMET_ADDRESS ? USDbC_COMET_ADDRESS : USDC_COMET_ADDRESS;
+        const fromCContract = cometAddressMap.get(fromTokenAddress)!;
+        const toCContract = cometAddressMap.get(toTokenAddress)!;
 
         await compoundHelper.allow(fromTokenAddress, deployedContractAddress);
         await compoundHelper.allow(toTokenAddress, deployedContractAddress);
@@ -116,18 +118,12 @@ describe("Compound DebtSwap", function () {
         await compoundHelper.supply(USDC_COMET_ADDRESS);
         await compoundHelper.borrow(USDC_ADDRESS);
 
-        await approve(cbETH_ADDRESS, USDbC_COMET_ADDRESS, impersonatedSigner);
-        await approve(USDC_ADDRESS, USDC_COMET_ADDRESS, impersonatedSigner);
-
         await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL);
     });
 
     it("should switch from USDbC to USDC", async function () {
         await compoundHelper.supply(USDbC_COMET_ADDRESS);
         await compoundHelper.borrow(USDbC_ADDRESS);
-
-        await approve(cbETH_ADDRESS, USDC_COMET_ADDRESS, impersonatedSigner);
-        await approve(USDbC_ADDRESS, USDbC_COMET_ADDRESS, impersonatedSigner);
 
         await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL);
     });

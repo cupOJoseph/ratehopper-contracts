@@ -45,6 +45,7 @@ export class AaveV3Helper {
 
     async getATokenAddress(assetAddress: string): Promise<string> {
         const result = await this.pool.getReserveData(assetAddress);
+        console.log("aTokenAddress:", result.aTokenAddress);
         return result.aTokenAddress;
     }
 
