@@ -25,7 +25,7 @@ contract AaveV3Handler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData // Not used for AAVE V3, but kept for compatibility
     ) external override {
-        aaveV3Repay(address(fromAsset), amount, onBehalfOf);
+        repay(address(fromAsset), amount, onBehalfOf, extraData);
         aaveV3Pool.borrow(
             address(toAsset),
             amountInMaximum + totalFee,
@@ -46,7 +46,7 @@ contract AaveV3Handler is IProtocolHandler {
             (address, uint256)
         );
 
-        aaveV3Repay(address(fromAsset), amount, onBehalfOf);
+        repay(address(fromAsset), amount, onBehalfOf, extraData);
         console.log("repay done");
 
         DataTypes.ReserveData memory reserveData = aaveV3Pool.getReserveData(
@@ -85,21 +85,13 @@ contract AaveV3Handler is IProtocolHandler {
         console.log("aave v3 borrow done");
     }
 
-    function repayRemainingBalance(
+    function repay(
         address asset,
         uint256 amount,
         address onBehalfOf,
         bytes calldata extraData
-    ) external {
-        aaveV3Repay(asset, amount, onBehalfOf);
-    }
-
-    function aaveV3Repay(
-        address asset,
-        uint256 amount,
-        address onBehalfOf
-    ) internal returns (uint256) {
+    ) public {
         IERC20(asset).approve(address(aaveV3Pool), amount);
-        return aaveV3Pool.repay(asset, amount, 2, onBehalfOf);
+        aaveV3Pool.repay(asset, amount, 2, onBehalfOf);
     }
 }

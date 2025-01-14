@@ -116,15 +116,17 @@ contract DebtSwap {
 
             address handler = protocolRegistry.getHandler(protocol);
             handler.delegatecall(
-                abi.encodeWithSignature(
-                    "switchIn(address,address,uint256,uint256,uint256,address,bytes)",
-                    decoded.fromAsset,
-                    decoded.toAsset,
-                    decoded.amount,
-                    decoded.amountInMaximum,
-                    totalFee,
-                    decoded.onBehalfOf,
-                    decoded.fromExtraData
+                abi.encodeCall(
+                    IProtocolHandler.switchIn,
+                    (
+                        decoded.fromAsset,
+                        decoded.toAsset,
+                        decoded.amount,
+                        decoded.amountInMaximum,
+                        totalFee,
+                        decoded.onBehalfOf,
+                        decoded.fromExtraData
+                    )
                 )
             );
         } else {
@@ -134,12 +136,14 @@ contract DebtSwap {
 
             address fromHandler = protocolRegistry.getHandler(fromProtocol);
             fromHandler.delegatecall(
-                abi.encodeWithSignature(
-                    "switchFrom(address,uint256,address,bytes)",
-                    decoded.fromAsset,
-                    decoded.amount,
-                    decoded.onBehalfOf,
-                    decoded.fromExtraData
+                abi.encodeCall(
+                    IProtocolHandler.switchFrom,
+                    (
+                        decoded.fromAsset,
+                        decoded.amount,
+                        decoded.onBehalfOf,
+                        decoded.fromExtraData
+                    )
                 )
             );
 
@@ -149,12 +153,14 @@ contract DebtSwap {
 
             address toHandler = protocolRegistry.getHandler(toProtocol);
             toHandler.delegatecall(
-                abi.encodeWithSignature(
-                    "switchTo(address,uint256,address,bytes)",
-                    decoded.toAsset,
-                    decoded.amountInMaximum + totalFee,
-                    decoded.onBehalfOf,
-                    decoded.toExtraData
+                abi.encodeCall(
+                    IProtocolHandler.switchTo,
+                    (
+                        decoded.toAsset,
+                        decoded.amountInMaximum + totalFee,
+                        decoded.onBehalfOf,
+                        decoded.toExtraData
+                    )
                 )
             );
         }
@@ -185,12 +191,14 @@ contract DebtSwap {
             address handler = protocolRegistry.getHandler(protocol);
 
             handler.delegatecall(
-                abi.encodeWithSignature(
-                    "repayRemainingBalance(address,uint256,address,bytes)",
-                    decoded.toAsset,
-                    remainingBalance,
-                    decoded.onBehalfOf,
-                    decoded.toExtraData
+                abi.encodeCall(
+                    IProtocolHandler.repay,
+                    (
+                        decoded.toAsset,
+                        remainingBalance,
+                        decoded.onBehalfOf,
+                        decoded.toExtraData
+                    )
                 )
             );
         }

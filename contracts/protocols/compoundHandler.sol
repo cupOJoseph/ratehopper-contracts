@@ -79,7 +79,7 @@ contract CompoundHandler is IProtocolHandler {
         console.log("compound borrow done");
     }
 
-    function repayRemainingBalance(
+    function repay(
         address asset,
         uint256 amount,
         address onBehalfOf,
