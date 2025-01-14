@@ -74,8 +74,8 @@ describe("Protocol Switch", function () {
         let fromExtraData = "0x";
         let toExtraData = "0x";
 
-        const fromCometAddress = await cometAddressMap.get(fromTokenAddress);
-        const toCometAddress = await cometAddressMap.get(toTokenAddress);
+        const fromCometAddress = await cometAddressMap.get(fromTokenAddress)!;
+        const toCometAddress = await cometAddressMap.get(toTokenAddress)!;
         switch (fromProtocol) {
             case Protocols.AAVE_V3:
                 const aTokenAddress = await aaveV3Helper.getATokenAddress(cbETH_ADDRESS);
@@ -89,9 +89,11 @@ describe("Protocol Switch", function () {
             case Protocols.COMPOUND:
                 await compoundHelper.allow(fromTokenAddress, deployedContractAddress);
 
-                fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "address", "address", "uint256"],
-                    [fromCometAddress, toCometAddress, cbETH_ADDRESS, collateralAmount],
+                fromExtraData = compoundHelper.encodeExtraData(
+                    fromCometAddress,
+                    toCometAddress,
+                    cbETH_ADDRESS,
+                    collateralAmount,
                 );
                 break;
         }
@@ -109,9 +111,11 @@ describe("Protocol Switch", function () {
             case Protocols.COMPOUND:
                 await compoundHelper.allow(toTokenAddress, deployedContractAddress);
 
-                toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "address", "address", "uint256"],
-                    [fromCometAddress, toCometAddress, cbETH_ADDRESS, collateralAmount],
+                toExtraData = compoundHelper.encodeExtraData(
+                    fromCometAddress,
+                    toCometAddress,
+                    cbETH_ADDRESS,
+                    collateralAmount,
                 );
                 break;
         }

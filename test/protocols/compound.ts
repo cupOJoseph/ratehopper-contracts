@@ -66,4 +66,16 @@ export class CompoundHelper {
         await tx.wait();
         console.log(`allow ${tokenAddress} to ${targetAddress}`);
     }
+
+    encodeExtraData(
+        fromCometAddress: string,
+        toCometAddress: string,
+        colalleralAddress: string,
+        collateralAmount: bigint,
+    ) {
+        return ethers.AbiCoder.defaultAbiCoder().encode(
+            ["address", "address", "address", "uint256"],
+            [fromCometAddress, toCometAddress, colalleralAddress, collateralAmount],
+        );
+    }
 }

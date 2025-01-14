@@ -128,11 +128,11 @@ contract DebtSwap {
                 )
             );
         } else {
-            ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
+            ProtocolRegistry.Protocol fromProtocol = ProtocolRegistry.Protocol(
                 uint(decoded.fromProtocol)
             );
 
-            address fromHandler = protocolRegistry.getHandler(protocol);
+            address fromHandler = protocolRegistry.getHandler(fromProtocol);
             fromHandler.delegatecall(
                 abi.encodeWithSignature(
                     "switchFrom(address,uint256,address,bytes)",
@@ -143,15 +143,11 @@ contract DebtSwap {
                 )
             );
 
-            uint256 fromTokenBalance2 = IERC20(decoded.fromAsset).balanceOf(
-                address(this)
-            );
-
-            ProtocolRegistry.Protocol ToProtocol = ProtocolRegistry.Protocol(
+            ProtocolRegistry.Protocol toProtocol = ProtocolRegistry.Protocol(
                 uint(decoded.toProtocol)
             );
 
-            address toHandler = protocolRegistry.getHandler(ToProtocol);
+            address toHandler = protocolRegistry.getHandler(toProtocol);
             toHandler.delegatecall(
                 abi.encodeWithSignature(
                     "switchTo(address,uint256,address,bytes)",
