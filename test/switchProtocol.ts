@@ -24,7 +24,7 @@ import {
 } from "./constants";
 
 import { AaveV3DebtManager } from "./protocols/aaveV3";
-import { CompoundDebtManager, USDC_COMET_ADDRESS } from "./protocols/compound";
+import { cometAddressMap, CompoundDebtManager, USDC_COMET_ADDRESS } from "./protocols/compound";
 
 describe("Protocol Switch", function () {
     let myContract: DebtSwap;
@@ -50,13 +50,14 @@ describe("Protocol Switch", function () {
     });
 
     async function executeDebtSwap(
-        fromTokenAddress: string,
         flashloanPool: string,
+        fromTokenAddress: string,
+        toTokenAddress: string,
         fromProtocol: Protocols,
         toProtocol: Protocols,
     ) {
         const beforeAaveDebt = await aaveV3DebtManager.getDebtAmount(fromTokenAddress);
-        const beforeCompoundDebt = await compoundDebtManager.getDebtAmount(USDC_COMET_ADDRESS);
+        const beforeCompoundDebt = await compoundDebtManager.getDebtAmount(fromTokenAddress);
 
         const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
         const usdcBalance = await usdcContract.balanceOf(TEST_ADDRESS);
@@ -76,7 +77,7 @@ describe("Protocol Switch", function () {
                 : await compoundDebtManager.getCollateralAmount(USDC_COMET_ADDRESS);
         console.log("collateralAmount:", ethers.formatEther(collateralAmount));
 
-        await compoundDebtManager.allow(USDC_COMET_ADDRESS, deployedContractAddress);
+        await compoundDebtManager.allow(fromTokenAddress, deployedContractAddress);
 
         let fromExtraData = "0x";
         let toExtraData = "0x";
@@ -116,7 +117,7 @@ describe("Protocol Switch", function () {
             fromProtocol,
             toProtocol,
             fromTokenAddress,
-            fromTokenAddress,
+            toTokenAddress,
             debtAmountSwitchedFrom,
             getAmountInMax(debtAmountSwitchedFrom),
             fromExtraData,
@@ -125,10 +126,9 @@ describe("Protocol Switch", function () {
         await tx.wait();
 
         const afterAaveDebt = await aaveV3DebtManager.getDebtAmount(fromTokenAddress);
-        const afterCompoundDebt = await compoundDebtManager.getDebtAmount(USDC_COMET_ADDRESS);
+        const afterCompoundDebt = await compoundDebtManager.getDebtAmount(fromTokenAddress);
 
         const usdcBalanceAfter = await usdcContract.balanceOf(TEST_ADDRESS);
-
         const cbethBalanceAfter = await cbethContract.balanceOf(TEST_ADDRESS);
 
         console.log(
@@ -144,20 +144,6 @@ describe("Protocol Switch", function () {
             formatAmount(afterCompoundDebt),
         );
 
-        console.log(
-            `USDC Balance:`,
-            ethers.formatUnits(usdcBalance, 6),
-            " -> ",
-            ethers.formatUnits(usdcBalanceAfter, 6),
-        );
-
-        console.log(
-            `cbETH Balance:`,
-            ethers.formatUnits(cbethBalance, 18),
-            " -> ",
-            ethers.formatUnits(cbethBalanceAfter, 18),
-        );
-
         expect(usdcBalanceAfter).to.be.equal(usdcBalance);
         expect(cbethBalanceAfter).to.be.equal(cbethBalance);
     }
@@ -166,15 +152,42 @@ describe("Protocol Switch", function () {
         await aaveV3DebtManager.supply(cbETH_ADDRESS);
         await aaveV3DebtManager.borrow(USDC_ADDRESS);
 
-        await executeDebtSwap(USDC_ADDRESS, USDC_hyUSD_POOL, Protocols.AAVE_V3, Protocols.COMPOUND);
+        await executeDebtSwap(
+            USDC_hyUSD_POOL,
+            USDC_ADDRESS,
+            USDC_ADDRESS,
+            Protocols.AAVE_V3,
+            Protocols.COMPOUND,
+        );
     });
 
     it("should switch USDC debt from Compound to Aave", async function () {
         await compoundDebtManager.supply(USDC_COMET_ADDRESS);
-        await compoundDebtManager.borrow(USDC_COMET_ADDRESS, USDC_ADDRESS);
+        await compoundDebtManager.borrow(USDC_ADDRESS);
 
         await approve(USDC_ADDRESS, USDC_COMET_ADDRESS, impersonatedSigner);
 
-        await executeDebtSwap(USDC_ADDRESS, USDC_hyUSD_POOL, Protocols.COMPOUND, Protocols.AAVE_V3);
+        await executeDebtSwap(
+            USDC_hyUSD_POOL,
+            USDC_ADDRESS,
+            USDC_ADDRESS,
+            Protocols.COMPOUND,
+            Protocols.AAVE_V3,
+        );
     });
+
+    // it("should switch USDC debt on Aave to USDbC on Compound", async function () {
+    //     await aaveV3DebtManager.supply(cbETH_ADDRESS);
+    //     await aaveV3DebtManager.borrow(USDC_ADDRESS);
+
+    //     await approve(USDC_ADDRESS, USDC_COMET_ADDRESS, impersonatedSigner);
+
+    //     await executeDebtSwap(
+    //         USDC_hyUSD_POOL,
+    //         USDC_ADDRESS,
+    //         USDbC_ADDRESS,
+    //         Protocols.AAVE_V3,
+    //         Protocols.COMPOUND,
+    //     );
+    // });
 });
