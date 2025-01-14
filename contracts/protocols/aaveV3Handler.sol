@@ -91,16 +91,6 @@ contract AaveV3Handler is IProtocolHandler {
         aaveV3Repay(asset, amount, onBehalfOf);
     }
 
-    // function aaveV3Supply(
-    //     address asset,
-    //     uint256 amount,
-    //     address onBehalfOf
-    // ) internal {
-    //     IERC20(asset).safeTransferFrom(onBehalfOf, address(this), amount);
-    //     IERC20(asset).approve(address(aaveV3Pool), amount);
-    //     aaveV3Pool.supply(asset, amount, onBehalfOf, 0);
-    // }
-
     function aaveV3Repay(
         address asset,
         uint256 amount,
