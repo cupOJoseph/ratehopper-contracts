@@ -10,6 +10,8 @@ import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.
 import { Contract, MaxUint256 } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import WETH_ABI from "../externalAbi/weth.json";
+import { morphoHandlerSol } from "../typechain-types/factories/contracts/protocols";
+import { MORPHO_ADDRESS } from "./protocols/morpho";
 
 // We define a fixture to reuse the same setup in every test.
 // We use loadFixture to run this setup once, snapshot that state,
@@ -28,6 +30,9 @@ export async function deployContractFixture() {
     const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
     const compoundHandler = await CompoundHandler.deploy();
 
+    const MorphoHandler = await hre.ethers.getContractFactory("MorphoHandler");
+    const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS);
+
     const FluidHandler = await hre.ethers.getContractFactory("FluidHandler");
     const fluidHandler = await FluidHandler.deploy();
 
@@ -35,6 +40,7 @@ export async function deployContractFixture() {
     const protocolRegistry = await ProtocolRegistry.deploy(
         aaveV3Handler.getAddress(),
         compoundHandler.getAddress(),
+        morphoHandler.getAddress(),
         fluidHandler.getAddress(),
     );
 
@@ -52,7 +58,7 @@ export async function deployContractFixture() {
 
     return {
         debtSwap,
-        fluidHandler,
+        morphoHandler,
     };
 }
 

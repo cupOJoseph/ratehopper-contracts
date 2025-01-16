@@ -27,26 +27,26 @@ describe("Fluid v3 DebtSwap", function () {
     let deployedContractAddress: string;
     let fluidHelper: FluidHelper;
 
-    this.beforeEach(async () => {
-        impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
-        fluidHelper = new FluidHelper(impersonatedSigner);
+    // this.beforeEach(async () => {
+    //     impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
+    //     fluidHelper = new FluidHelper(impersonatedSigner);
 
-        const { debtSwap, fluidHandler } = await loadFixture(deployContractFixture);
-        // deployedContractAddress = await debtSwap.getAddress();
+    //     const { debtSwap, fluidHandler } = await loadFixture(deployContractFixture);
+    //     // deployedContractAddress = await debtSwap.getAddress();
 
-        // myContract = await ethers.getContractAt(
-        //     "DebtSwap",
-        //     deployedContractAddress,
-        //     impersonatedSigner,
-        // );
-        deployedContractAddress = await fluidHandler.getAddress();
+    //     // myContract = await ethers.getContractAt(
+    //     //     "DebtSwap",
+    //     //     deployedContractAddress,
+    //     //     impersonatedSigner,
+    //     // );
+    //     deployedContractAddress = await fluidHandler.getAddress();
 
-        myContract = await ethers.getContractAt(
-            "FluidHandler",
-            deployedContractAddress,
-            impersonatedSigner,
-        );
-    });
+    //     myContract = await ethers.getContractAt(
+    //         "FluidHandler",
+    //         deployedContractAddress,
+    //         impersonatedSigner,
+    //     );
+    // });
 
     // it("should switch from USDC to USDbC", async function () {
     //     const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
