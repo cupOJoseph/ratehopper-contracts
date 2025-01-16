@@ -3,7 +3,13 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { Contract, MaxUint256 } from "ethers";
 import cometAbi from "../../externalAbi/compound/comet.json";
 import { approve, formatAmount } from "../utils";
-import { cbETH_ADDRESS, TEST_ADDRESS, USDbC_ADDRESS, USDC_ADDRESS } from "../constants";
+import {
+    cbETH_ADDRESS,
+    DEFAULT_SUPPLY_AMOUNT,
+    TEST_ADDRESS,
+    USDbC_ADDRESS,
+    USDC_ADDRESS,
+} from "../constants";
 
 export const USDC_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
 export const USDbC_COMET_ADDRESS = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
@@ -25,21 +31,24 @@ export class CompoundHelper {
         return await comet.borrowBalanceOf(TEST_ADDRESS);
     }
 
-    async getCollateralAmount(cometAddress: string): Promise<bigint> {
+    async getCollateralAmount(
+        cometAddress: string,
+        collateralTokenAddress: string,
+    ): Promise<bigint> {
         const comet = new ethers.Contract(cometAddress, cometAbi, this.signer);
-        const response = await comet.userCollateral(TEST_ADDRESS, cbETH_ADDRESS);
+        const response = await comet.userCollateral(TEST_ADDRESS, collateralTokenAddress);
         return response.balance;
     }
 
-    async supply(cometAddress: string) {
-        await approve(cbETH_ADDRESS, cometAddress, this.signer);
-        const supplyAmount = ethers.parseEther("0.001");
+    async supply(cometAddress: string, collateralTokenAddress: string) {
+        await approve(collateralTokenAddress, cometAddress, this.signer);
+        const supplyAmount = ethers.parseEther(DEFAULT_SUPPLY_AMOUNT);
         const comet = new ethers.Contract(cometAddress, cometAbi, this.signer);
 
-        const tx = await comet.supply(cbETH_ADDRESS, supplyAmount);
+        const tx = await comet.supply(collateralTokenAddress, supplyAmount);
         await tx.wait();
-        const suppliedAmount = await this.getCollateralAmount(cometAddress);
-        console.log(`Supplied ${ethers.formatEther(suppliedAmount)} cbETH`);
+        const suppliedAmount = await this.getCollateralAmount(cometAddress, collateralTokenAddress);
+        console.log(`Supplied ${ethers.formatEther(suppliedAmount)} ${collateralTokenAddress}`);
     }
 
     async borrow(tokenAddress: string) {

@@ -1,3 +1,4 @@
+export const WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
 export const USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // Circle
 export const USDbC_ADDRESS = "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca"; // Coinbase
 export const cbETH_ADDRESS = "0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22";
@@ -13,4 +14,7 @@ export const ETH_USDbC_POOL = "0x3B8000CD10625ABdC7370fb47eD4D4a9C6311fD5";
 export enum Protocols {
     AAVE_V3 = 0,
     COMPOUND = 1,
+    FLUID = 2,
 }
+
+export const DEFAULT_SUPPLY_AMOUNT = "0.001";

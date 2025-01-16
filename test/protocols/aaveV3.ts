@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { Contract, MaxUint256 } from "ethers";
-import { AAVE_V3_POOL_ADDRESS, TEST_ADDRESS } from "../constants";
+import { AAVE_V3_POOL_ADDRESS, DEFAULT_SUPPLY_AMOUNT, TEST_ADDRESS } from "../constants";
 const aaveV3ProtocolDataProvider = "0xd82a47fdebB5bf5329b09441C3DaB4b5df2153Ad";
 const aaveProtocolDataProviderAbi = require("../../externalAbi/aaveV3/aaveProtocolDataProvider.json");
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
@@ -64,7 +64,7 @@ export class AaveV3Helper {
         const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.signer);
 
         await approve(tokenAddress, AAVE_V3_POOL_ADDRESS, this.signer);
-        const amount = ethers.parseEther("0.001");
+        const amount = ethers.parseEther(DEFAULT_SUPPLY_AMOUNT);
 
         const supplyTx = await this.pool.supply(tokenAddress, amount, TEST_ADDRESS, 0);
         await supplyTx.wait();

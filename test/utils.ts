@@ -4,10 +4,12 @@ import {
     AAVE_V3_POOL_ADDRESS,
     UNISWAP_V3_FACTORY_ADRESS,
     UNISWAP_V3_SWAP_ROUTER_ADDRESS,
+    WETH_ADDRESS,
 } from "./constants";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { Contract, MaxUint256 } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import WETH_ABI from "../externalAbi/weth.json";
 
 // We define a fixture to reuse the same setup in every test.
 // We use loadFixture to run this setup once, snapshot that state,
@@ -26,10 +28,14 @@ export async function deployContractFixture() {
     const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
     const compoundHandler = await CompoundHandler.deploy();
 
+    const FluidHandler = await hre.ethers.getContractFactory("FluidHandler");
+    const fluidHandler = await FluidHandler.deploy();
+
     const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
     const protocolRegistry = await ProtocolRegistry.deploy(
         aaveV3Handler.getAddress(),
         compoundHandler.getAddress(),
+        fluidHandler.getAddress(),
     );
 
     const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
@@ -46,6 +52,7 @@ export async function deployContractFixture() {
 
     return {
         debtSwap,
+        fluidHandler,
     };
 }
 
@@ -70,4 +77,13 @@ export function getAmountInMax(amountOut: bigint): bigint {
 
 export function formatAmount(amount: bigint): string {
     return ethers.formatUnits(String(amount), 6);
+}
+
+export async function wrapETH(amountIn: string, signer: HardhatEthersSigner) {
+    const wethContract = new ethers.Contract(WETH_ADDRESS, WETH_ABI, signer);
+
+    const amount = ethers.parseEther(amountIn);
+    const tx = await wethContract.deposit({ value: amount });
+    await tx.wait();
+    console.log("Wrapped ETH to WETH:", amount);
 }

@@ -203,7 +203,6 @@ contract DebtSwap {
             );
         }
 
-        //
         uint256 remainingBalanceAfter = toToken.balanceOf(address(this));
         console.log("remainingBalanceAfter:", remainingBalanceAfter);
     }

@@ -7,7 +7,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 
-import { approve, deployContractFixture, formatAmount, getAmountInMax } from "./utils";
+import { approve, deployContractFixture, formatAmount, getAmountInMax, wrapETH } from "./utils";
 
 import {
     USDC_ADDRESS,
@@ -17,6 +17,8 @@ import {
     USDC_hyUSD_POOL,
     ETH_USDbC_POOL,
     Protocols,
+    WETH_ADDRESS,
+    DEFAULT_SUPPLY_AMOUNT,
 } from "./constants";
 import {
     cometAddressMap,
@@ -49,6 +51,7 @@ describe("Compound DebtSwap", function () {
         fromTokenAddress: string,
         toTokenAddress: string,
         flashloanPool: string,
+        collateralTokenAddress: string,
     ) {
         const fromCContract = cometAddressMap.get(fromTokenAddress)!;
         const toCContract = cometAddressMap.get(toTokenAddress)!;
@@ -61,14 +64,21 @@ describe("Compound DebtSwap", function () {
         const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
         const usdcBalance = await usdcContract.balanceOf(TEST_ADDRESS);
 
-        const cbethContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, impersonatedSigner);
-        const cbethBalance = await cbethContract.balanceOf(TEST_ADDRESS);
+        const collateralToken = new ethers.Contract(
+            collateralTokenAddress,
+            ERC20_ABI,
+            impersonatedSigner,
+        );
+        const collateralBalance = await collateralToken.balanceOf(TEST_ADDRESS);
 
-        const collateralAmount = await compoundHelper.getCollateralAmount(fromCContract);
+        const collateralAmount = await compoundHelper.getCollateralAmount(
+            fromCContract,
+            collateralTokenAddress,
+        );
 
         const extraData = ethers.AbiCoder.defaultAbiCoder().encode(
             ["address", "address", "address", "uint256"],
-            [fromCContract, toCContract, cbETH_ADDRESS, collateralAmount],
+            [fromCContract, toCContract, collateralTokenAddress, collateralAmount],
         );
 
         const tx = await myContract.executeDebtSwap(
@@ -88,7 +98,7 @@ describe("Compound DebtSwap", function () {
         const afterToTokenDebt = await compoundHelper.getDebtAmount(toTokenAddress);
 
         const usdcBalanceAfter = await usdcContract.balanceOf(TEST_ADDRESS);
-        const cbethBalanceAfter = await cbethContract.balanceOf(TEST_ADDRESS);
+        const collateralBalanceAfter = await collateralToken.balanceOf(TEST_ADDRESS);
 
         console.log(
             `${fromTokenAddress} Debt Amount:`,
@@ -104,27 +114,49 @@ describe("Compound DebtSwap", function () {
         );
 
         expect(usdcBalanceAfter).to.be.equal(usdcBalance);
-        expect(cbethBalanceAfter).to.be.equal(cbethBalance);
+        expect(collateralBalanceAfter).to.be.equal(collateralBalance);
         expect(afterFromTokenDebt).to.be.lessThan(beforeFromTokenDebt);
         expect(afterToTokenDebt).to.be.greaterThan(beforeToTokenDebt);
     }
 
     it("should return collateral amount for cbETH", async function () {
-        const collateralAmount = await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS);
+        const collateralAmount = await compoundHelper.getCollateralAmount(
+            USDC_COMET_ADDRESS,
+            cbETH_ADDRESS,
+        );
         console.log("collateralAmount:", ethers.formatEther(collateralAmount));
     });
 
-    it("should switch from USDC to USDbC", async function () {
-        await compoundHelper.supply(USDC_COMET_ADDRESS);
-        await compoundHelper.borrow(USDC_ADDRESS);
+    describe("Collateral is cbETH", function () {
+        it("should switch from USDC to USDbC", async function () {
+            await compoundHelper.supply(USDC_COMET_ADDRESS, cbETH_ADDRESS);
+            await compoundHelper.borrow(USDC_ADDRESS);
 
-        await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL);
+            await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL, cbETH_ADDRESS);
+        });
+
+        it("should switch from USDbC to USDC", async function () {
+            await compoundHelper.supply(USDbC_COMET_ADDRESS, cbETH_ADDRESS);
+            await compoundHelper.borrow(USDbC_ADDRESS);
+
+            await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL, cbETH_ADDRESS);
+        });
     });
+    describe("Collateral is WETH", function () {
+        it("should switch from USDC to USDbC", async function () {
+            await wrapETH(DEFAULT_SUPPLY_AMOUNT, impersonatedSigner);
+            await compoundHelper.supply(USDC_COMET_ADDRESS, WETH_ADDRESS);
+            await compoundHelper.borrow(USDC_ADDRESS);
 
-    it("should switch from USDbC to USDC", async function () {
-        await compoundHelper.supply(USDbC_COMET_ADDRESS);
-        await compoundHelper.borrow(USDbC_ADDRESS);
+            await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL, WETH_ADDRESS);
+        });
 
-        await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL);
+        it("should switch from USDbC to USDC", async function () {
+            await wrapETH(DEFAULT_SUPPLY_AMOUNT, impersonatedSigner);
+            await compoundHelper.supply(USDbC_COMET_ADDRESS, WETH_ADDRESS);
+            await compoundHelper.borrow(USDbC_ADDRESS);
+
+            await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL, WETH_ADDRESS);
+        });
     });
 });

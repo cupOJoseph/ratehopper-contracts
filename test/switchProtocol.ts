@@ -68,7 +68,7 @@ describe("Protocol Switch", function () {
         const collateralAmount =
             fromProtocol == Protocols.AAVE_V3
                 ? await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS)
-                : await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS);
+                : await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS, cbETH_ADDRESS);
         console.log("collateralAmount:", ethers.formatEther(collateralAmount));
 
         let fromExtraData = "0x";
@@ -178,7 +178,7 @@ describe("Protocol Switch", function () {
     });
 
     it("should switch USDC debt from Compound to Aave", async function () {
-        await compoundHelper.supply(USDC_COMET_ADDRESS);
+        await compoundHelper.supply(USDC_COMET_ADDRESS, cbETH_ADDRESS);
         await compoundHelper.borrow(USDC_ADDRESS);
 
         await executeDebtSwap(
