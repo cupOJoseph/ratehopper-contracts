@@ -58,7 +58,6 @@ export async function deployContractFixture() {
 
     return {
         debtSwap,
-        morphoHandler,
     };
 }
 

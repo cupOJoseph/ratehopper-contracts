@@ -28,7 +28,9 @@ contract DebtSwap {
 
     enum Protocol {
         AAVE_V3,
-        COMPOUND
+        COMPOUND,
+        MORPHO,
+        FLUID
     }
 
     struct FlashCallbackData {

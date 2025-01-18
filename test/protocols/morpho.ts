@@ -19,13 +19,36 @@ export class MorphoHelper {
         this.morpho = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, signer);
     }
 
-    async getPosition() {
-        const position = await this.morpho.position(
-            "0x1c21c59df9db44bf6f645d854ee710a8ca17b479451447e9f56758aee10a2fad",
-            TEST_ADDRESS,
-        );
+    async getDebtAmount(marketId: string): Promise<bigint> {
+        const positionData = await this.getPosition(marketId);
+        const marketData = await this.getMarketData(marketId);
+        const borrowShares = BigInt(positionData.borrowShares);
+        const totalBorrowAssets = BigInt(marketData.totalBorrowAssets) + BigInt(1);
+        const totalBorrowShares = BigInt(marketData.totalBorrowShares) + BigInt(1000000);
+
+        const result1 = borrowShares * totalBorrowAssets;
+        const result2 = totalBorrowShares - BigInt(1);
+        const debtAmount = result1 / result2;
+        console.log("debtAmount:", formatAmount(debtAmount));
+        return debtAmount;
+    }
+
+    async getCollateralAmount(marketId: string): Promise<bigint> {
+        const positionData = await this.getPosition(marketId);
+        const collateralAmount = positionData.collateral;
+        console.log("collateralAmount:", collateralAmount);
+        return collateralAmount;
+    }
+
+    async getPosition(marketId: string) {
+        const position = await this.morpho.position(marketId, TEST_ADDRESS);
         console.log("position:", position);
         return position;
+    }
+
+    async getMarketData(marketId: string) {
+        const marketData = await this.morpho.market(marketId);
+        return marketData;
     }
 
     async borrow() {
