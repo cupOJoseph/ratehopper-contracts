@@ -16,7 +16,8 @@ contract FluidHandler is IProtocolHandler {
         uint256 amountInMaximum,
         uint256 totalFee,
         address onBehalfOf,
-        bytes calldata extraData
+        bytes calldata fromExtraData,
+        bytes calldata toExtraData
     ) external override {
         // Implement logic for switching in assets
     }

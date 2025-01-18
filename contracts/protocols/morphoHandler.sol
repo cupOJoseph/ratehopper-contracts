@@ -10,7 +10,7 @@ import "../interfaces/morpho/IMorpho.sol";
 
 contract MorphoHandler is IProtocolHandler {
     using GPv2SafeERC20 for IERC20;
-    IMorphoBase public morpho;
+    IMorpho public immutable morpho;
 
     constructor(address _MORPHO_ADDRESS) {
         morpho = IMorpho(_MORPHO_ADDRESS);
@@ -23,10 +23,11 @@ contract MorphoHandler is IProtocolHandler {
         uint256 amountInMaximum,
         uint256 totalFee,
         address onBehalfOf,
-        bytes calldata extraData
+        bytes calldata fromExtraData,
+        bytes calldata toExtraData
     ) external override {
-        switchFrom(fromAsset, amount, onBehalfOf, extraData);
-        switchTo(toAsset, amountInMaximum + totalFee, onBehalfOf, extraData);
+        switchFrom(fromAsset, amount, onBehalfOf, fromExtraData);
+        switchTo(toAsset, amountInMaximum + totalFee, onBehalfOf, toExtraData);
     }
 
     function supply(
@@ -42,6 +43,7 @@ contract MorphoHandler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData
     ) public override {
+        console.log("msg.sender", msg.sender);
         (
             uint256 collateralAmount,
             address loanToken,
@@ -53,31 +55,26 @@ contract MorphoHandler is IProtocolHandler {
                 extraData,
                 (uint256, address, address, address, address, uint256)
             );
-        console.log("collateralAmount", collateralAmount);
-        console.log("loanToken", loanToken);
-        console.log("collateralToken", collateralToken);
-        console.log("oracle", oracle);
-        console.log("irm", irm);
-        console.log("lltv", lltv);
 
-        MarketParams memory marketParams = MarketParams(
-            loanToken,
-            collateralToken,
-            oracle,
-            irm,
-            lltv
-        );
+        MarketParams memory marketParams = MarketParams({
+            loanToken: loanToken,
+            collateralToken: collateralToken,
+            oracle: oracle,
+            irm: irm,
+            lltv: lltv
+        });
 
-        IERC20(fromAsset).safeTransferFrom(onBehalfOf, address(this), amount);
         IERC20(fromAsset).approve(address(morpho), amount);
         morpho.repay(marketParams, amount, 0, onBehalfOf, "");
+        console.log("repay done");
 
         morpho.withdrawCollateral(
             marketParams,
             collateralAmount,
             onBehalfOf,
-            onBehalfOf
+            address(this)
         );
+        console.log("withdrawCollateral done");
     }
 
     function switchTo(
@@ -87,21 +84,32 @@ contract MorphoHandler is IProtocolHandler {
         bytes calldata extraData
     ) public override {
         (
-            address collateralAsset,
             uint256 collateralAmount,
-            MarketParams memory marketParams
-        ) = abi.decode(extraData, (address, uint256, MarketParams));
+            address loanToken,
+            address collateralToken,
+            address oracle,
+            address irm,
+            uint256 lltv
+        ) = abi.decode(
+                extraData,
+                (uint256, address, address, address, address, uint256)
+            );
 
-        IERC20(toAsset).safeTransferFrom(onBehalfOf, address(this), amount);
-        IERC20(toAsset).approve(address(morpho), amount);
-        morpho.supplyCollateral(marketParams, amount, onBehalfOf, "");
-        morpho.borrow(
-            marketParams,
-            collateralAmount,
-            0,
-            onBehalfOf,
-            onBehalfOf
-        );
+        MarketParams memory marketParams = MarketParams({
+            loanToken: loanToken,
+            collateralToken: collateralToken,
+            oracle: oracle,
+            irm: irm,
+            lltv: lltv
+        });
+
+        console.log("oracle", marketParams.oracle);
+
+        IERC20(collateralToken).approve(address(morpho), collateralAmount);
+        morpho.supplyCollateral(marketParams, collateralAmount, onBehalfOf, "");
+        console.log("supplyCollateral done");
+        morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
+        console.log("borrow done");
     }
 
     function repay(
@@ -111,13 +119,27 @@ contract MorphoHandler is IProtocolHandler {
         bytes calldata extraData
     ) public {
         (
-            address collateralAsset,
             uint256 collateralAmount,
-            MarketParams memory marketParams
-        ) = abi.decode(extraData, (address, uint256, MarketParams));
+            address loanToken,
+            address collateralToken,
+            address oracle,
+            address irm,
+            uint256 lltv
+        ) = abi.decode(
+                extraData,
+                (uint256, address, address, address, address, uint256)
+            );
 
-        IERC20(asset).safeTransferFrom(onBehalfOf, address(this), amount);
+        MarketParams memory marketParams = MarketParams({
+            loanToken: loanToken,
+            collateralToken: collateralToken,
+            oracle: oracle,
+            irm: irm,
+            lltv: lltv
+        });
+
         IERC20(asset).approve(address(morpho), amount);
         morpho.repay(marketParams, amount, 0, onBehalfOf, "");
+        console.log("remaining repay done");
     }
 }

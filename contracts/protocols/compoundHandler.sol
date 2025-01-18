@@ -13,10 +13,16 @@ contract CompoundHandler is IProtocolHandler {
         uint256 amountInMaximum,
         uint256 totalFee,
         address onBehalfOf,
-        bytes calldata extraData
+        bytes calldata fromExtraData,
+        bytes calldata toExtraData
     ) external override {
-        switchFrom(fromAsset, amount, onBehalfOf, extraData);
-        switchTo(toAsset, amountInMaximum + totalFee, onBehalfOf, extraData);
+        switchFrom(fromAsset, amount, onBehalfOf, fromExtraData);
+        switchTo(
+            toAsset,
+            amountInMaximum + totalFee,
+            onBehalfOf,
+            fromExtraData
+        );
     }
 
     function switchFrom(

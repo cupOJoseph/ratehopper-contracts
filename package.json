@@ -5,9 +5,11 @@
     "main": "index.js",
     "scripts": {
         "test": "npx hardhat test",
+        "trace": "npx hardhat test --v",
         "compile": "npx hardhat compile",
         "size": "npx hardhat size-contracts",
-        "coverage": "npx hardhat coverage"
+        "coverage": "npx hardhat coverage",
+        "clean": "npx hardhat clean"
     },
     "author": "",
     "license": "ISC",
@@ -45,6 +47,7 @@
         "eslint-plugin-import": "^2.31.0",
         "ethers": "^6.4.0",
         "hardhat-gas-reporter": "^2.2.2",
+        "hardhat-tracer": "^3.1.0",
         "prettier": "^3.4.2",
         "prettier-plugin-solidity": "^1.4.1",
         "solhint": "^5.0.3",

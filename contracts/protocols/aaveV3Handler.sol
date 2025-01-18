@@ -24,9 +24,10 @@ contract AaveV3Handler is IProtocolHandler {
         uint256 amountInMaximum,
         uint256 totalFee,
         address onBehalfOf,
-        bytes calldata extraData // Not used for AAVE V3, but kept for compatibility
+        bytes calldata fromExtraData,
+        bytes calldata toExtraData
     ) external override {
-        repay(address(fromAsset), amount, onBehalfOf, extraData);
+        repay(address(fromAsset), amount, onBehalfOf, fromExtraData);
         aaveV3Pool.borrow(
             address(toAsset),
             amountInMaximum + totalFee,

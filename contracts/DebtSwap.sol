@@ -127,7 +127,8 @@ contract DebtSwap {
                         decoded.amountInMaximum,
                         totalFee,
                         decoded.onBehalfOf,
-                        decoded.fromExtraData
+                        decoded.fromExtraData,
+                        decoded.toExtraData
                     )
                 )
             );

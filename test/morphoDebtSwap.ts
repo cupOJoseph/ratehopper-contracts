@@ -30,7 +30,7 @@ describe(" Morpho v3 DebtSwap", function () {
     let morphoHelper: MorphoHelper;
 
     const fromMarketId = "0x1c21c59df9db44bf6f645d854ee710a8ca17b479451447e9f56758aee10a2fad";
-    const toMarketId = "0xb5d424e4af49244b074790f1f2dc9c20df948ce291fc6bcc6b59149ecf91196d";
+    const toMarketId = "0xdba352d93a64b17c71104cbddc6aef85cd432322a1446b5b65163cbbc615cd0c";
 
     this.beforeEach(async () => {
         impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
@@ -60,11 +60,19 @@ describe(" Morpho v3 DebtSwap", function () {
             lltv: 860000000000000000n,
         };
 
+        // const toMarketParams = {
+        //     collateralToken: cbETH_ADDRESS,
+        //     loanToken: eUSD_ADDRESS,
+        //     irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
+        //     oracle: "0xc3Fa71D77d80f671F366DAA6812C8bD6C7749cEc",
+        //     lltv: 860000000000000000n,
+        // };
+
         const toMarketParams = {
             collateralToken: cbETH_ADDRESS,
-            loanToken: eUSD_ADDRESS,
+            loanToken: USDC_ADDRESS,
             irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
-            oracle: "0xc3Fa71D77d80f671F366DAA6812C8bD6C7749cEc",
+            oracle: "0x4756c26E01E61c7c2F86b10f4316e179db8F9425",
             lltv: 860000000000000000n,
         };
 
@@ -83,11 +91,12 @@ describe(" Morpho v3 DebtSwap", function () {
         const collateralAmount = await morphoHelper.getCollateralAmount(fromMarketId);
 
         await approve(USDC_ADDRESS, deployedContractAddress, impersonatedSigner);
+        await approve(collateralTokenAddress, deployedContractAddress, impersonatedSigner);
 
         const fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
             ["uint256", "address", "address", "address", "address", "uint256"],
             [
-                collateralAmount,
+                collateralAmount / BigInt(2),
                 fromMarketParams.loanToken,
                 fromMarketParams.collateralToken,
                 fromMarketParams.oracle,
@@ -99,12 +108,12 @@ describe(" Morpho v3 DebtSwap", function () {
         const toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
             ["uint256", "address", "address", "address", "address", "uint256"],
             [
-                collateralAmount,
-                fromMarketParams.loanToken,
-                fromMarketParams.collateralToken,
-                fromMarketParams.oracle,
-                fromMarketParams.irm,
-                fromMarketParams.lltv,
+                collateralAmount / BigInt(2),
+                toMarketParams.loanToken,
+                toMarketParams.collateralToken,
+                toMarketParams.oracle,
+                toMarketParams.irm,
+                toMarketParams.lltv,
             ],
         );
 
@@ -114,8 +123,8 @@ describe(" Morpho v3 DebtSwap", function () {
             Protocols.MORPHO,
             fromTokenAddress,
             toTokenAddress,
-            beforeFromTokenDebt,
-            getAmountInMax(beforeFromTokenDebt),
+            beforeFromTokenDebt / BigInt(2),
+            getAmountInMax(beforeFromTokenDebt / BigInt(2)),
             fromExtraData,
             toExtraData,
         );
@@ -128,13 +137,13 @@ describe(" Morpho v3 DebtSwap", function () {
         const collateralBalanceAfter = await collateralToken.balanceOf(TEST_ADDRESS);
 
         console.log(
-            `${fromTokenAddress} Debt Amount:`,
+            `${fromMarketId} Debt Amount:`,
             formatAmount(beforeFromTokenDebt),
             " -> ",
             formatAmount(afterFromTokenDebt),
         );
         console.log(
-            `${toTokenAddress} Debt Amount:`,
+            `${toMarketId} Debt Amount:`,
             formatAmount(beforeToTokenDebt),
             " -> ",
             formatAmount(afterToTokenDebt),
@@ -159,7 +168,7 @@ describe(" Morpho v3 DebtSwap", function () {
 
             await morphoHelper.borrow();
 
-            await executeDebtSwap(USDC_ADDRESS, eUSD_ADDRESS, USDC_hyUSD_POOL, cbETH_ADDRESS);
+            await executeDebtSwap(USDC_ADDRESS, USDC_ADDRESS, USDC_hyUSD_POOL, cbETH_ADDRESS);
         });
     });
 
