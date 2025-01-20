@@ -76,10 +76,17 @@ describe("Compound DebtSwap", function () {
             collateralTokenAddress,
         );
 
-        const extraData = ethers.AbiCoder.defaultAbiCoder().encode(
-            ["address", "address", "address", "uint256"],
-            [fromCContract, toCContract, collateralTokenAddress, collateralAmount],
+        const fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
+            ["address", "address", "uint256"],
+            [fromCContract, collateralTokenAddress, collateralAmount],
         );
+
+        const toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
+            ["address", "address", "uint256"],
+            [toCContract, collateralTokenAddress, collateralAmount],
+        );
+
+        await time.increaseTo((await time.latest()) + 60);
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
@@ -89,8 +96,8 @@ describe("Compound DebtSwap", function () {
             toTokenAddress,
             beforeFromTokenDebt,
             getAmountInMax(beforeFromTokenDebt),
-            extraData,
-            "0x",
+            fromExtraData,
+            toExtraData,
         );
         await tx.wait();
 

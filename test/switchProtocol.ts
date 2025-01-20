@@ -91,7 +91,6 @@ describe("Protocol Switch", function () {
 
                 fromExtraData = compoundHelper.encodeExtraData(
                     fromCometAddress,
-                    toCometAddress,
                     cbETH_ADDRESS,
                     collateralAmount,
                 );
@@ -112,7 +111,6 @@ describe("Protocol Switch", function () {
                 await compoundHelper.allow(toTokenAddress, deployedContractAddress);
 
                 toExtraData = compoundHelper.encodeExtraData(
-                    fromCometAddress,
                     toCometAddress,
                     cbETH_ADDRESS,
                     collateralAmount,
@@ -213,6 +211,19 @@ describe("Protocol Switch", function () {
             USDC_ADDRESS,
             Protocols.AAVE_V3,
             Protocols.COMPOUND,
+        );
+    });
+
+    it("should switch USDC debt on Aave to USDC on Morpho", async function () {
+        await aaveV3Helper.supply(cbETH_ADDRESS);
+        await aaveV3Helper.borrow(USDC_ADDRESS);
+
+        await executeDebtSwap(
+            USDC_hyUSD_POOL,
+            USDC_ADDRESS,
+            USDC_ADDRESS,
+            Protocols.AAVE_V3,
+            Protocols.MORPHO,
         );
     });
 });

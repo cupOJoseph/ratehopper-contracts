@@ -1,4 +1,4 @@
-import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
+import { loadFixture, time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 const { expect } = require("chai");
 import { ethers } from "hardhat";
 const aaveV3PoolJson = require("../externalAbi/aaveV3/aaveV3Pool.json");
@@ -67,6 +67,8 @@ describe("Aave v3 DebtSwap", function () {
 
         await approve(USDC_ADDRESS, deployedContractAddress, impersonatedSigner);
         await aaveV3Helper.approveDelegation(toTokenAddress, deployedContractAddress);
+
+        await time.increaseTo((await time.latest()) + 60);
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,

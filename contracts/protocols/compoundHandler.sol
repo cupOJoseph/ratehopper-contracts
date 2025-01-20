@@ -17,12 +17,7 @@ contract CompoundHandler is IProtocolHandler {
         bytes calldata toExtraData
     ) external override {
         switchFrom(fromAsset, amount, onBehalfOf, fromExtraData);
-        switchTo(
-            toAsset,
-            amountInMaximum + totalFee,
-            onBehalfOf,
-            fromExtraData
-        );
+        switchTo(toAsset, amountInMaximum + totalFee, onBehalfOf, toExtraData);
     }
 
     function switchFrom(
@@ -32,15 +27,14 @@ contract CompoundHandler is IProtocolHandler {
         bytes calldata extraData
     ) public override {
         (
-            address fromCContract,
-            ,
+            address cContract,
             address collateralAsset,
             uint256 collateralAmount
-        ) = abi.decode(extraData, (address, address, address, uint256));
+        ) = abi.decode(extraData, (address, address, uint256));
 
-        IComet fromComet = IComet(fromCContract);
+        IComet fromComet = IComet(cContract);
 
-        IERC20(fromAsset).approve(address(fromCContract), amount);
+        IERC20(fromAsset).approve(address(cContract), amount);
         fromComet.supplyTo(onBehalfOf, fromAsset, amount);
         console.log("compound repay done");
 
@@ -61,15 +55,14 @@ contract CompoundHandler is IProtocolHandler {
         bytes calldata extraData
     ) public override {
         (
-            ,
-            address toCContract,
+            address cContract,
             address collateralAsset,
             uint256 collateralAmount
-        ) = abi.decode(extraData, (address, address, address, uint256));
+        ) = abi.decode(extraData, (address, address, uint256));
 
-        IComet toComet = IComet(toCContract);
+        IComet toComet = IComet(cContract);
 
-        IERC20(collateralAsset).approve(address(toCContract), collateralAmount);
+        IERC20(collateralAsset).approve(address(cContract), collateralAmount);
 
         // supply collateral
         toComet.supplyFrom(
@@ -91,13 +84,14 @@ contract CompoundHandler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData
     ) external override {
-        (address toCContract, , ) = abi.decode(
-            extraData,
-            (address, address, uint256)
-        );
+        (
+            address cContract,
+            address collateralAsset,
+            uint256 collateralAmount
+        ) = abi.decode(extraData, (address, address, uint256));
 
-        IERC20(asset).approve(address(toCContract), amount);
-        IComet toComet = IComet(toCContract);
+        IERC20(asset).approve(address(cContract), amount);
+        IComet toComet = IComet(cContract);
         toComet.supplyFrom(address(this), onBehalfOf, asset, amount);
     }
 }

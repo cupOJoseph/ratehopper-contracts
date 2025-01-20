@@ -12,10 +12,42 @@ import { BundlerAction } from "@morpho-org/bundler-sdk-ethers";
 export const bundlerAddress = "0x23055618898e202386e6c13955a58d3c68200bfb";
 export const MORPHO_ADDRESS = "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb";
 
+export const morphoMarket1Id = "0x1c21c59df9db44bf6f645d854ee710a8ca17b479451447e9f56758aee10a2fad";
+export const morphoMarket2Id = "0xdba352d93a64b17c71104cbddc6aef85cd432322a1446b5b65163cbbc615cd0c";
+
+const market1Params = {
+    collateralToken: cbETH_ADDRESS,
+    loanToken: USDC_ADDRESS,
+    irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
+    oracle: "0xb40d93F44411D8C09aD17d7F88195eF9b05cCD96",
+    lltv: 860000000000000000n,
+};
+
+const market2Params = {
+    collateralToken: cbETH_ADDRESS,
+    loanToken: USDC_ADDRESS,
+    irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
+    oracle: "0x4756c26E01E61c7c2F86b10f4316e179db8F9425",
+    lltv: 860000000000000000n,
+};
+
+export const marketParamsMap = new Map<string, any>([
+    [morphoMarket1Id, market1Params],
+    [morphoMarket2Id, market2Params],
+]);
+
+// const toMarketParams = {
+//     collateralToken: cbETH_ADDRESS,
+//     loanToken: eUSD_ADDRESS,
+//     irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
+//     oracle: "0xc3Fa71D77d80f671F366DAA6812C8bD6C7749cEc",
+//     lltv: 860000000000000000n,
+// };
+
 export class MorphoHelper {
     private morpho;
 
-    constructor(private signer: HardhatEthersSigner) {
+    constructor(private signer: HardhatEthersSigner | any) {
         this.morpho = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, signer);
     }
 
@@ -29,7 +61,6 @@ export class MorphoHelper {
         const result1 = borrowShares * totalBorrowAssets;
         const result2 = totalBorrowShares - BigInt(1);
         const debtAmount = result1 / result2;
-        console.log("debtAmount:", formatAmount(debtAmount));
         return debtAmount;
     }
 
@@ -40,26 +71,23 @@ export class MorphoHelper {
         return collateralAmount;
     }
 
+    async getBorrowShares(marketId: string): Promise<bigint> {
+        const positionData = await this.getPosition(marketId);
+        const borrowShares = positionData.borrowShares;
+        console.log("borrowShares:", borrowShares);
+        return borrowShares;
+    }
+
     async getPosition(marketId: string) {
-        const position = await this.morpho.position(marketId, TEST_ADDRESS);
-        console.log("position:", position);
-        return position;
+        return await this.morpho.position(marketId, TEST_ADDRESS);
     }
 
     async getMarketData(marketId: string) {
-        const marketData = await this.morpho.market(marketId);
-        return marketData;
+        return await this.morpho.market(marketId);
     }
 
-    async borrow() {
-        const marketParams = {
-            collateralToken: cbETH_ADDRESS,
-            loanToken: USDC_ADDRESS,
-            irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
-            oracle: "0xb40d93F44411D8C09aD17d7F88195eF9b05cCD96",
-            lltv: 860000000000000000n, // 86% LLTV
-        };
-
+    async borrow(marketId: string) {
+        const marketParams = marketParamsMap.get(marketId)!;
         const amount = ethers.parseUnits("1", 6);
         const tx = await this.morpho.borrow(marketParams, amount, 0, TEST_ADDRESS, TEST_ADDRESS);
         await tx.wait();
@@ -73,34 +101,28 @@ export class MorphoHelper {
         // }
     }
 
-    async supply(tokenAddress: string) {
-        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.signer);
-        await approve(tokenAddress, bundlerAddress, this.signer);
+    async supply(collateralTokenAddress: string, marketId: string) {
+        const tokenContract = new ethers.Contract(collateralTokenAddress, ERC20_ABI, this.signer);
+        await approve(collateralTokenAddress, bundlerAddress, this.signer);
         const amount = ethers.parseEther(DEFAULT_SUPPLY_AMOUNT);
-        const borrowAmount = ethers.parseUnits("1", 6);
 
         const walletBalance = await tokenContract.balanceOf(TEST_ADDRESS);
-        console.log(`${tokenAddress} Wallet Balance:`, formatAmount(walletBalance));
+        console.log(`${collateralTokenAddress} Wallet Balance:`, formatAmount(walletBalance));
 
-        const erc20TransferAction = BundlerAction.erc20TransferFrom(tokenAddress, amount);
+        const erc20TransferAction = BundlerAction.erc20TransferFrom(collateralTokenAddress, amount);
 
-        const marketParams = {
-            collateralToken: cbETH_ADDRESS,
-            loanToken: USDC_ADDRESS,
-            irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
-            oracle: "0xb40d93F44411D8C09aD17d7F88195eF9b05cCD96",
-            lltv: 860000000000000000n, // 86% LLTV
-        };
+        const marketParam = marketParamsMap.get(marketId)!;
 
         const supplyAction = BundlerAction.morphoSupplyCollateral(
-            marketParams,
+            marketParam,
             amount,
             TEST_ADDRESS,
             [],
         );
 
+        const borrowAmount = ethers.parseUnits("1", 6);
         const borrowAction = BundlerAction.morphoBorrow(
-            marketParams,
+            marketParam,
             borrowAmount,
             0n,
             0n,
@@ -111,7 +133,7 @@ export class MorphoHelper {
         await bundler.multicall([erc20TransferAction, supplyAction]);
 
         const walletBalanceAfter = await tokenContract.balanceOf(TEST_ADDRESS);
-        console.log(`${tokenAddress} Wallet Balance:`, formatAmount(walletBalanceAfter));
+        console.log(`${collateralTokenAddress} Wallet Balance:`, formatAmount(walletBalanceAfter));
     }
 
     async decode(rawData: string) {
