@@ -81,7 +81,7 @@ describe("Aave v3 DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             debtAmount,
-            getAmountInMax(beforeFromTokenDebt),
+            ethers.parseUnits("1.01", 6),
             "0x",
             "0x",
         );

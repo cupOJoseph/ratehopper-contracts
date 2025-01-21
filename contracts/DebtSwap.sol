@@ -40,7 +40,7 @@ contract DebtSwap {
         address fromAsset;
         address toAsset;
         uint256 amount;
-        uint256 amountInMaximum;
+        uint256 allowedSlippage;
         address onBehalfOf;
         bytes fromExtraData;
         bytes toExtraData;
@@ -63,7 +63,7 @@ contract DebtSwap {
         address _fromAsset,
         address _toAsset,
         uint256 _amount,
-        uint256 _amountInMaximum,
+        uint256 _allowedSlippage,
         bytes calldata _fromExtraData,
         bytes calldata _toExtraData
     ) public {
@@ -101,7 +101,7 @@ contract DebtSwap {
                 fromAsset: _fromAsset,
                 toAsset: _toAsset,
                 amount: debtAmount,
-                amountInMaximum: _amountInMaximum,
+                allowedSlippage: _allowedSlippage,
                 onBehalfOf: msg.sender,
                 fromExtraData: _fromExtraData,
                 toExtraData: _toExtraData
@@ -131,6 +131,10 @@ contract DebtSwap {
             address(this)
         );
 
+        uint256 amountInMax = (decoded.amount * decoded.allowedSlippage) /
+            10 ** 6;
+        console.log("amountInMax:", amountInMax);
+
         if (decoded.fromProtocol == decoded.toProtocol) {
             ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
                 uint(decoded.fromProtocol)
@@ -144,7 +148,7 @@ contract DebtSwap {
                         decoded.fromAsset,
                         decoded.toAsset,
                         decoded.amount,
-                        decoded.amountInMaximum,
+                        amountInMax,
                         totalFee,
                         decoded.onBehalfOf,
                         decoded.fromExtraData,
@@ -180,7 +184,7 @@ contract DebtSwap {
                     IProtocolHandler.switchTo,
                     (
                         decoded.toAsset,
-                        decoded.amountInMaximum + totalFee,
+                        amountInMax + totalFee,
                         decoded.onBehalfOf,
                         decoded.toExtraData
                     )
@@ -193,7 +197,7 @@ contract DebtSwap {
                 address(decoded.toAsset),
                 address(decoded.fromAsset),
                 decoded.amount + totalFee,
-                decoded.amountInMaximum
+                amountInMax
             );
         }
 

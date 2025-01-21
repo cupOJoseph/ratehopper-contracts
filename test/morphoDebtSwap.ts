@@ -117,7 +117,7 @@ describe("Morpho DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             MaxUint256,
-            getAmountInMax(beforeFromTokenDebt),
+            ethers.parseUnits("1.01", 6),
             fromExtraData,
             toExtraData,
         );

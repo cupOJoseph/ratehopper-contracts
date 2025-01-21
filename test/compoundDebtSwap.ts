@@ -99,7 +99,7 @@ describe("Compound DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             debtAmount,
-            getAmountInMax(beforeFromTokenDebt),
+            ethers.parseUnits("1.01", 6),
             fromExtraData,
             toExtraData,
         );

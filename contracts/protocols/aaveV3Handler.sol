@@ -39,7 +39,7 @@ contract AaveV3Handler is IProtocolHandler {
         address fromAsset,
         address toAsset,
         uint256 amount,
-        uint256 amountInMaximum,
+        uint256 amountInMax,
         uint256 totalFee,
         address onBehalfOf,
         bytes calldata fromExtraData,
@@ -48,7 +48,7 @@ contract AaveV3Handler is IProtocolHandler {
         repay(address(fromAsset), amount, onBehalfOf, fromExtraData);
         aaveV3Pool.borrow(
             address(toAsset),
-            amountInMaximum + totalFee,
+            amountInMax + totalFee,
             2,
             0,
             onBehalfOf
