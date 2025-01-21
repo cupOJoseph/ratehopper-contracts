@@ -26,6 +26,7 @@ import {
     USDbC_COMET_ADDRESS,
     USDC_COMET_ADDRESS,
 } from "./protocols/compound";
+import { MaxUint256 } from "ethers";
 
 describe("Compound DebtSwap", function () {
     let myContract: DebtSwap;
@@ -52,6 +53,7 @@ describe("Compound DebtSwap", function () {
         toTokenAddress: string,
         flashloanPool: string,
         collateralTokenAddress: string,
+        useMaxAmount = false,
     ) {
         const fromCContract = cometAddressMap.get(fromTokenAddress)!;
         const toCContract = cometAddressMap.get(toTokenAddress)!;
@@ -86,7 +88,9 @@ describe("Compound DebtSwap", function () {
             [toCContract, collateralTokenAddress, collateralAmount],
         );
 
-        // await time.increaseTo((await time.latest()) + 60);
+        await time.increaseTo((await time.latest()) + 600);
+
+        const debtAmount = useMaxAmount ? MaxUint256 : beforeFromTokenDebt;
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
@@ -94,7 +98,7 @@ describe("Compound DebtSwap", function () {
             Protocols.COMPOUND,
             fromTokenAddress,
             toTokenAddress,
-            beforeFromTokenDebt,
+            debtAmount,
             getAmountInMax(beforeFromTokenDebt),
             fromExtraData,
             toExtraData,
@@ -135,18 +139,24 @@ describe("Compound DebtSwap", function () {
     });
 
     describe("Collateral is cbETH", function () {
-        it("should switch from USDC to USDbC", async function () {
-            await compoundHelper.supply(USDC_COMET_ADDRESS, cbETH_ADDRESS);
-            await compoundHelper.borrow(USDC_ADDRESS);
-
-            await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL, cbETH_ADDRESS);
-        });
-
         it("should switch from USDbC to USDC", async function () {
             await compoundHelper.supply(USDbC_COMET_ADDRESS, cbETH_ADDRESS);
             await compoundHelper.borrow(USDbC_ADDRESS);
 
-            await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL, cbETH_ADDRESS);
+            await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL, cbETH_ADDRESS, true);
+        });
+
+        it("should switch from USDC to USDbC with max amount", async function () {
+            await compoundHelper.supply(USDC_COMET_ADDRESS, cbETH_ADDRESS);
+            await compoundHelper.borrow(USDC_ADDRESS);
+
+            await executeDebtSwap(
+                USDC_ADDRESS,
+                USDbC_ADDRESS,
+                USDC_hyUSD_POOL,
+                cbETH_ADDRESS,
+                true,
+            );
         });
     });
     describe("Collateral is WETH", function () {
@@ -155,7 +165,7 @@ describe("Compound DebtSwap", function () {
             await compoundHelper.supply(USDC_COMET_ADDRESS, WETH_ADDRESS);
             await compoundHelper.borrow(USDC_ADDRESS);
 
-            await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL, WETH_ADDRESS);
+            await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL, WETH_ADDRESS, true);
         });
 
         it("should switch from USDbC to USDC", async function () {
@@ -163,7 +173,7 @@ describe("Compound DebtSwap", function () {
             await compoundHelper.supply(USDbC_COMET_ADDRESS, WETH_ADDRESS);
             await compoundHelper.borrow(USDbC_ADDRESS);
 
-            await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL, WETH_ADDRESS);
+            await executeDebtSwap(USDbC_ADDRESS, USDC_ADDRESS, ETH_USDbC_POOL, WETH_ADDRESS, true);
         });
     });
 });

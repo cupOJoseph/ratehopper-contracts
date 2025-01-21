@@ -68,10 +68,30 @@ contract DebtSwap {
         bytes calldata _toExtraData
     ) public {
         pool = IUniswapV3Pool(_flashloanPool);
+        uint256 debtAmount = _amount;
+
+        if (_amount == type(uint256).max) {
+            ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
+                uint(_fromProtocol)
+            );
+
+            address handler = protocolRegistry.getHandler(protocol);
+
+            // TODO: remove delegateCall?
+            (bool success, bytes memory returnData) = handler.delegatecall(
+                abi.encodeCall(
+                    IProtocolHandler.getDebtAmount,
+                    (_fromAsset, msg.sender, _fromExtraData)
+                )
+            );
+            require(success);
+            debtAmount = abi.decode(returnData, (uint256));
+            console.log("on-chain debtAmount:", debtAmount);
+        }
 
         address token0 = pool.token0();
-        uint256 amount0 = _fromAsset == token0 ? _amount : 0;
-        uint256 amount1 = _fromAsset == token0 ? 0 : _amount;
+        uint256 amount0 = _fromAsset == token0 ? debtAmount : 0;
+        uint256 amount1 = _fromAsset == token0 ? 0 : debtAmount;
 
         bytes memory data = abi.encode(
             FlashCallbackData({
@@ -80,7 +100,7 @@ contract DebtSwap {
                 toProtocol: _toProtocol,
                 fromAsset: _fromAsset,
                 toAsset: _toAsset,
-                amount: _amount,
+                amount: debtAmount,
                 amountInMaximum: _amountInMaximum,
                 onBehalfOf: msg.sender,
                 fromExtraData: _fromExtraData,

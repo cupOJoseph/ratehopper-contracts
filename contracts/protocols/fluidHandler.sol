@@ -9,6 +9,12 @@ import "hardhat/console.sol";
 contract FluidHandler is IProtocolHandler {
     using GPv2SafeERC20 for IERC20;
 
+    function getDebtAmount(
+        address asset,
+        address onBehalfOf,
+        bytes calldata fromExtraData
+    ) public view returns (uint256) {}
+
     function switchIn(
         address fromAsset,
         address toAsset,

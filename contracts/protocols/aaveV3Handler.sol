@@ -7,14 +7,32 @@ import {IPoolV3} from "../interfaces/aaveV3/IPoolV3.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import "hardhat/console.sol";
 import {DataTypes} from "../interfaces/aaveV3/DataTypes.sol";
+import {IAaveProtocolDataProvider} from "../interfaces/aaveV3/IAaveProtocolDataProvider.sol";
 
 contract AaveV3Handler is IProtocolHandler {
     using GPv2SafeERC20 for IERC20;
 
     IPoolV3 public immutable aaveV3Pool;
+    IAaveProtocolDataProvider public immutable dataProvider;
 
-    constructor(address _AAVE_V3_POOL_ADDRESS) {
+    constructor(
+        address _AAVE_V3_POOL_ADDRESS,
+        address _AAVE_V3_DATA_PROVIDER_ADDRESS
+    ) {
         aaveV3Pool = IPoolV3(_AAVE_V3_POOL_ADDRESS);
+        dataProvider = IAaveProtocolDataProvider(
+            _AAVE_V3_DATA_PROVIDER_ADDRESS
+        );
+    }
+
+    function getDebtAmount(
+        address asset,
+        address onBehalfOf,
+        bytes calldata fromExtraData
+    ) public view returns (uint256) {
+        (, , uint256 currentVariableDebt, , , , , , ) = dataProvider
+            .getUserReserveData(asset, onBehalfOf);
+        return currentVariableDebt;
     }
 
     function switchIn(

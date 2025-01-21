@@ -6,6 +6,19 @@ import {IERC20} from "../dependencies/IERC20.sol";
 import "hardhat/console.sol";
 
 contract CompoundHandler is IProtocolHandler {
+    function getDebtAmount(
+        address asset,
+        address onBehalfOf,
+        bytes calldata fromExtraData
+    ) public view returns (uint256) {
+        (address cContract, , ) = abi.decode(
+            fromExtraData,
+            (address, address, uint256)
+        );
+        IComet comet = IComet(cContract);
+        return comet.borrowBalanceOf(onBehalfOf);
+    }
+
     function switchIn(
         address fromAsset,
         address toAsset,
@@ -34,7 +47,7 @@ contract CompoundHandler is IProtocolHandler {
 
         IComet fromComet = IComet(cContract);
 
-        IERC20(fromAsset).approve(address(cContract), amount);
+        IERC20(fromAsset).approve(address(cContract), type(uint256).max);
         fromComet.supplyTo(onBehalfOf, fromAsset, amount);
         console.log("compound repay done");
 
@@ -92,6 +105,6 @@ contract CompoundHandler is IProtocolHandler {
 
         IERC20(asset).approve(address(cContract), amount);
         IComet toComet = IComet(cContract);
-        toComet.supplyFrom(address(this), onBehalfOf, asset, amount);
+        toComet.supplyTo(onBehalfOf, asset, amount);
     }
 }

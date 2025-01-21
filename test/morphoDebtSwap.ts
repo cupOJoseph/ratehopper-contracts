@@ -18,6 +18,7 @@ import {
     cbETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
     eUSD_ADDRESS,
+    MAI_ADDRESS,
 } from "./constants";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
 import {
@@ -26,10 +27,11 @@ import {
     MorphoHelper,
     morphoMarket1Id,
     morphoMarket2Id,
+    morphoMarket3Id,
 } from "./protocols/morpho";
 import { DebtSwap } from "../typechain-types";
 
-describe("Morpho v3 DebtSwap", function () {
+describe("Morpho DebtSwap", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
     let deployedContractAddress: string;
@@ -71,7 +73,8 @@ describe("Morpho v3 DebtSwap", function () {
         const collateralBalance = await collateralToken.balanceOf(TEST_ADDRESS);
         const collateralAmount = await morphoHelper.getCollateralAmount(fromMarketId);
 
-        await approve(USDC_ADDRESS, deployedContractAddress, impersonatedSigner);
+        await approve(fromTokenAddress, deployedContractAddress, impersonatedSigner);
+        await approve(toTokenAddress, deployedContractAddress, impersonatedSigner);
         await approve(collateralTokenAddress, deployedContractAddress, impersonatedSigner);
 
         const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, impersonatedSigner);
@@ -107,16 +110,14 @@ describe("Morpho v3 DebtSwap", function () {
             ],
         );
 
-        const amountBuffered = (beforeFromTokenDebt * BigInt(11)) / BigInt(10);
-
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
             Protocols.MORPHO,
             Protocols.MORPHO,
             fromTokenAddress,
             toTokenAddress,
-            amountBuffered,
-            getAmountInMax(amountBuffered),
+            MaxUint256,
+            getAmountInMax(beforeFromTokenDebt),
             fromExtraData,
             toExtraData,
         );
@@ -173,6 +174,20 @@ describe("Morpho v3 DebtSwap", function () {
                 cbETH_ADDRESS,
                 morphoMarket2Id,
                 morphoMarket1Id,
+            );
+        });
+
+        it.skip("should switch from market 1 to market 3(MAI)", async function () {
+            await morphoHelper.supply(cbETH_ADDRESS, morphoMarket1Id);
+            await morphoHelper.borrow(morphoMarket1Id);
+
+            await executeDebtSwap(
+                USDC_ADDRESS,
+                MAI_ADDRESS,
+                USDC_hyUSD_POOL,
+                cbETH_ADDRESS,
+                morphoMarket1Id,
+                morphoMarket3Id,
             );
         });
     });

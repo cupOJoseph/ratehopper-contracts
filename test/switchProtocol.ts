@@ -316,7 +316,7 @@ describe("Protocol Switch", function () {
         );
     });
 
-    it.only("should switch USDC debt on Morpho to USDbC on Aave", async function () {
+    it("should switch USDC debt on Morpho to USDbC on Aave", async function () {
         await morphoHelper.supply(cbETH_ADDRESS, morphoMarket1Id);
         await morphoHelper.borrow(morphoMarket1Id);
 

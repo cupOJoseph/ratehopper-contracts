@@ -2,6 +2,12 @@
 pragma solidity =0.8.27;
 
 interface IProtocolHandler {
+    function getDebtAmount(
+        address asset,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external view returns (uint256);
+
     function switchIn(
         address fromAsset,
         address toAsset,

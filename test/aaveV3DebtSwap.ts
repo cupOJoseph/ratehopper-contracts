@@ -51,6 +51,7 @@ describe("Aave v3 DebtSwap", function () {
         toTokenAddress: string,
         flashloanPool: string,
         collateralTokenAddress: string,
+        useMaxAmount = false,
     ) {
         const beforeFromTokenDebt = await aaveV3Helper.getDebtAmount(fromTokenAddress);
         const beforeToTokenDebt = await aaveV3Helper.getDebtAmount(toTokenAddress);
@@ -70,13 +71,16 @@ describe("Aave v3 DebtSwap", function () {
 
         await time.increaseTo((await time.latest()) + 60);
 
+        const debtAmount = useMaxAmount ? MaxUint256 : beforeFromTokenDebt;
+        // const debtAmountInMax = useMaxAmount ? MaxUint256 : getAmountInMax(beforeFromTokenDebt);
+
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
             Protocols.AAVE_V3,
             Protocols.AAVE_V3,
             fromTokenAddress,
             toTokenAddress,
-            beforeFromTokenDebt,
+            debtAmount,
             getAmountInMax(beforeFromTokenDebt),
             "0x",
             "0x",
@@ -123,6 +127,19 @@ describe("Aave v3 DebtSwap", function () {
             await aaveV3Helper.borrow(USDC_ADDRESS);
 
             await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL, cbETH_ADDRESS);
+        });
+
+        it("should switch from USDC to USDbC with max amount", async function () {
+            await aaveV3Helper.supply(cbETH_ADDRESS);
+            await aaveV3Helper.borrow(USDC_ADDRESS);
+
+            await executeDebtSwap(
+                USDC_ADDRESS,
+                USDbC_ADDRESS,
+                USDC_hyUSD_POOL,
+                cbETH_ADDRESS,
+                true,
+            );
         });
 
         it("should switch from USDbC to USDC", async function () {

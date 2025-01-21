@@ -1,6 +1,7 @@
 import hre from "hardhat";
 import { ethers } from "hardhat";
 import {
+    AAVE_V3_DATA_PROVIDER_ADDRESS,
     AAVE_V3_POOL_ADDRESS,
     Protocols,
     UNISWAP_V3_FACTORY_ADRESS,
@@ -33,9 +34,13 @@ export async function deployContractFixture() {
     const gasPrice = feeData.gasPrice!;
 
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
-    const aaveV3Handler = await AaveV3Handler.deploy(AAVE_V3_POOL_ADDRESS, {
-        maxFeePerGas: gasPrice * BigInt(5),
-    });
+    const aaveV3Handler = await AaveV3Handler.deploy(
+        AAVE_V3_POOL_ADDRESS,
+        AAVE_V3_DATA_PROVIDER_ADDRESS,
+        {
+            maxFeePerGas: gasPrice * BigInt(5),
+        },
+    );
 
     const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
     const compoundHandler = await CompoundHandler.deploy();
