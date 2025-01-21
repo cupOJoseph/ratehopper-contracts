@@ -86,7 +86,7 @@ describe("Compound DebtSwap", function () {
             [toCContract, collateralTokenAddress, collateralAmount],
         );
 
-        await time.increaseTo((await time.latest()) + 60);
+        // await time.increaseTo((await time.latest()) + 60);
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,

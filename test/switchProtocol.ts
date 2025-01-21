@@ -6,8 +6,15 @@ import "dotenv/config";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
+import morphoAbi from "../externalAbi/morpho/morpho.json";
 
-import { approve, deployContractFixture, formatAmount, getAmountInMax } from "./utils";
+import {
+    approve,
+    deployContractFixture,
+    formatAmount,
+    getAmountInMax,
+    protocolHelperMap,
+} from "./utils";
 import {
     USDC_ADDRESS,
     USDbC_ADDRESS,
@@ -20,6 +27,7 @@ import {
 
 import { AaveV3Helper } from "./protocols/aaveV3";
 import { cometAddressMap, CompoundHelper, USDC_COMET_ADDRESS } from "./protocols/compound";
+import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id } from "./protocols/morpho";
 
 describe("Protocol Switch", function () {
     let myContract: DebtSwap;
@@ -28,11 +36,13 @@ describe("Protocol Switch", function () {
     let deployedContractAddress: string;
     let aaveV3Helper: AaveV3Helper;
     let compoundHelper: CompoundHelper;
+    let morphoHelper: MorphoHelper;
 
     this.beforeEach(async () => {
         impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
         aaveV3Helper = new AaveV3Helper(impersonatedSigner);
         compoundHelper = new CompoundHelper(impersonatedSigner);
+        morphoHelper = new MorphoHelper(impersonatedSigner);
 
         const { debtSwap } = await loadFixture(deployContractFixture);
         deployedContractAddress = await debtSwap.getAddress();
@@ -50,10 +60,21 @@ describe("Protocol Switch", function () {
         toTokenAddress: string,
         fromProtocol: Protocols,
         toProtocol: Protocols,
+        fromMarketId?: string,
+        toMarketId?: string,
     ) {
-        const beforeAaveDebt = await aaveV3Helper.getDebtAmount(fromTokenAddress);
-        const beforeCompoundDebt = await compoundHelper.getDebtAmount(fromTokenAddress);
-        const beforeCompoundToAssetDebt = await compoundHelper.getDebtAmount(toTokenAddress);
+        const FromHelper = protocolHelperMap.get(fromProtocol)!;
+        const fromHelper = new FromHelper(impersonatedSigner);
+        const ToHelper = protocolHelperMap.get(toProtocol)!;
+        const toHelper = new ToHelper(impersonatedSigner);
+
+        const fromDebtAmountParameter =
+            fromProtocol === Protocols.MORPHO ? fromMarketId! : fromTokenAddress;
+        const beforeFromProtocolDebt = await fromHelper.getDebtAmount(fromDebtAmountParameter);
+
+        const toDebtAmountParameter =
+            toProtocol === Protocols.MORPHO ? toMarketId! : toTokenAddress;
+        const beforeToProtocolDebt = await toHelper.getDebtAmount(toDebtAmountParameter);
 
         const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
         const usdcBalance = await usdcContract.balanceOf(TEST_ADDRESS);
@@ -61,21 +82,28 @@ describe("Protocol Switch", function () {
         const cbethContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, impersonatedSigner);
         const cbethBalance = await cbethContract.balanceOf(TEST_ADDRESS);
 
-        const debtAmountSwitchedFrom =
-            fromProtocol == Protocols.AAVE_V3 ? beforeAaveDebt : beforeCompoundDebt;
-        console.log(`${fromProtocol} Debt Amount:`, debtAmountSwitchedFrom);
-
-        const collateralAmount =
-            fromProtocol == Protocols.AAVE_V3
-                ? await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS)
-                : await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS, cbETH_ADDRESS);
+        let collateralAmount: bigint;
+        switch (fromProtocol) {
+            case Protocols.AAVE_V3:
+                collateralAmount = await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS);
+                break;
+            case Protocols.COMPOUND:
+                collateralAmount = await compoundHelper.getCollateralAmount(
+                    USDC_COMET_ADDRESS,
+                    cbETH_ADDRESS,
+                );
+                break;
+            case Protocols.MORPHO:
+                collateralAmount = await morphoHelper.getCollateralAmount(fromMarketId!);
+                break;
+            default:
+                throw new Error("Unsupported protocol");
+        }
         console.log("collateralAmount:", ethers.formatEther(collateralAmount));
 
         let fromExtraData = "0x";
         let toExtraData = "0x";
 
-        const fromCometAddress = await cometAddressMap.get(fromTokenAddress)!;
-        const toCometAddress = await cometAddressMap.get(toTokenAddress)!;
         switch (fromProtocol) {
             case Protocols.AAVE_V3:
                 const aTokenAddress = await aaveV3Helper.getATokenAddress(cbETH_ADDRESS);
@@ -89,9 +117,26 @@ describe("Protocol Switch", function () {
             case Protocols.COMPOUND:
                 await compoundHelper.allow(fromTokenAddress, deployedContractAddress);
 
+                const fromCometAddress = cometAddressMap.get(fromTokenAddress)!;
                 fromExtraData = compoundHelper.encodeExtraData(
                     fromCometAddress,
                     cbETH_ADDRESS,
+                    collateralAmount,
+                );
+                break;
+
+            case Protocols.MORPHO:
+                const morphoContract = new ethers.Contract(
+                    MORPHO_ADDRESS,
+                    morphoAbi,
+                    impersonatedSigner,
+                );
+                await morphoContract.setAuthorization(deployedContractAddress, true);
+                const borrowShares = await morphoHelper.getBorrowShares(fromMarketId!);
+
+                fromExtraData = morphoHelper.encodeExtraData(
+                    fromMarketId!,
+                    borrowShares,
                     collateralAmount,
                 );
                 break;
@@ -99,7 +144,7 @@ describe("Protocol Switch", function () {
 
         switch (toProtocol) {
             case Protocols.AAVE_V3:
-                await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
+                await aaveV3Helper.approveDelegation(toTokenAddress, deployedContractAddress);
 
                 toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
                     ["address", "uint256"],
@@ -110,13 +155,32 @@ describe("Protocol Switch", function () {
             case Protocols.COMPOUND:
                 await compoundHelper.allow(toTokenAddress, deployedContractAddress);
 
+                const toCometAddress = cometAddressMap.get(toTokenAddress)!;
                 toExtraData = compoundHelper.encodeExtraData(
                     toCometAddress,
                     cbETH_ADDRESS,
                     collateralAmount,
                 );
                 break;
+
+            case Protocols.MORPHO:
+                const morphoContract = new ethers.Contract(
+                    MORPHO_ADDRESS,
+                    morphoAbi,
+                    impersonatedSigner,
+                );
+                await morphoContract.setAuthorization(deployedContractAddress, true);
+                const borrowShares = await morphoHelper.getBorrowShares(toMarketId!);
+
+                toExtraData = morphoHelper.encodeExtraData(
+                    toMarketId!,
+                    borrowShares,
+                    collateralAmount,
+                );
+                break;
         }
+
+        const amountBuffered = (beforeFromProtocolDebt * BigInt(11)) / BigInt(10);
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
@@ -124,38 +188,31 @@ describe("Protocol Switch", function () {
             toProtocol,
             fromTokenAddress,
             toTokenAddress,
-            debtAmountSwitchedFrom,
-            getAmountInMax(debtAmountSwitchedFrom),
+            amountBuffered,
+            getAmountInMax(amountBuffered),
             fromExtraData,
             toExtraData,
         );
         await tx.wait();
 
-        const afterAaveDebt = await aaveV3Helper.getDebtAmount(fromTokenAddress);
-        const afterCompoundDebt = await compoundHelper.getDebtAmount(fromTokenAddress);
-        const afterCompoundToAssetDebt = await compoundHelper.getDebtAmount(toTokenAddress);
+        const afterFromProtocolDebt = await fromHelper.getDebtAmount(fromDebtAmountParameter);
+        const afterToProtocolDebt = await toHelper.getDebtAmount(toDebtAmountParameter);
 
         const usdcBalanceAfter = await usdcContract.balanceOf(TEST_ADDRESS);
         const cbethBalanceAfter = await cbethContract.balanceOf(TEST_ADDRESS);
 
         console.log(
-            `Aave Debt Amount:`,
-            formatAmount(beforeAaveDebt),
+            `Before Protocol ${Protocols[fromProtocol]}, asset: ${fromTokenAddress} Debt Amount:`,
+            formatAmount(beforeFromProtocolDebt),
             " -> ",
-            formatAmount(afterAaveDebt),
-        );
-        console.log(
-            `Compound Debt Amount:`,
-            formatAmount(beforeCompoundDebt),
-            " -> ",
-            formatAmount(afterCompoundDebt),
+            formatAmount(afterFromProtocolDebt),
         );
 
         console.log(
-            `Compound To Asset Debt Amount:`,
-            formatAmount(beforeCompoundToAssetDebt),
+            `To Protocol ${Protocols[toProtocol]}, asset: ${toTokenAddress} Debt Amount:`,
+            formatAmount(beforeToProtocolDebt),
             " -> ",
-            formatAmount(afterCompoundToAssetDebt),
+            formatAmount(afterToProtocolDebt),
         );
 
         expect(usdcBalanceAfter).to.be.equal(usdcBalance);
@@ -224,6 +281,53 @@ describe("Protocol Switch", function () {
             USDC_ADDRESS,
             Protocols.AAVE_V3,
             Protocols.MORPHO,
+            undefined,
+            morphoMarket1Id,
+        );
+    });
+
+    it("should switch USDC debt on Morpho to USDC on Aave", async function () {
+        await morphoHelper.supply(cbETH_ADDRESS, morphoMarket1Id);
+        await morphoHelper.borrow(morphoMarket1Id);
+
+        await executeDebtSwap(
+            USDC_hyUSD_POOL,
+            USDC_ADDRESS,
+            USDC_ADDRESS,
+            Protocols.MORPHO,
+            Protocols.AAVE_V3,
+            morphoMarket1Id,
+            undefined,
+        );
+    });
+
+    it("should switch USDC debt on Morpho to USDC on Compound", async function () {
+        await morphoHelper.supply(cbETH_ADDRESS, morphoMarket1Id);
+        await morphoHelper.borrow(morphoMarket1Id);
+
+        await executeDebtSwap(
+            USDC_hyUSD_POOL,
+            USDC_ADDRESS,
+            USDC_ADDRESS,
+            Protocols.MORPHO,
+            Protocols.COMPOUND,
+            morphoMarket1Id,
+            undefined,
+        );
+    });
+
+    it.only("should switch USDC debt on Morpho to USDbC on Aave", async function () {
+        await morphoHelper.supply(cbETH_ADDRESS, morphoMarket1Id);
+        await morphoHelper.borrow(morphoMarket1Id);
+
+        await executeDebtSwap(
+            USDC_hyUSD_POOL,
+            USDC_ADDRESS,
+            USDbC_ADDRESS,
+            Protocols.MORPHO,
+            Protocols.AAVE_V3,
+            morphoMarket1Id,
+            undefined,
         );
     });
 });

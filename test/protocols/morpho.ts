@@ -91,6 +91,7 @@ export class MorphoHelper {
         const amount = ethers.parseUnits("1", 6);
         const tx = await this.morpho.borrow(marketParams, amount, 0, TEST_ADDRESS, TEST_ADDRESS);
         await tx.wait();
+        console.log("borrowed", amount);
         // const receipt = await tx.wait();
         // console.log("Transaction Receipt:", receipt);
 
@@ -134,6 +135,23 @@ export class MorphoHelper {
 
         const walletBalanceAfter = await tokenContract.balanceOf(TEST_ADDRESS);
         console.log(`${collateralTokenAddress} Wallet Balance:`, formatAmount(walletBalanceAfter));
+    }
+
+    encodeExtraData(marketId: string, borrowShares: bigint, collateralAmount: bigint) {
+        const fromMarketParams = marketParamsMap.get(marketId)!;
+
+        return ethers.AbiCoder.defaultAbiCoder().encode(
+            ["uint256", "address", "address", "address", "address", "uint256", "uint256"],
+            [
+                collateralAmount,
+                fromMarketParams.loanToken,
+                fromMarketParams.collateralToken,
+                fromMarketParams.oracle,
+                fromMarketParams.irm,
+                fromMarketParams.lltv,
+                borrowShares,
+            ],
+        );
     }
 
     async decode(rawData: string) {

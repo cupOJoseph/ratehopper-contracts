@@ -2,6 +2,7 @@ import hre from "hardhat";
 import { ethers } from "hardhat";
 import {
     AAVE_V3_POOL_ADDRESS,
+    Protocols,
     UNISWAP_V3_FACTORY_ADRESS,
     UNISWAP_V3_SWAP_ROUTER_ADDRESS,
     WETH_ADDRESS,
@@ -12,6 +13,15 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import WETH_ABI from "../externalAbi/weth.json";
 import { morphoHandlerSol } from "../typechain-types/factories/contracts/protocols";
 import { MORPHO_ADDRESS } from "./protocols/morpho";
+import { AaveV3Helper } from "./protocols/aaveV3";
+import { CompoundHelper } from "./protocols/compound";
+import { MorphoHelper } from "./protocols/morpho";
+
+export const protocolHelperMap = new Map<Protocols, any>([
+    [Protocols.AAVE_V3, AaveV3Helper],
+    [Protocols.COMPOUND, CompoundHelper],
+    [Protocols.MORPHO, MorphoHelper],
+]);
 
 // We define a fixture to reuse the same setup in every test.
 // We use loadFixture to run this setup once, snapshot that state,
