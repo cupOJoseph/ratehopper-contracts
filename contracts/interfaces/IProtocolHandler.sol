@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.27;
 
+import "../DebtSwap.sol";
+
 interface IProtocolHandler {
     function getDebtAmount(
         address asset,
@@ -15,6 +17,7 @@ interface IProtocolHandler {
         uint256 amountInMaximum,
         uint256 totalFee,
         address onBehalfOf,
+        CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
     ) external;
@@ -23,6 +26,7 @@ interface IProtocolHandler {
         address fromAsset,
         uint256 amount,
         address onBehalfOf,
+        CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external;
 
@@ -30,6 +34,7 @@ interface IProtocolHandler {
         address toAsset,
         uint256 amount,
         address onBehalfOf,
+        CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external;
 

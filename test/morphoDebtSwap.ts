@@ -86,9 +86,8 @@ describe("Morpho DebtSwap", function () {
         const borrowShares = await morphoHelper.getBorrowShares(fromMarketId);
 
         const fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-            ["uint256", "address", "address", "address", "address", "uint256", "uint256"],
+            ["address", "address", "address", "address", "uint256", "uint256"],
             [
-                collateralAmount,
                 fromMarketParams.loanToken,
                 fromMarketParams.collateralToken,
                 fromMarketParams.oracle,
@@ -99,9 +98,8 @@ describe("Morpho DebtSwap", function () {
         );
 
         const toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-            ["uint256", "address", "address", "address", "address", "uint256"],
+            ["address", "address", "address", "address", "uint256"],
             [
-                collateralAmount,
                 toMarketParams.loanToken,
                 toMarketParams.collateralToken,
                 toMarketParams.oracle,
@@ -117,7 +115,8 @@ describe("Morpho DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             MaxUint256,
-            ethers.parseUnits("1.01", 6),
+            ethers.parseUnits("1.01", 4),
+            [{ asset: collateralTokenAddress, amount: collateralAmount }],
             fromExtraData,
             toExtraData,
         );

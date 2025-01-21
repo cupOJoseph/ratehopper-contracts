@@ -18,6 +18,11 @@ import {ProtocolRegistry} from "./protocolRegistry.sol";
 
 import "hardhat/console.sol";
 
+struct CollateralAsset {
+    address asset;
+    uint256 amount;
+}
+
 contract DebtSwap {
     using GPv2SafeERC20 for IERC20;
     ProtocolRegistry private protocolRegistry;
@@ -41,6 +46,7 @@ contract DebtSwap {
         address toAsset;
         uint256 amount;
         uint256 allowedSlippage;
+        CollateralAsset[] collateralAssets;
         address onBehalfOf;
         bytes fromExtraData;
         bytes toExtraData;
@@ -63,12 +69,15 @@ contract DebtSwap {
         address _fromAsset,
         address _toAsset,
         uint256 _amount,
-        uint256 _allowedSlippage,
+        uint16 _allowedSlippage,
+        CollateralAsset[] calldata _collateralAssets,
         bytes calldata _fromExtraData,
         bytes calldata _toExtraData
     ) public {
         pool = IUniswapV3Pool(_flashloanPool);
         uint256 debtAmount = _amount;
+
+        console.log("collateralAmount:", _collateralAssets[0].amount);
 
         if (_amount == type(uint256).max) {
             ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
@@ -103,6 +112,7 @@ contract DebtSwap {
                 amount: debtAmount,
                 allowedSlippage: _allowedSlippage,
                 onBehalfOf: msg.sender,
+                collateralAssets: _collateralAssets,
                 fromExtraData: _fromExtraData,
                 toExtraData: _toExtraData
             })
@@ -132,7 +142,7 @@ contract DebtSwap {
         );
 
         uint256 amountInMax = (decoded.amount * decoded.allowedSlippage) /
-            10 ** 6;
+            10 ** 4;
         console.log("amountInMax:", amountInMax);
 
         if (decoded.fromProtocol == decoded.toProtocol) {
@@ -151,6 +161,7 @@ contract DebtSwap {
                         amountInMax,
                         totalFee,
                         decoded.onBehalfOf,
+                        decoded.collateralAssets,
                         decoded.fromExtraData,
                         decoded.toExtraData
                     )
@@ -169,6 +180,7 @@ contract DebtSwap {
                         decoded.fromAsset,
                         decoded.amount,
                         decoded.onBehalfOf,
+                        decoded.collateralAssets,
                         decoded.fromExtraData
                     )
                 )
@@ -186,6 +198,7 @@ contract DebtSwap {
                         decoded.toAsset,
                         amountInMax + totalFee,
                         decoded.onBehalfOf,
+                        decoded.collateralAssets,
                         decoded.toExtraData
                     )
                 )

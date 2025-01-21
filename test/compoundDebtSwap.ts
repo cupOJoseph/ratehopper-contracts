@@ -79,14 +79,11 @@ describe("Compound DebtSwap", function () {
         );
 
         const fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-            ["address", "address", "uint256"],
-            [fromCContract, collateralTokenAddress, collateralAmount],
+            ["address"],
+            [fromCContract],
         );
 
-        const toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-            ["address", "address", "uint256"],
-            [toCContract, collateralTokenAddress, collateralAmount],
-        );
+        const toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [toCContract]);
 
         await time.increaseTo((await time.latest()) + 600);
 
@@ -99,7 +96,8 @@ describe("Compound DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             debtAmount,
-            ethers.parseUnits("1.01", 6),
+            ethers.parseUnits("1.01", 4),
+            [{ asset: collateralTokenAddress, amount: collateralAmount }],
             fromExtraData,
             toExtraData,
         );

@@ -25,7 +25,6 @@ contract MorphoHandler is IProtocolHandler {
         bytes calldata fromExtraData
     ) public view returns (uint256) {
         (
-            uint256 collateralAmount,
             address loanToken,
             address collateralToken,
             address oracle,
@@ -34,7 +33,7 @@ contract MorphoHandler is IProtocolHandler {
             uint256 borrowShares
         ) = abi.decode(
                 fromExtraData,
-                (uint256, address, address, address, address, uint256, uint256)
+                (address, address, address, address, uint256, uint256)
             );
         MarketParams memory marketParams = MarketParams({
             loanToken: loanToken,
@@ -64,28 +63,34 @@ contract MorphoHandler is IProtocolHandler {
         uint256 amountInMaximum,
         uint256 totalFee,
         address onBehalfOf,
+        CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
     ) external override {
-        switchFrom(fromAsset, amount, onBehalfOf, fromExtraData);
-        switchTo(toAsset, amountInMaximum + totalFee, onBehalfOf, toExtraData);
+        switchFrom(
+            fromAsset,
+            amount,
+            onBehalfOf,
+            collateralAssets,
+            fromExtraData
+        );
+        switchTo(
+            toAsset,
+            amountInMaximum + totalFee,
+            onBehalfOf,
+            collateralAssets,
+            toExtraData
+        );
     }
-
-    function supply(
-        MarketParams calldata marketParams,
-        address fromAsset,
-        uint256 amount,
-        address onBehalfOf
-    ) public {}
 
     function switchFrom(
         address fromAsset,
         uint256 amount,
         address onBehalfOf,
+        CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) public override {
         (
-            uint256 collateralAmount,
             address loanToken,
             address collateralToken,
             address oracle,
@@ -94,7 +99,7 @@ contract MorphoHandler is IProtocolHandler {
             uint256 borrowShares
         ) = abi.decode(
                 extraData,
-                (uint256, address, address, address, address, uint256, uint256)
+                (address, address, address, address, uint256, uint256)
             );
 
         MarketParams memory marketParams = MarketParams({
@@ -111,7 +116,7 @@ contract MorphoHandler is IProtocolHandler {
 
         morpho.withdrawCollateral(
             marketParams,
-            collateralAmount,
+            collateralAssets[0].amount,
             onBehalfOf,
             address(this)
         );
@@ -121,10 +126,10 @@ contract MorphoHandler is IProtocolHandler {
         address toAsset,
         uint256 amount,
         address onBehalfOf,
+        CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) public override {
         (
-            uint256 collateralAmount,
             address loanToken,
             address collateralToken,
             address oracle,
@@ -132,7 +137,7 @@ contract MorphoHandler is IProtocolHandler {
             uint256 lltv
         ) = abi.decode(
                 extraData,
-                (uint256, address, address, address, address, uint256)
+                (address, address, address, address, uint256)
             );
 
         MarketParams memory marketParams = MarketParams({
@@ -143,8 +148,16 @@ contract MorphoHandler is IProtocolHandler {
             lltv: lltv
         });
 
-        IERC20(collateralToken).approve(address(morpho), collateralAmount);
-        morpho.supplyCollateral(marketParams, collateralAmount, onBehalfOf, "");
+        IERC20(collateralToken).approve(
+            address(morpho),
+            collateralAssets[0].amount
+        );
+        morpho.supplyCollateral(
+            marketParams,
+            collateralAssets[0].amount,
+            onBehalfOf,
+            ""
+        );
 
         morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
     }
@@ -156,7 +169,6 @@ contract MorphoHandler is IProtocolHandler {
         bytes calldata extraData
     ) public {
         (
-            uint256 collateralAmount,
             address loanToken,
             address collateralToken,
             address oracle,
@@ -164,7 +176,7 @@ contract MorphoHandler is IProtocolHandler {
             uint256 lltv
         ) = abi.decode(
                 extraData,
-                (uint256, address, address, address, address, uint256)
+                (address, address, address, address, uint256)
             );
 
         MarketParams memory marketParams = MarketParams({

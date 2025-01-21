@@ -32,6 +32,9 @@ const config: HardhatUserConfig = {
         timeout: 3000000,
         parallel: false,
     },
+    gasReporter: {
+        enabled: process.env.REPORT_GAS ? true : false,
+    },
     networks: {
         base: {
             url: baseUrl,

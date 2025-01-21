@@ -23,7 +23,7 @@ import {
 } from "./constants";
 import { AaveV3Helper } from "./protocols/aaveV3";
 
-describe("Aave v3 DebtSwap", function () {
+describe("Aave DebtSwap", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
     let aaveV3Pool: Contract;
@@ -81,7 +81,8 @@ describe("Aave v3 DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             debtAmount,
-            ethers.parseUnits("1.01", 6),
+            ethers.parseUnits("1.01", 4),
+            [{ asset: collateralTokenAddress, amount: collateralBalance }],
             "0x",
             "0x",
         );

@@ -119,11 +119,7 @@ describe("Protocol Switch", function () {
                 await compoundHelper.allow(fromTokenAddress, deployedContractAddress);
 
                 const fromCometAddress = cometAddressMap.get(fromTokenAddress)!;
-                fromExtraData = compoundHelper.encodeExtraData(
-                    fromCometAddress,
-                    cbETH_ADDRESS,
-                    collateralAmount,
-                );
+                fromExtraData = compoundHelper.encodeExtraData(fromCometAddress);
                 break;
 
             case Protocols.MORPHO:
@@ -135,11 +131,7 @@ describe("Protocol Switch", function () {
                 await morphoContract.setAuthorization(deployedContractAddress, true);
                 const borrowShares = await morphoHelper.getBorrowShares(fromMarketId!);
 
-                fromExtraData = morphoHelper.encodeExtraData(
-                    fromMarketId!,
-                    borrowShares,
-                    collateralAmount,
-                );
+                fromExtraData = morphoHelper.encodeExtraData(fromMarketId!, borrowShares);
                 break;
         }
 
@@ -157,11 +149,7 @@ describe("Protocol Switch", function () {
                 await compoundHelper.allow(toTokenAddress, deployedContractAddress);
 
                 const toCometAddress = cometAddressMap.get(toTokenAddress)!;
-                toExtraData = compoundHelper.encodeExtraData(
-                    toCometAddress,
-                    cbETH_ADDRESS,
-                    collateralAmount,
-                );
+                toExtraData = compoundHelper.encodeExtraData(toCometAddress);
                 break;
 
             case Protocols.MORPHO:
@@ -173,11 +161,7 @@ describe("Protocol Switch", function () {
                 await morphoContract.setAuthorization(deployedContractAddress, true);
                 const borrowShares = await morphoHelper.getBorrowShares(toMarketId!);
 
-                toExtraData = morphoHelper.encodeExtraData(
-                    toMarketId!,
-                    borrowShares,
-                    collateralAmount,
-                );
+                toExtraData = morphoHelper.encodeExtraData(toMarketId!, borrowShares);
                 break;
         }
 
@@ -188,7 +172,8 @@ describe("Protocol Switch", function () {
             fromTokenAddress,
             toTokenAddress,
             MaxUint256,
-            ethers.parseUnits("1.01", 6),
+            ethers.parseUnits("1.01", 4),
+            [{ asset: cbETH_ADDRESS, amount: collateralAmount }],
             fromExtraData,
             toExtraData,
         );

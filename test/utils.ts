@@ -48,15 +48,15 @@ export async function deployContractFixture() {
     const MorphoHandler = await hre.ethers.getContractFactory("MorphoHandler");
     const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS);
 
-    const FluidHandler = await hre.ethers.getContractFactory("FluidHandler");
-    const fluidHandler = await FluidHandler.deploy();
+    // const FluidHandler = await hre.ethers.getContractFactory("FluidHandler");
+    // const fluidHandler = await FluidHandler.deploy();
 
     const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
     const protocolRegistry = await ProtocolRegistry.deploy(
         aaveV3Handler.getAddress(),
         compoundHandler.getAddress(),
         morphoHandler.getAddress(),
-        fluidHandler.getAddress(),
+        // fluidHandler.getAddress(),
     );
 
     const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");

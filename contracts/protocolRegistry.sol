@@ -4,8 +4,8 @@ contract ProtocolRegistry {
     enum Protocol {
         COMPOUND,
         AAVE_V3,
-        MORPHO,
-        FLUID
+        MORPHO
+        // FLUID
     }
 
     mapping(Protocol => address) private protocolHandlers;
@@ -13,13 +13,13 @@ contract ProtocolRegistry {
     constructor(
         address compoundHandler,
         address aaveV3Handler,
-        address morphoHandler,
-        address fluidHandler
-    ) {
+        address morphoHandler
+    ) // address fluidHandler
+    {
         protocolHandlers[Protocol.COMPOUND] = compoundHandler;
         protocolHandlers[Protocol.AAVE_V3] = aaveV3Handler;
         protocolHandlers[Protocol.MORPHO] = morphoHandler;
-        protocolHandlers[Protocol.FLUID] = fluidHandler;
+        // protocolHandlers[Protocol.FLUID] = fluidHandler;
     }
 
     // TODO: add setProtocol()

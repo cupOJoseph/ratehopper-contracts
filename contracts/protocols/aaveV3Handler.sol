@@ -42,6 +42,7 @@ contract AaveV3Handler is IProtocolHandler {
         uint256 amountInMax,
         uint256 totalFee,
         address onBehalfOf,
+        CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
     ) external override {
@@ -59,6 +60,7 @@ contract AaveV3Handler is IProtocolHandler {
         address fromAsset,
         uint256 amount,
         address onBehalfOf,
+        CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external override {
         (address collateralAsset, uint256 collateralAmount) = abi.decode(
@@ -83,6 +85,7 @@ contract AaveV3Handler is IProtocolHandler {
         address toAsset,
         uint256 amount,
         address onBehalfOf,
+        CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external override {
         (address collateralAsset, uint256 collateralAmount) = abi.decode(

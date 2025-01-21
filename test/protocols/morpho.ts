@@ -153,13 +153,12 @@ export class MorphoHelper {
         console.log(`${collateralTokenAddress} Wallet Balance:`, formatAmount(walletBalanceAfter));
     }
 
-    encodeExtraData(marketId: string, borrowShares: bigint, collateralAmount: bigint) {
+    encodeExtraData(marketId: string, borrowShares: bigint) {
         const fromMarketParams = marketParamsMap.get(marketId)!;
 
         return ethers.AbiCoder.defaultAbiCoder().encode(
-            ["uint256", "address", "address", "address", "address", "uint256", "uint256"],
+            ["address", "address", "address", "address", "uint256", "uint256"],
             [
-                collateralAmount,
                 fromMarketParams.loanToken,
                 fromMarketParams.collateralToken,
                 fromMarketParams.oracle,
