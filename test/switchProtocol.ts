@@ -28,6 +28,7 @@ import {
 import { AaveV3Helper } from "./protocols/aaveV3";
 import { cometAddressMap, CompoundHelper, USDC_COMET_ADDRESS } from "./protocols/compound";
 import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id } from "./protocols/morpho";
+import { MaxUint256 } from "ethers";
 
 describe("Protocol Switch", function () {
     let myContract: DebtSwap;
@@ -180,16 +181,14 @@ describe("Protocol Switch", function () {
                 break;
         }
 
-        const amountBuffered = (beforeFromProtocolDebt * BigInt(11)) / BigInt(10);
-
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
             fromProtocol,
             toProtocol,
             fromTokenAddress,
             toTokenAddress,
-            amountBuffered,
-            getAmountInMax(amountBuffered),
+            MaxUint256,
+            ethers.parseUnits("1.01", 6),
             fromExtraData,
             toExtraData,
         );

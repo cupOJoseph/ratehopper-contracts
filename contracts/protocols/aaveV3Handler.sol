@@ -67,7 +67,6 @@ contract AaveV3Handler is IProtocolHandler {
         );
 
         repay(address(fromAsset), amount, onBehalfOf, extraData);
-        console.log("repay done");
 
         DataTypes.ReserveData memory reserveData = aaveV3Pool.getReserveData(
             collateralAsset
@@ -78,7 +77,6 @@ contract AaveV3Handler is IProtocolHandler {
             collateralAmount
         );
         aaveV3Pool.withdraw(collateralAsset, collateralAmount, address(this));
-        console.log("withdraw done");
     }
 
     function switchTo(
@@ -99,10 +97,7 @@ contract AaveV3Handler is IProtocolHandler {
         IERC20(collateralAsset).approve(address(aaveV3Pool), collateralAmount);
         aaveV3Pool.supply(collateralAsset, collateralAmount, onBehalfOf, 0);
 
-        console.log("aave v3 supply done");
-
         aaveV3Pool.borrow(toAsset, amount, 2, 0, onBehalfOf);
-        console.log("aave v3 borrow done");
     }
 
     function repay(

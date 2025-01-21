@@ -45,7 +45,6 @@ contract MorphoHandler is IProtocolHandler {
         });
 
         Id marketId = marketParams.id();
-        // console.log("marketId:", marketId);
 
         Position memory p = morpho.position(marketId, onBehalfOf);
         Market memory m = morpho.market(marketId);
@@ -109,7 +108,6 @@ contract MorphoHandler is IProtocolHandler {
         IERC20(fromAsset).approve(address(morpho), type(uint256).max);
 
         morpho.repay(marketParams, 0, borrowShares, onBehalfOf, "");
-        console.log("repay done");
 
         morpho.withdrawCollateral(
             marketParams,
@@ -117,7 +115,6 @@ contract MorphoHandler is IProtocolHandler {
             onBehalfOf,
             address(this)
         );
-        console.log("withdrawCollateral done");
     }
 
     function switchTo(
@@ -148,9 +145,8 @@ contract MorphoHandler is IProtocolHandler {
 
         IERC20(collateralToken).approve(address(morpho), collateralAmount);
         morpho.supplyCollateral(marketParams, collateralAmount, onBehalfOf, "");
-        console.log("supplyCollateral done");
+
         morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
-        console.log("borrow done");
     }
 
     function repay(

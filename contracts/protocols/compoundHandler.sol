@@ -49,7 +49,6 @@ contract CompoundHandler is IProtocolHandler {
 
         IERC20(fromAsset).approve(address(cContract), type(uint256).max);
         fromComet.supplyTo(onBehalfOf, fromAsset, amount);
-        console.log("compound repay done");
 
         // withdraw collateral
         fromComet.withdrawFrom(
@@ -58,7 +57,6 @@ contract CompoundHandler is IProtocolHandler {
             collateralAsset,
             collateralAmount
         );
-        console.log("compound withdraw collateral done");
     }
 
     function switchTo(
@@ -84,11 +82,9 @@ contract CompoundHandler is IProtocolHandler {
             collateralAsset,
             collateralAmount
         );
-        console.log("compound supply done");
 
         // borrow
         toComet.withdrawFrom(onBehalfOf, address(this), toAsset, amount);
-        console.log("compound borrow done");
     }
 
     function repay(
