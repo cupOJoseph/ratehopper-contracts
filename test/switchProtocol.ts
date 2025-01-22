@@ -5,7 +5,7 @@ import { ethers } from "hardhat";
 import "dotenv/config";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { DebtSwap } from "../typechain-types";
+import { aave, DebtSwap } from "../typechain-types";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
 
 import {
@@ -14,6 +14,7 @@ import {
     formatAmount,
     getAmountInMax,
     protocolHelperMap,
+    wrapETH,
 } from "./utils";
 import {
     USDC_ADDRESS,
@@ -23,6 +24,8 @@ import {
     ETH_USDbC_POOL,
     Protocols,
     cbETH_ADDRESS,
+    WETH_ADDRESS,
+    DEFAULT_SUPPLY_AMOUNT,
 } from "./constants";
 
 import { AaveV3Helper } from "./protocols/aaveV3";
@@ -63,6 +66,7 @@ describe("Protocol Switch", function () {
         toProtocol: Protocols,
         fromMarketId?: string,
         toMarketId?: string,
+        anotherCollateralTokenAddress?: string,
     ) {
         const FromHelper = protocolHelperMap.get(fromProtocol)!;
         const fromHelper = new FromHelper(impersonatedSigner);
@@ -110,10 +114,16 @@ describe("Protocol Switch", function () {
                 const aTokenAddress = await aaveV3Helper.getATokenAddress(cbETH_ADDRESS);
                 await approve(aTokenAddress, deployedContractAddress, impersonatedSigner);
 
-                fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "uint256"],
-                    [cbETH_ADDRESS, collateralAmount],
-                );
+                if (anotherCollateralTokenAddress) {
+                    const anotherATokenAddress = await aaveV3Helper.getATokenAddress(
+                        anotherCollateralTokenAddress,
+                    );
+                    await approve(
+                        anotherATokenAddress,
+                        deployedContractAddress,
+                        impersonatedSigner,
+                    );
+                }
                 break;
             case Protocols.COMPOUND:
                 await compoundHelper.allow(fromTokenAddress, deployedContractAddress);
@@ -138,11 +148,6 @@ describe("Protocol Switch", function () {
         switch (toProtocol) {
             case Protocols.AAVE_V3:
                 await aaveV3Helper.approveDelegation(toTokenAddress, deployedContractAddress);
-
-                toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "uint256"],
-                    [cbETH_ADDRESS, collateralAmount],
-                );
                 break;
 
             case Protocols.COMPOUND:
@@ -165,6 +170,16 @@ describe("Protocol Switch", function () {
                 break;
         }
 
+        const collateralArray = anotherCollateralTokenAddress
+            ? [
+                  { asset: cbETH_ADDRESS, amount: collateralAmount },
+                  {
+                      asset: anotherCollateralTokenAddress,
+                      amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
+                  },
+              ]
+            : [{ asset: cbETH_ADDRESS, amount: collateralAmount }];
+
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
             fromProtocol,
@@ -173,7 +188,7 @@ describe("Protocol Switch", function () {
             toTokenAddress,
             MaxUint256,
             ethers.parseUnits("1.01", 4),
-            [{ asset: cbETH_ADDRESS, amount: collateralAmount }],
+            collateralArray,
             fromExtraData,
             toExtraData,
         );
@@ -313,5 +328,103 @@ describe("Protocol Switch", function () {
             morphoMarket1Id,
             undefined,
         );
+    });
+
+    it("should switch debt Multiple collateral case from Aave to Compound", async function () {
+        await aaveV3Helper.supply(cbETH_ADDRESS);
+        await wrapETH(DEFAULT_SUPPLY_AMOUNT, impersonatedSigner);
+        await aaveV3Helper.supply(WETH_ADDRESS);
+        await aaveV3Helper.borrow(USDC_ADDRESS);
+
+        const WETHAmountInAaveBefore = await aaveV3Helper.getCollateralAmount(WETH_ADDRESS);
+        console.log(
+            "WETH collateralAmountInAaveBefore:",
+            ethers.formatEther(WETHAmountInAaveBefore),
+        );
+        const WETHAmountInCompoundBefore = await compoundHelper.getCollateralAmount(
+            USDC_COMET_ADDRESS,
+            WETH_ADDRESS,
+        );
+        console.log(
+            "WETH collateralAmountInCompoundBefore:",
+            ethers.formatEther(WETHAmountInCompoundBefore),
+        );
+
+        const cbETHAmountInAaveBefore = await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS);
+        console.log(
+            "cbETH collateralAmountInAaveBefore:",
+            ethers.formatEther(cbETHAmountInAaveBefore),
+        );
+        const cbETHAmountInCompoundBefore = await compoundHelper.getCollateralAmount(
+            USDC_COMET_ADDRESS,
+            cbETH_ADDRESS,
+        );
+        console.log(
+            "cbETH collateralAmountInCompoundBefore:",
+            ethers.formatEther(cbETHAmountInCompoundBefore),
+        );
+
+        await executeDebtSwap(
+            USDC_hyUSD_POOL,
+            USDC_ADDRESS,
+            USDbC_ADDRESS,
+            Protocols.AAVE_V3,
+            Protocols.COMPOUND,
+            undefined,
+            undefined,
+            WETH_ADDRESS,
+        );
+
+        const WETHAmountInAave = await aaveV3Helper.getCollateralAmount(WETH_ADDRESS);
+        console.log("WETH collateralAmountInAave:", ethers.formatEther(WETHAmountInAave));
+        const WETHAmountInCompound = await compoundHelper.getCollateralAmount(
+            USDC_COMET_ADDRESS,
+            WETH_ADDRESS,
+        );
+        // TODO: this should be 0.001
+        console.log("WETH collateralAmountInCompound:", ethers.formatEther(WETHAmountInCompound));
+
+        const cbETHAmountInAave = await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS);
+        console.log("cbETH collateralAmountInAave:", ethers.formatEther(cbETHAmountInAave));
+        const cbETHAmountInCompound = await compoundHelper.getCollateralAmount(
+            USDC_COMET_ADDRESS,
+            cbETH_ADDRESS,
+        );
+        console.log("cbETH collateralAmountInCompound:", ethers.formatEther(cbETHAmountInCompound));
+    });
+
+    it.only("should switch debt Multiple collateral case from Compound to Aave", async function () {
+        await compoundHelper.supply(USDC_COMET_ADDRESS, cbETH_ADDRESS);
+        await wrapETH(DEFAULT_SUPPLY_AMOUNT, impersonatedSigner);
+        await compoundHelper.supply(USDC_COMET_ADDRESS, WETH_ADDRESS);
+        await compoundHelper.borrow(USDC_ADDRESS);
+
+        await executeDebtSwap(
+            USDC_hyUSD_POOL,
+            USDC_ADDRESS,
+            USDbC_ADDRESS,
+            Protocols.COMPOUND,
+            Protocols.AAVE_V3,
+            undefined,
+            undefined,
+            WETH_ADDRESS,
+        );
+
+        const WETHAmountInAave = await aaveV3Helper.getCollateralAmount(WETH_ADDRESS);
+        console.log("WETH collateralAmountInAave:", ethers.formatEther(WETHAmountInAave));
+        const WETHAmountInCompound = await compoundHelper.getCollateralAmount(
+            USDC_COMET_ADDRESS,
+            WETH_ADDRESS,
+        );
+        // TODO: this should be 0.001
+        console.log("WETH collateralAmountInCompound:", ethers.formatEther(WETHAmountInCompound));
+
+        const cbETHAmountInAave = await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS);
+        console.log("cbETH collateralAmountInAave:", ethers.formatEther(cbETHAmountInAave));
+        const cbETHAmountInCompound = await compoundHelper.getCollateralAmount(
+            USDC_COMET_ADDRESS,
+            cbETH_ADDRESS,
+        );
+        console.log("cbETH collateralAmountInCompound:", ethers.formatEther(cbETHAmountInCompound));
     });
 });

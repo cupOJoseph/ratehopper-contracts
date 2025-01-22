@@ -137,10 +137,6 @@ contract DebtSwap {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
-        uint256 fromTokenBalance = IERC20(decoded.fromAsset).balanceOf(
-            address(this)
-        );
-
         uint256 amountInMax = (decoded.amount * decoded.allowedSlippage) /
             10 ** 4;
         console.log("amountInMax:", amountInMax);

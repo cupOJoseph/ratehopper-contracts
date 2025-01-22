@@ -63,22 +63,23 @@ contract AaveV3Handler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external override {
-        (address collateralAsset, uint256 collateralAmount) = abi.decode(
-            extraData,
-            (address, uint256)
-        );
-
         repay(address(fromAsset), amount, onBehalfOf, extraData);
 
-        DataTypes.ReserveData memory reserveData = aaveV3Pool.getReserveData(
-            collateralAsset
-        );
-        IERC20(reserveData.aTokenAddress).safeTransferFrom(
-            onBehalfOf,
-            address(this),
-            collateralAmount
-        );
-        aaveV3Pool.withdraw(collateralAsset, collateralAmount, address(this));
+        for (uint256 i = 0; i < collateralAssets.length; i++) {
+            DataTypes.ReserveData memory reserveData = aaveV3Pool
+                .getReserveData(collateralAssets[i].asset);
+            IERC20(reserveData.aTokenAddress).safeTransferFrom(
+                onBehalfOf,
+                address(this),
+                collateralAssets[i].amount
+            );
+
+            aaveV3Pool.withdraw(
+                collateralAssets[i].asset,
+                collateralAssets[i].amount,
+                address(this)
+            );
+        }
     }
 
     function switchTo(
@@ -88,18 +89,18 @@ contract AaveV3Handler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external override {
-        (address collateralAsset, uint256 collateralAmount) = abi.decode(
-            extraData,
-            (address, uint256)
-        );
-
-        uint256 collateralTokenBalance = IERC20(collateralAsset).balanceOf(
-            address(this)
-        );
-
-        IERC20(collateralAsset).approve(address(aaveV3Pool), collateralAmount);
-        aaveV3Pool.supply(collateralAsset, collateralAmount, onBehalfOf, 0);
-
+        for (uint256 i = 0; i < collateralAssets.length; i++) {
+            IERC20(collateralAssets[i].asset).approve(
+                address(aaveV3Pool),
+                collateralAssets[i].amount
+            );
+            aaveV3Pool.supply(
+                collateralAssets[i].asset,
+                collateralAssets[i].amount,
+                onBehalfOf,
+                0
+            );
+        }
         aaveV3Pool.borrow(toAsset, amount, 2, 0, onBehalfOf);
     }
 
