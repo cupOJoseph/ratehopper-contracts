@@ -156,17 +156,31 @@ export class MorphoHelper {
     encodeExtraData(marketId: string, borrowShares: bigint) {
         const fromMarketParams = marketParamsMap.get(marketId)!;
 
+        const structType = ["address", "address", "address", "address", "uint256"];
+        const structValue = [
+            fromMarketParams.loanToken,
+            fromMarketParams.collateralToken,
+            fromMarketParams.oracle,
+            fromMarketParams.irm,
+            fromMarketParams.lltv,
+        ];
+
         return ethers.AbiCoder.defaultAbiCoder().encode(
-            ["address", "address", "address", "address", "uint256", "uint256"],
-            [
-                fromMarketParams.loanToken,
-                fromMarketParams.collateralToken,
-                fromMarketParams.oracle,
-                fromMarketParams.irm,
-                fromMarketParams.lltv,
-                borrowShares,
-            ],
+            [`tuple(${structType.join(",")})`, "uint256"],
+            [structValue, borrowShares],
         );
+
+        // return ethers.AbiCoder.defaultAbiCoder().encode(
+        //     ["address", "address", "address", "address", "uint256", "uint256"],
+        //     [
+        //         fromMarketParams.loanToken,
+        //         fromMarketParams.collateralToken,
+        //         fromMarketParams.oracle,
+        //         fromMarketParams.irm,
+        //         fromMarketParams.lltv,
+        //         borrowShares,
+        //     ],
+        // );
     }
 
     async decode(rawData: string) {

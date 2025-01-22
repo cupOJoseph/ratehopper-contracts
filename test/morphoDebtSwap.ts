@@ -80,33 +80,10 @@ describe("Morpho DebtSwap", function () {
         const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, impersonatedSigner);
         await morphoContract.setAuthorization(deployedContractAddress, true);
 
-        const fromMarketParams = marketParamsMap.get(fromMarketId)!;
-        const toMarketParams = marketParamsMap.get(toMarketId)!;
-
         const borrowShares = await morphoHelper.getBorrowShares(fromMarketId);
 
-        const fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-            ["address", "address", "address", "address", "uint256", "uint256"],
-            [
-                fromMarketParams.loanToken,
-                fromMarketParams.collateralToken,
-                fromMarketParams.oracle,
-                fromMarketParams.irm,
-                fromMarketParams.lltv,
-                borrowShares,
-            ],
-        );
-
-        const toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-            ["address", "address", "address", "address", "uint256"],
-            [
-                toMarketParams.loanToken,
-                toMarketParams.collateralToken,
-                toMarketParams.oracle,
-                toMarketParams.irm,
-                toMarketParams.lltv,
-            ],
-        );
+        const fromExtraData = await morphoHelper.encodeExtraData(fromMarketId, borrowShares);
+        const toExtraData = await morphoHelper.encodeExtraData(toMarketId, borrowShares);
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,

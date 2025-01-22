@@ -393,7 +393,7 @@ describe("Protocol Switch", function () {
         console.log("cbETH collateralAmountInCompound:", ethers.formatEther(cbETHAmountInCompound));
     });
 
-    it.only("should switch debt Multiple collateral case from Compound to Aave", async function () {
+    it("should switch debt Multiple collateral case from Compound to Aave", async function () {
         await compoundHelper.supply(USDC_COMET_ADDRESS, cbETH_ADDRESS);
         await wrapETH(DEFAULT_SUPPLY_AMOUNT, impersonatedSigner);
         await compoundHelper.supply(USDC_COMET_ADDRESS, WETH_ADDRESS);
