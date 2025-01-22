@@ -15,6 +15,7 @@ import {IComet} from "./interfaces/compound/IComet.sol";
 import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
 import {ProtocolRegistry} from "./protocolRegistry.sol";
+import "./types.sol";
 
 import "hardhat/console.sol";
 
@@ -30,13 +31,6 @@ contract DebtSwap {
     IUniswapV3Pool public pool;
     ISwapRouter02 public immutable swapRouter;
     address public immutable uniswapV3Factory;
-
-    enum Protocol {
-        AAVE_V3,
-        COMPOUND,
-        MORPHO,
-        FLUID
-    }
 
     struct FlashCallbackData {
         address flashloanPool;

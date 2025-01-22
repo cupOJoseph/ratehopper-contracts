@@ -101,6 +101,30 @@ contract CompoundHandler is IProtocolHandler {
         toComet.withdrawFrom(onBehalfOf, address(this), toAsset, amount);
     }
 
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        address cContract = abi.decode(extraData, (address));
+        IERC20(asset).approve(address(cContract), amount);
+        // supply collateral
+        IComet(cContract).supplyTo(onBehalfOf, asset, amount);
+    }
+
+    function borrow(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        address cContract = abi.decode(extraData, (address));
+
+        IComet comet = IComet(cContract);
+        comet.withdrawFrom(onBehalfOf, address(this), asset, amount);
+    }
+
     function repay(
         address asset,
         uint256 amount,

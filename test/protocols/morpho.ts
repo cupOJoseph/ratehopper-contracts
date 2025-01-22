@@ -169,18 +169,6 @@ export class MorphoHelper {
             [`tuple(${structType.join(",")})`, "uint256"],
             [structValue, borrowShares],
         );
-
-        // return ethers.AbiCoder.defaultAbiCoder().encode(
-        //     ["address", "address", "address", "address", "uint256", "uint256"],
-        //     [
-        //         fromMarketParams.loanToken,
-        //         fromMarketParams.collateralToken,
-        //         fromMarketParams.oracle,
-        //         fromMarketParams.irm,
-        //         fromMarketParams.lltv,
-        //         borrowShares,
-        //     ],
-        // );
     }
 
     async decode(rawData: string) {

@@ -119,6 +119,35 @@ contract MorphoHandler is IProtocolHandler {
         morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
     }
 
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(
+            extraData,
+            (MarketParams, uint256)
+        );
+
+        IERC20(asset).approve(address(morpho), amount);
+        morpho.supplyCollateral(marketParams, amount, onBehalfOf, "");
+    }
+
+    function borrow(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(
+            extraData,
+            (MarketParams, uint256)
+        );
+
+        morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
+    }
+
     function repay(
         address asset,
         uint256 amount,

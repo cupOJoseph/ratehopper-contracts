@@ -104,6 +104,25 @@ contract AaveV3Handler is IProtocolHandler {
         aaveV3Pool.borrow(toAsset, amount, 2, 0, onBehalfOf);
     }
 
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        IERC20(asset).approve(address(aaveV3Pool), amount);
+        aaveV3Pool.supply(asset, amount, onBehalfOf, 0);
+    }
+
+    function borrow(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external override {
+        aaveV3Pool.borrow(asset, amount, 2, 0, onBehalfOf);
+    }
+
     function repay(
         address asset,
         uint256 amount,

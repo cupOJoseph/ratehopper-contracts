@@ -60,7 +60,6 @@ export async function deployContractFixture() {
     );
 
     const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
-
     const debtSwap = await DebtSwap.deploy(
         protocolRegistry.getAddress(),
         UNISWAP_V3_FACTORY_ADRESS,
@@ -71,8 +70,18 @@ export async function deployContractFixture() {
     );
     console.log("DebtSwap deployed to:", await debtSwap.getAddress());
 
+    const LeveragedPosition = await hre.ethers.getContractFactory("LeveragedPosition");
+    const leveragedPosition = await LeveragedPosition.deploy(
+        protocolRegistry.getAddress(),
+        UNISWAP_V3_FACTORY_ADRESS,
+        UNISWAP_V3_SWAP_ROUTER_ADDRESS,
+    );
+
+    console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
+
     return {
         debtSwap,
+        leveragedPosition,
     };
 }
 

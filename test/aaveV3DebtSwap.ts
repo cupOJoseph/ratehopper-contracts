@@ -66,7 +66,6 @@ describe("Aave DebtSwap", function () {
         );
         const collateralBalance = await collateralToken.balanceOf(TEST_ADDRESS);
 
-        await approve(USDC_ADDRESS, deployedContractAddress, impersonatedSigner);
         await aaveV3Helper.approveDelegation(toTokenAddress, deployedContractAddress);
 
         await time.increaseTo((await time.latest()) + 60);

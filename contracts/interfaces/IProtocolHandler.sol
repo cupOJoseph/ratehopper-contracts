@@ -38,6 +38,20 @@ interface IProtocolHandler {
         bytes calldata extraData
     ) external;
 
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external;
+
+    function borrow(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata extraData
+    ) external;
+
     function repay(
         address asset,
         uint256 amount,
