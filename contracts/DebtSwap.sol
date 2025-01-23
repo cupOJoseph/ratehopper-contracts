@@ -14,8 +14,9 @@ import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
 import {IComet} from "./interfaces/compound/IComet.sol";
 import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
-import {ProtocolRegistry} from "./protocolRegistry.sol";
-import "./types.sol";
+import {ProtocolRegistry} from "./ProtocolRegistry.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Types.sol";
 
 import "hardhat/console.sol";
 
@@ -24,9 +25,9 @@ struct CollateralAsset {
     uint256 amount;
 }
 
-contract DebtSwap {
+contract DebtSwap is Ownable {
     using GPv2SafeERC20 for IERC20;
-    ProtocolRegistry private protocolRegistry;
+    ProtocolRegistry public protocolRegistry;
 
     IUniswapV3Pool public pool;
     ISwapRouter02 public immutable swapRouter;
@@ -46,14 +47,13 @@ contract DebtSwap {
         bytes toExtraData;
     }
 
-    constructor(
-        address registry,
-        address uniswap_v3_factory,
-        address uniswap_v3_swap_router
-    ) {
-        protocolRegistry = ProtocolRegistry(registry);
-        uniswapV3Factory = uniswap_v3_factory;
-        swapRouter = ISwapRouter02(uniswap_v3_swap_router);
+    constructor(address _uniswap_v3_factory, address _uniswap_v3_swap_router) {
+        uniswapV3Factory = _uniswap_v3_factory;
+        swapRouter = ISwapRouter02(_uniswap_v3_swap_router);
+    }
+
+    function setRegistry(address _registry) public onlyOwner {
+        protocolRegistry = ProtocolRegistry(_registry);
     }
 
     function executeDebtSwap(
@@ -74,11 +74,7 @@ contract DebtSwap {
         console.log("collateralAmount:", _collateralAssets[0].amount);
 
         if (_amount == type(uint256).max) {
-            ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
-                uint(_fromProtocol)
-            );
-
-            address handler = protocolRegistry.getHandler(protocol);
+            address handler = protocolRegistry.getHandler(_fromProtocol);
 
             // TODO: remove delegateCall?
             (bool success, bytes memory returnData) = handler.delegatecall(
@@ -131,16 +127,13 @@ contract DebtSwap {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
-        uint256 amountInMax = (decoded.amount * (10 ** 4 + decoded.allowedSlippage)) /
-            10 ** 4;
+        uint256 amountInMax = (decoded.amount *
+            (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
         console.log("amountInMax:", amountInMax);
 
         if (decoded.fromProtocol == decoded.toProtocol) {
-            ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
-                uint(decoded.fromProtocol)
-            );
+            address handler = protocolRegistry.getHandler(decoded.fromProtocol);
 
-            address handler = protocolRegistry.getHandler(protocol);
             handler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchIn,
@@ -158,11 +151,9 @@ contract DebtSwap {
                 )
             );
         } else {
-            ProtocolRegistry.Protocol fromProtocol = ProtocolRegistry.Protocol(
-                uint(decoded.fromProtocol)
+            address fromHandler = protocolRegistry.getHandler(
+                decoded.fromProtocol
             );
-
-            address fromHandler = protocolRegistry.getHandler(fromProtocol);
             fromHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchFrom,
@@ -176,11 +167,7 @@ contract DebtSwap {
                 )
             );
 
-            ProtocolRegistry.Protocol toProtocol = ProtocolRegistry.Protocol(
-                uint(decoded.toProtocol)
-            );
-
-            address toHandler = protocolRegistry.getHandler(toProtocol);
+            address toHandler = protocolRegistry.getHandler(decoded.toProtocol);
             toHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchTo,
@@ -214,11 +201,7 @@ contract DebtSwap {
         console.log("remainingBalance:", remainingBalance);
 
         if (remainingBalance > 0) {
-            ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
-                uint(decoded.toProtocol)
-            );
-
-            address handler = protocolRegistry.getHandler(protocol);
+            address handler = protocolRegistry.getHandler(decoded.toProtocol);
 
             handler.delegatecall(
                 abi.encodeCall(

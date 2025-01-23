@@ -13,7 +13,7 @@ export class AaveV3Helper {
     private protocolDataProvider;
     private pool;
 
-    constructor(private signer: HardhatEthersSigner) {
+    constructor(private signer: HardhatEthersSigner | any) {
         this.protocolDataProvider = new ethers.Contract(
             aaveV3ProtocolDataProvider,
             aaveProtocolDataProviderAbi,

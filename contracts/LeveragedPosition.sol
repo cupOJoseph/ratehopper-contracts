@@ -14,12 +14,13 @@ import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
 import {IComet} from "./interfaces/compound/IComet.sol";
 import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
-import {ProtocolRegistry} from "./protocolRegistry.sol";
-import "./types.sol";
+import {ProtocolRegistry} from "./ProtocolRegistry.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Types.sol";
 
 import "hardhat/console.sol";
 
-contract LeveragedPosition {
+contract LeveragedPosition is Ownable {
     using GPv2SafeERC20 for IERC20;
     ProtocolRegistry private protocolRegistry;
 
@@ -40,14 +41,13 @@ contract LeveragedPosition {
         bytes extraData;
     }
 
-    constructor(
-        address registry,
-        address uniswap_v3_factory,
-        address uniswap_v3_swap_router
-    ) {
-        protocolRegistry = ProtocolRegistry(registry);
+    constructor(address uniswap_v3_factory, address uniswap_v3_swap_router) {
         uniswapV3Factory = uniswap_v3_factory;
         swapRouter = ISwapRouter02(uniswap_v3_swap_router);
+    }
+
+    function setRegistry(address _registry) public onlyOwner {
+        protocolRegistry = ProtocolRegistry(_registry);
     }
 
     function createLeveragedPosition(
@@ -119,11 +119,7 @@ contract LeveragedPosition {
         uint256 amountInMax = (decoded.debtAmount * decoded.allowedSlippage) /
             10 ** 4;
 
-        ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
-            uint(decoded.protocol)
-        );
-
-        address handler = protocolRegistry.getHandler(protocol);
+        address handler = protocolRegistry.getHandler(decoded.protocol);
 
         handler.delegatecall(
             abi.encodeCall(
@@ -166,12 +162,6 @@ contract LeveragedPosition {
         console.log("remainingBalance:", remainingBalance);
 
         if (remainingBalance > 0) {
-            ProtocolRegistry.Protocol protocol = ProtocolRegistry.Protocol(
-                uint(decoded.protocol)
-            );
-
-            address handler = protocolRegistry.getHandler(protocol);
-
             handler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.repay,

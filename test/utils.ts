@@ -12,7 +12,6 @@ import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.
 import { Contract, MaxUint256 } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import WETH_ABI from "../externalAbi/weth.json";
-import { morphoHandlerSol } from "../typechain-types/factories/contracts/protocols";
 import { MORPHO_ADDRESS } from "./protocols/morpho";
 import { AaveV3Helper } from "./protocols/aaveV3";
 import { CompoundHelper } from "./protocols/compound";
@@ -52,16 +51,14 @@ export async function deployContractFixture() {
     // const fluidHandler = await FluidHandler.deploy();
 
     const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
-    const protocolRegistry = await ProtocolRegistry.deploy(
-        aaveV3Handler.getAddress(),
-        compoundHandler.getAddress(),
-        morphoHandler.getAddress(),
-        // fluidHandler.getAddress(),
-    );
+    const protocolRegistry = await ProtocolRegistry.deploy();
+
+    await protocolRegistry.setHandler(Protocols.AAVE_V3, aaveV3Handler.getAddress());
+    await protocolRegistry.setHandler(Protocols.COMPOUND, compoundHandler.getAddress());
+    await protocolRegistry.setHandler(Protocols.MORPHO, morphoHandler.getAddress());
 
     const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
     const debtSwap = await DebtSwap.deploy(
-        protocolRegistry.getAddress(),
         UNISWAP_V3_FACTORY_ADRESS,
         UNISWAP_V3_SWAP_ROUTER_ADDRESS,
         {
@@ -69,15 +66,16 @@ export async function deployContractFixture() {
         },
     );
     console.log("DebtSwap deployed to:", await debtSwap.getAddress());
+    debtSwap.setRegistry(protocolRegistry.getAddress());
 
     const LeveragedPosition = await hre.ethers.getContractFactory("LeveragedPosition");
     const leveragedPosition = await LeveragedPosition.deploy(
-        protocolRegistry.getAddress(),
         UNISWAP_V3_FACTORY_ADRESS,
         UNISWAP_V3_SWAP_ROUTER_ADDRESS,
     );
 
     console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
+    leveragedPosition.setRegistry(protocolRegistry.getAddress());
 
     return {
         debtSwap,

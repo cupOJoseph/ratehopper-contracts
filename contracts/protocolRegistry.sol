@@ -1,28 +1,15 @@
 pragma solidity =0.8.27;
 
-contract ProtocolRegistry {
-    enum Protocol {
-        COMPOUND,
-        AAVE_V3,
-        MORPHO
-        // FLUID
-    }
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Types.sol";
 
+contract ProtocolRegistry is Ownable {
     mapping(Protocol => address) private protocolHandlers;
 
-    constructor(
-        address compoundHandler,
-        address aaveV3Handler,
-        address morphoHandler
-    ) // address fluidHandler
-    {
-        protocolHandlers[Protocol.COMPOUND] = compoundHandler;
-        protocolHandlers[Protocol.AAVE_V3] = aaveV3Handler;
-        protocolHandlers[Protocol.MORPHO] = morphoHandler;
-        // protocolHandlers[Protocol.FLUID] = fluidHandler;
+    function setHandler(Protocol protocol, address handler) external onlyOwner {
+        require(handler != address(0), "Invalid handler address");
+        protocolHandlers[protocol] = handler;
     }
-
-    // TODO: add setProtocol()
 
     function getHandler(Protocol protocol) external view returns (address) {
         return protocolHandlers[protocol];

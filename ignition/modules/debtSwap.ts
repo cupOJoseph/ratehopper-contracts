@@ -2,25 +2,26 @@
 // Learn more about it at https://hardhat.org/ignition
 
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+import { UNISWAP_V3_FACTORY_ADRESS, UNISWAP_V3_SWAP_ROUTER_ADDRESS } from "../../test/constants";
 
 const DebtSwapModule = buildModule("DebtSwap", (m) => {
-    const AAVE_V3_POOL_ADDRESS = m.getParameter(
-        "AAVE_V3_POOL_ADDRESS",
-        "0x794a61358d6845594f94dc1db02a252b5b4814ad",
+    const uniswap_v3_factory_address = m.getParameter(
+        "UNISWAP_V3_FACTORY_ADDRESS",
+        UNISWAP_V3_FACTORY_ADRESS,
     );
 
-    const UNISWAP_V3_SWAP_ROUTER_ADDRESS = m.getParameter(
+    const uniswap_v3_swap_router_address = m.getParameter(
         "UNISWAP_V3_SWAP_ROUTER_ADDRESS",
-        "0x2626664c2603336E57B271c5C0b26F421741e481",
+        UNISWAP_V3_SWAP_ROUTER_ADDRESS,
     );
 
-    const DebtSwap = m.contract(
+    const debtSwap = m.contract(
         "DebtSwap",
-        [AAVE_V3_POOL_ADDRESS, UNISWAP_V3_SWAP_ROUTER_ADDRESS],
+        [uniswap_v3_factory_address, uniswap_v3_swap_router_address],
         {},
     );
 
-    return { DebtSwap };
+    return { debtSwap };
 });
 
 export default DebtSwapModule;
