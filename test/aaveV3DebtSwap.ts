@@ -80,7 +80,7 @@ describe("Aave DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             debtAmount,
-            ethers.parseUnits("1.01", 4),
+            10,
             [{ asset: collateralTokenAddress, amount: collateralBalance }],
             "0x",
             "0x",

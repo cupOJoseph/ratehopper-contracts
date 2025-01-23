@@ -107,7 +107,7 @@ describe("Compound DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             debtAmount,
-            ethers.parseUnits("1.01", 4),
+            10,
             collateralArray,
             fromExtraData,
             toExtraData,

@@ -27,7 +27,7 @@ import { AaveV3Helper } from "./protocols/aaveV3";
 import { CompoundHelper, USDC_COMET_ADDRESS } from "./protocols/compound";
 import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id } from "./protocols/morpho";
 
-describe.only("Create leveraged position", function () {
+describe("Create leveraged position", function () {
     let myContract: LeveragedPosition;
     let impersonatedSigner: HardhatEthersSigner;
 
@@ -51,6 +51,12 @@ describe.only("Create leveraged position", function () {
             impersonatedSigner,
         );
     });
+
+    function calculateBorrowAmount(amountToRepay: number) {
+        const price = 3300;
+        const amountToBorrow = amountToRepay * price;
+        return amountToBorrow;
+    }
 
     it("should create on Aave", async function () {
         await approve(cbETH_ADDRESS, deployedContractAddress, impersonatedSigner);

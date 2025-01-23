@@ -92,7 +92,7 @@ describe("Morpho DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             MaxUint256,
-            ethers.parseUnits("1.01", 4),
+            10,
             [{ asset: collateralTokenAddress, amount: collateralAmount }],
             fromExtraData,
             toExtraData,

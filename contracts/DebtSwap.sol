@@ -131,7 +131,7 @@ contract DebtSwap {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
-        uint256 amountInMax = (decoded.amount * decoded.allowedSlippage) /
+        uint256 amountInMax = (decoded.amount * (10 ** 4 + decoded.allowedSlippage)) /
             10 ** 4;
         console.log("amountInMax:", amountInMax);
 

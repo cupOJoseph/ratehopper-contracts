@@ -201,6 +201,7 @@ contract LeveragedPosition {
             .ExactOutputSingleParams({
                 tokenIn: inputToken,
                 tokenOut: outputToken,
+                // TODO: make this dynamic
                 fee: 3000,
                 recipient: address(this),
                 amountOut: amountOut,
