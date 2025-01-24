@@ -38,6 +38,7 @@ contract LeveragedPosition is Ownable {
         uint256 debtAmount;
         uint16 allowedSlippage;
         address onBehalfOf;
+        uint16 swapFee;
         bytes extraData;
     }
 
@@ -59,6 +60,7 @@ contract LeveragedPosition is Ownable {
         address _debtAsset,
         uint256 _debtAmount,
         uint16 _allowedSlippage,
+        uint16 _swapFee,
         bytes calldata _extraData
     ) public {
         IERC20(_collateralAsset).transferFrom(
@@ -90,6 +92,7 @@ contract LeveragedPosition is Ownable {
                 targetCollateralAmount: _targetCollateralAmount,
                 debtAmount: _debtAmount,
                 allowedSlippage: _allowedSlippage,
+                swapFee: _swapFee,
                 onBehalfOf: msg.sender,
                 extraData: _extraData
             })
@@ -116,8 +119,8 @@ contract LeveragedPosition is Ownable {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
-        uint256 amountInMax = (decoded.debtAmount * decoded.allowedSlippage) /
-            10 ** 4;
+        uint256 amountInMax = (decoded.debtAmount *
+            (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
 
         address handler = protocolRegistry.getHandler(decoded.protocol);
 
@@ -149,7 +152,8 @@ contract LeveragedPosition is Ownable {
             address(decoded.debtAsset),
             address(decoded.collateralAsset),
             flashloanBorrowAmount + totalFee,
-            amountInMax
+            amountInMax,
+            decoded.swapFee
         );
 
         IERC20 token = IERC20(decoded.collateralAsset);
@@ -183,7 +187,8 @@ contract LeveragedPosition is Ownable {
         address inputToken,
         address outputToken,
         uint256 amountOut,
-        uint256 amountInMaximum
+        uint256 amountInMaximum,
+        uint16 swapFee
     ) internal {
         IERC20(inputToken).approve(address(swapRouter), amountInMaximum);
 
@@ -191,8 +196,7 @@ contract LeveragedPosition is Ownable {
             .ExactOutputSingleParams({
                 tokenIn: inputToken,
                 tokenOut: outputToken,
-                // TODO: make this dynamic
-                fee: 3000,
+                fee: swapFee,
                 recipient: address(this),
                 amountOut: amountOut,
                 amountInMaximum: amountInMaximum,

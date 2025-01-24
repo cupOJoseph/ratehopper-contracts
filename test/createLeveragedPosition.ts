@@ -27,7 +27,7 @@ import { AaveV3Helper } from "./protocols/aaveV3";
 import { CompoundHelper, USDC_COMET_ADDRESS } from "./protocols/compound";
 import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id } from "./protocols/morpho";
 
-describe("Create leveraged position", function () {
+describe.only("Create leveraged position", function () {
     let myContract: LeveragedPosition;
     let impersonatedSigner: HardhatEthersSigner;
 
@@ -35,6 +35,9 @@ describe("Create leveraged position", function () {
     let aaveV3Helper: AaveV3Helper;
     let compoundHelper: CompoundHelper;
     let morphoHelper: MorphoHelper;
+
+    const slipage = 10;
+    const defaultTargetSupplyAmount = "0.002";
 
     this.beforeEach(async () => {
         impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
@@ -52,25 +55,46 @@ describe("Create leveraged position", function () {
         );
     });
 
-    function calculateBorrowAmount(amountToRepay: number) {
-        const price = 3300;
-        const amountToBorrow = amountToRepay * price;
-        return amountToBorrow;
+    function calculateBorrowAmount(
+        principleSupplyAmount: number,
+        targetSupplyAmount: number,
+        borrowTokenDecimal: number,
+        supplyTokenPrice: number,
+    ): bigint {
+        const amountDiff = targetSupplyAmount - principleSupplyAmount;
+        // add buffer of 20%. remaining amount is repaid on contract
+        const amountToBorrow = amountDiff * supplyTokenPrice * 1.2;
+        const roundedAmount = parseFloat(amountToBorrow.toFixed(borrowTokenDecimal));
+
+        return ethers.parseUnits(roundedAmount.toString(), borrowTokenDecimal);
     }
+
+    it("calculate borrow amount", async function () {
+        const amount = calculateBorrowAmount(0.001, 0.002, 6, 3300);
+        console.log("amount: ", amount);
+    });
 
     it("should create on Aave", async function () {
         await approve(cbETH_ADDRESS, deployedContractAddress, impersonatedSigner);
         await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
+
+        const borrowAmount = calculateBorrowAmount(
+            Number(DEFAULT_SUPPLY_AMOUNT),
+            Number(defaultTargetSupplyAmount),
+            6,
+            3300,
+        );
 
         await myContract.createLeveragedPosition(
             cbETH_ETH_POOL,
             Protocols.AAVE_V3,
             cbETH_ADDRESS,
             ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
-            ethers.parseEther("0.002"),
+            ethers.parseEther(defaultTargetSupplyAmount),
             USDC_ADDRESS,
-            ethers.parseUnits("4", 6),
-            ethers.parseUnits("1.01", 4),
+            borrowAmount,
+            slipage,
+            3000,
             "0x",
         );
 
@@ -86,15 +110,23 @@ describe("Create leveraged position", function () {
         await compoundHelper.allow(USDC_ADDRESS, deployedContractAddress);
         const extraData = compoundHelper.encodeExtraData(USDC_COMET_ADDRESS);
 
+        const borrowAmount = calculateBorrowAmount(
+            Number(DEFAULT_SUPPLY_AMOUNT),
+            Number(defaultTargetSupplyAmount),
+            6,
+            3300,
+        );
+
         await myContract.createLeveragedPosition(
             cbETH_ETH_POOL,
             Protocols.COMPOUND,
             cbETH_ADDRESS,
             ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
-            ethers.parseEther("0.002"),
+            ethers.parseEther(defaultTargetSupplyAmount),
             USDC_ADDRESS,
-            ethers.parseUnits("4", 6),
-            ethers.parseUnits("1.01", 4),
+            borrowAmount,
+            slipage,
+            3000,
             extraData,
         );
 
@@ -116,15 +148,23 @@ describe("Create leveraged position", function () {
 
         const extraData = morphoHelper.encodeExtraData(morphoMarket1Id, BigInt(0));
 
+        const borrowAmount = calculateBorrowAmount(
+            Number(DEFAULT_SUPPLY_AMOUNT),
+            Number(defaultTargetSupplyAmount),
+            6,
+            3300,
+        );
+
         await myContract.createLeveragedPosition(
             cbETH_ETH_POOL,
             Protocols.MORPHO,
             cbETH_ADDRESS,
             ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
-            ethers.parseEther("0.002"),
+            ethers.parseEther(defaultTargetSupplyAmount),
             USDC_ADDRESS,
-            ethers.parseUnits("4", 6),
-            ethers.parseUnits("1.01", 4),
+            borrowAmount,
+            slipage,
+            3000,
             extraData,
         );
 
