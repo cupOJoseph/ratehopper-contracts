@@ -29,6 +29,9 @@ const config: HardhatUserConfig = {
             },
         ],
     },
+    etherscan: {
+        apiKey: process.env.EXPLORER_KEY,
+    },
     mocha: {
         timeout: 3000000,
         parallel: false,
