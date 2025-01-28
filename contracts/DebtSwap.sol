@@ -127,8 +127,18 @@ contract DebtSwap is Ownable {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
+        uint8 fromDecimals = IERC20(decoded.fromAsset).decimals();
+        uint8 toDecimals = IERC20(decoded.toAsset).decimals();
+        uint8 decimalDiff = fromDecimals > toDecimals
+            ? fromDecimals - toDecimals
+            : toDecimals - fromDecimals;
+
         uint256 amountInMax = (decoded.amount *
             (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
+
+        if (decimalDiff > 0) {
+            amountInMax = amountInMax * 10 ** decimalDiff;
+        }
         console.log("amountInMax:", amountInMax);
 
         if (decoded.fromProtocol == decoded.toProtocol) {
@@ -226,7 +236,7 @@ contract DebtSwap is Ownable {
         uint256 amountOut,
         uint256 amountInMaximum
     ) internal {
-        IERC20(inputToken).approve(address(swapRouter), amountInMaximum);
+        IERC20(inputToken).approve(address(swapRouter), type(uint256).max);
 
         IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter
             .ExactOutputSingleParams({

@@ -20,14 +20,16 @@ import {
     WETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
     cbETH_ETH_POOL,
+    cbBTC_ADDRESS,
+    cbBTC_USDC_POOL,
 } from "./constants";
 
 import { MaxUint256 } from "ethers";
 import { AaveV3Helper } from "./protocols/aaveV3";
 import { CompoundHelper, USDC_COMET_ADDRESS } from "./protocols/compound";
-import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id } from "./protocols/morpho";
+import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id, morphoMarket4Id } from "./protocols/morpho";
 
-describe.only("Create leveraged position", function () {
+describe("Create leveraged position", function () {
     let myContract: LeveragedPosition;
     let impersonatedSigner: HardhatEthersSigner;
 
@@ -38,6 +40,9 @@ describe.only("Create leveraged position", function () {
 
     const slipage = 10;
     const defaultTargetSupplyAmount = "0.002";
+    const sampleEthPrice = 3300;
+    const sampleBtcPrice = 101000;
+    const cbBTCDecimals = 8;
 
     this.beforeEach(async () => {
         impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
@@ -74,7 +79,7 @@ describe.only("Create leveraged position", function () {
         console.log("amount: ", amount);
     });
 
-    it("should create on Aave", async function () {
+    it("should create on Aave with cbETH", async function () {
         await approve(cbETH_ADDRESS, deployedContractAddress, impersonatedSigner);
         await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
 
@@ -82,7 +87,7 @@ describe.only("Create leveraged position", function () {
             Number(DEFAULT_SUPPLY_AMOUNT),
             Number(defaultTargetSupplyAmount),
             6,
-            3300,
+            sampleEthPrice,
         );
 
         await myContract.createLeveragedPosition(
@@ -105,7 +110,79 @@ describe.only("Create leveraged position", function () {
         console.log("collateralAmount: ", ethers.formatEther(collateralAmount));
     });
 
-    it("should create on Compoud", async function () {
+    it("should create on Aave with cbBTC", async function () {
+        await approve(cbBTC_ADDRESS, deployedContractAddress, impersonatedSigner);
+        await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
+
+        const principleAmount = 0.00006;
+        const targetAmount = principleAmount * 2;
+
+        const borrowAmount = calculateBorrowAmount(
+            Number(principleAmount),
+            Number(targetAmount),
+            6,
+            sampleBtcPrice,
+        );
+
+        console.log("borrowAmount: ", borrowAmount);
+
+        await myContract.createLeveragedPosition(
+            cbBTC_USDC_POOL,
+            Protocols.AAVE_V3,
+            cbBTC_ADDRESS,
+            ethers.parseUnits(principleAmount.toString(), cbBTCDecimals),
+            ethers.parseUnits(targetAmount.toString(), cbBTCDecimals),
+            USDC_ADDRESS,
+            borrowAmount,
+            slipage,
+            3000,
+            "0x",
+        );
+
+        const debtAmount = await aaveV3Helper.getDebtAmount(USDC_ADDRESS);
+        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
+
+        const collateralAmount = await aaveV3Helper.getCollateralAmount(cbBTC_ADDRESS);
+        console.log("collateralAmount: ", ethers.formatUnits(collateralAmount, cbBTCDecimals));
+    });
+
+    it.only("should create on Aave with cbBTC more leverage", async function () {
+        await approve(cbBTC_ADDRESS, deployedContractAddress, impersonatedSigner);
+        await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
+
+        const principleAmount = 0.00006;
+        const targetAmount = 0.00014;
+
+        const borrowAmount = calculateBorrowAmount(
+            Number(principleAmount),
+            Number(targetAmount),
+            6,
+            sampleBtcPrice,
+        );
+
+        console.log("borrowAmount: ", borrowAmount);
+
+        await myContract.createLeveragedPosition(
+            cbBTC_USDC_POOL,
+            Protocols.AAVE_V3,
+            cbBTC_ADDRESS,
+            ethers.parseUnits(principleAmount.toString(), cbBTCDecimals),
+            ethers.parseUnits(targetAmount.toString(), cbBTCDecimals),
+            USDC_ADDRESS,
+            borrowAmount,
+            slipage,
+            3000,
+            "0x",
+        );
+
+        const debtAmount = await aaveV3Helper.getDebtAmount(USDC_ADDRESS);
+        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
+
+        const collateralAmount = await aaveV3Helper.getCollateralAmount(cbBTC_ADDRESS);
+        console.log("collateralAmount: ", ethers.formatUnits(collateralAmount, cbBTCDecimals));
+    });
+
+    it("should create on Compoud with cbETH", async function () {
         await approve(cbETH_ADDRESS, deployedContractAddress, impersonatedSigner);
         await compoundHelper.allow(USDC_ADDRESS, deployedContractAddress);
         const extraData = compoundHelper.encodeExtraData(USDC_COMET_ADDRESS);
@@ -114,7 +191,7 @@ describe.only("Create leveraged position", function () {
             Number(DEFAULT_SUPPLY_AMOUNT),
             Number(defaultTargetSupplyAmount),
             6,
-            3300,
+            sampleEthPrice,
         );
 
         await myContract.createLeveragedPosition(
@@ -140,7 +217,47 @@ describe.only("Create leveraged position", function () {
         console.log("collateralAmount: ", ethers.formatEther(collateralAmount));
     });
 
-    it("should create on Morpho", async function () {
+    it("should create on Compound with cbBTC", async function () {
+        await approve(cbBTC_ADDRESS, deployedContractAddress, impersonatedSigner);
+        await compoundHelper.allow(USDC_ADDRESS, deployedContractAddress);
+        const extraData = compoundHelper.encodeExtraData(USDC_COMET_ADDRESS);
+
+        const principleAmount = 0.00006;
+        const targetAmount = principleAmount * 2;
+
+        const borrowAmount = calculateBorrowAmount(
+            Number(principleAmount),
+            Number(targetAmount),
+            6,
+            sampleBtcPrice,
+        );
+
+        console.log("borrowAmount: ", borrowAmount);
+
+        await myContract.createLeveragedPosition(
+            cbBTC_USDC_POOL,
+            Protocols.COMPOUND,
+            cbBTC_ADDRESS,
+            ethers.parseUnits(principleAmount.toString(), cbBTCDecimals),
+            ethers.parseUnits(targetAmount.toString(), cbBTCDecimals),
+            USDC_ADDRESS,
+            borrowAmount,
+            slipage,
+            3000,
+            extraData,
+        );
+
+        const debtAmount = await compoundHelper.getDebtAmount(USDC_ADDRESS);
+        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
+
+        const collateralAmount = await compoundHelper.getCollateralAmount(
+            USDC_COMET_ADDRESS,
+            cbBTC_ADDRESS,
+        );
+        console.log("collateralAmount: ", ethers.formatUnits(collateralAmount, cbBTCDecimals));
+    });
+
+    it("should create on Morpho with cbETH", async function () {
         await approve(cbETH_ADDRESS, deployedContractAddress, impersonatedSigner);
 
         const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, impersonatedSigner);
@@ -152,7 +269,7 @@ describe.only("Create leveraged position", function () {
             Number(DEFAULT_SUPPLY_AMOUNT),
             Number(defaultTargetSupplyAmount),
             6,
-            3300,
+            sampleEthPrice,
         );
 
         await myContract.createLeveragedPosition(
@@ -172,6 +289,44 @@ describe.only("Create leveraged position", function () {
         console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
 
         const collateralAmount = await morphoHelper.getCollateralAmount(morphoMarket1Id);
+        console.log("collateralAmount: ", ethers.formatEther(collateralAmount));
+    });
+
+    it("should create on Morpho with cbBTC", async function () {
+        await approve(cbBTC_ADDRESS, deployedContractAddress, impersonatedSigner);
+
+        const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, impersonatedSigner);
+        await morphoContract.setAuthorization(deployedContractAddress, true);
+
+        const principleAmount = 0.00006;
+        const targetAmount = principleAmount * 2;
+
+        const extraData = morphoHelper.encodeExtraData(morphoMarket4Id, BigInt(0));
+
+        const borrowAmount = calculateBorrowAmount(
+            Number(principleAmount),
+            Number(targetAmount),
+            6,
+            sampleBtcPrice,
+        );
+
+        await myContract.createLeveragedPosition(
+            cbBTC_USDC_POOL,
+            Protocols.MORPHO,
+            cbBTC_ADDRESS,
+            ethers.parseUnits(principleAmount.toString(), cbBTCDecimals),
+            ethers.parseUnits(targetAmount.toString(), cbBTCDecimals),
+            USDC_ADDRESS,
+            borrowAmount,
+            slipage,
+            3000,
+            extraData,
+        );
+
+        const debtAmount = await morphoHelper.getDebtAmount(morphoMarket4Id);
+        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
+
+        const collateralAmount = await morphoHelper.getCollateralAmount(morphoMarket4Id);
         console.log("collateralAmount: ", ethers.formatEther(collateralAmount));
     });
 });

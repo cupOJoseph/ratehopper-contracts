@@ -92,7 +92,7 @@ describe("Morpho DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             MaxUint256,
-            10,
+            2000,
             [{ asset: collateralTokenAddress, amount: collateralAmount }],
             fromExtraData,
             toExtraData,
@@ -153,7 +153,7 @@ describe("Morpho DebtSwap", function () {
             );
         });
 
-        it.skip("should switch from market 1 to market 3(MAI)", async function () {
+        it("should switch from market 1 to market 3(MAI, 18 decimals)", async function () {
             await morphoHelper.supply(cbETH_ADDRESS, morphoMarket1Id);
             await morphoHelper.borrow(morphoMarket1Id);
 

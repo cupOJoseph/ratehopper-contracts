@@ -68,6 +68,7 @@ contract AaveV3Handler is IProtocolHandler {
         for (uint256 i = 0; i < collateralAssets.length; i++) {
             DataTypes.ReserveData memory reserveData = aaveV3Pool
                 .getReserveData(collateralAssets[i].asset);
+
             IERC20(reserveData.aTokenAddress).safeTransferFrom(
                 onBehalfOf,
                 address(this),

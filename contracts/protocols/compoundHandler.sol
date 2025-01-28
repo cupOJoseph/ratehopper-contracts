@@ -83,16 +83,11 @@ contract CompoundHandler is IProtocolHandler {
                 address(cContract),
                 collateralAssets[i].amount
             );
+
             // supply collateral
             toComet.supplyTo(
                 onBehalfOf,
                 collateralAssets[i].asset,
-                collateralAssets[i].amount
-            );
-            console.log(
-                "supply collateral",
-                collateralAssets[i].asset,
-                ":",
                 collateralAssets[i].amount
             );
         }

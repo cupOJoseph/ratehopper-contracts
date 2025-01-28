@@ -2,6 +2,7 @@ import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { Contract, MaxUint256 } from "ethers";
 import {
+    cbBTC_ADDRESS,
     cbETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
     MAI_ADDRESS,
@@ -21,6 +22,7 @@ export const MORPHO_ADDRESS = "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb";
 export const morphoMarket1Id = "0x1c21c59df9db44bf6f645d854ee710a8ca17b479451447e9f56758aee10a2fad";
 export const morphoMarket2Id = "0xdba352d93a64b17c71104cbddc6aef85cd432322a1446b5b65163cbbc615cd0c";
 export const morphoMarket3Id = "0xf761e909ee2f87f118e36b7efb42c5915752a6d39263eec0c000c15d0ab7f489";
+export const morphoMarket4Id = "0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836";
 
 const market1Params = {
     collateralToken: cbETH_ADDRESS,
@@ -46,10 +48,19 @@ const market3Params = {
     lltv: 860000000000000000n,
 };
 
+const market4Params = {
+    collateralToken: cbBTC_ADDRESS,
+    loanToken: USDC_ADDRESS,
+    irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
+    oracle: "0x663BECd10daE6C4A3Dcd89F1d76c1174199639B9",
+    lltv: 860000000000000000n,
+};
+
 export const marketParamsMap = new Map<string, any>([
     [morphoMarket1Id, market1Params],
     [morphoMarket2Id, market2Params],
     [morphoMarket3Id, market3Params],
+    [morphoMarket4Id, market4Params],
 ]);
 
 // const toMarketParams = {

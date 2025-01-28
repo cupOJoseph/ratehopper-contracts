@@ -30,7 +30,7 @@ import {
 
 import { AaveV3Helper } from "./protocols/aaveV3";
 import { cometAddressMap, CompoundHelper, USDC_COMET_ADDRESS } from "./protocols/compound";
-import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id } from "./protocols/morpho";
+import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id, morphoMarket4Id } from "./protocols/morpho";
 import { MaxUint256 } from "ethers";
 
 describe("Protocol Switch", function () {
