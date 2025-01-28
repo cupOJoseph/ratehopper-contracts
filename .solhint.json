@@ -4,6 +4,7 @@
     "rules": {
         "prettier/prettier": "error",
         "no-console": "off",
-        "avoid-low-level-calls": "off"
+        "avoid-low-level-calls": "off",
+        "custom-errors": "off"
     }
 }

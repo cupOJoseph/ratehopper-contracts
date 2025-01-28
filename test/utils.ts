@@ -66,7 +66,7 @@ export async function deployContractFixture() {
         },
     );
     console.log("DebtSwap deployed to:", await debtSwap.getAddress());
-    debtSwap.setRegistry(protocolRegistry.getAddress());
+    await debtSwap.setRegistry(protocolRegistry.getAddress());
 
     const LeveragedPosition = await hre.ethers.getContractFactory("LeveragedPosition");
     const leveragedPosition = await LeveragedPosition.deploy(
@@ -75,7 +75,7 @@ export async function deployContractFixture() {
     );
 
     console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
-    leveragedPosition.setRegistry(protocolRegistry.getAddress());
+    await leveragedPosition.setRegistry(protocolRegistry.getAddress());
 
     return {
         debtSwap,

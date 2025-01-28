@@ -42,6 +42,15 @@ contract LeveragedPosition is Ownable {
         bytes extraData;
     }
 
+    event LeveragedPositionCreated(
+        address indexed onBehalfOf,
+        Protocol protocol,
+        address collateralAsset,
+        uint256 principleCollateralAmount,
+        uint256 targetCollateralAmount,
+        address debtAsset
+    );
+
     constructor(address uniswap_v3_factory, address uniswap_v3_swap_router) {
         uniswapV3Factory = uniswap_v3_factory;
         swapRouter = ISwapRouter02(uniswap_v3_swap_router);
@@ -63,6 +72,12 @@ contract LeveragedPosition is Ownable {
         uint16 _swapFee,
         bytes calldata _extraData
     ) public {
+        require(
+            _collateralAsset != address(0),
+            "Invalid collateral asset address"
+        );
+        require(_debtAsset != address(0), "Invalid debt asset address");
+
         IERC20(_collateralAsset).transferFrom(
             msg.sender,
             address(this),
@@ -74,7 +89,13 @@ contract LeveragedPosition is Ownable {
         uint256 flashloanBorrowAmount = _targetCollateralAmount -
             _principleCollateralAmount;
 
-        address token0 = pool.token0();
+        address token0;
+        try pool.token0() returns (address result) {
+            token0 = result;
+        } catch {
+            revert("Invalid flashloan pool address");
+        }
+
         uint256 amount0 = _collateralAsset == token0
             ? flashloanBorrowAmount
             : 0;
@@ -181,6 +202,15 @@ contract LeveragedPosition is Ownable {
 
         uint256 remainingBalanceAfter = debtToken.balanceOf(address(this));
         console.log("remainingBalanceAfter:", remainingBalanceAfter);
+
+        emit LeveragedPositionCreated(
+            decoded.onBehalfOf,
+            decoded.protocol,
+            decoded.collateralAsset,
+            decoded.principleCollateralAmount,
+            decoded.targetCollateralAmount,
+            decoded.debtAsset
+        );
     }
 
     function swapToken(

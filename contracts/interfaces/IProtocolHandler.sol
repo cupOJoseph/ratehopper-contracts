@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.27;
 
-import "../DebtSwap.sol";
+import "../Types.sol";
 
 interface IProtocolHandler {
     function getDebtAmount(

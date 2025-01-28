@@ -7,3 +7,8 @@ enum Protocol {
     MORPHO
     // FLUID
 }
+
+struct CollateralAsset {
+    address asset;
+    uint256 amount;
+}

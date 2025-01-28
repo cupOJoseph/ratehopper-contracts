@@ -121,6 +121,7 @@ describe("Aave DebtSwap", function () {
         const currentDebtAmount = await aaveV3Helper.getDebtAmount(USDC_ADDRESS);
         console.log("currentDebtAmount:", currentDebtAmount);
     });
+
     describe("Collateral is cbETH", function () {
         it("should switch from USDC to USDbC", async function () {
             await aaveV3Helper.supply(cbETH_ADDRESS);

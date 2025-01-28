@@ -6,6 +6,7 @@
     "scripts": {
         "test": "npx hardhat test",
         "trace": "npx hardhat test --v",
+        "fulltrace": "npx hardhat test --vvv",
         "compile": "npx hardhat compile",
         "size": "npx hardhat size-contracts",
         "coverage": "npx hardhat coverage",

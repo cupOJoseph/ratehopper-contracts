@@ -20,11 +20,6 @@ import "./Types.sol";
 
 import "hardhat/console.sol";
 
-struct CollateralAsset {
-    address asset;
-    uint256 amount;
-}
-
 contract DebtSwap is Ownable {
     using GPv2SafeERC20 for IERC20;
     ProtocolRegistry public protocolRegistry;
@@ -47,6 +42,15 @@ contract DebtSwap is Ownable {
         bytes toExtraData;
     }
 
+    event DebtSwapped(
+        address indexed onBehalfOf,
+        Protocol fromProtocol,
+        Protocol toProtocol,
+        address fromAsset,
+        address toAsset,
+        uint256 amount
+    );
+
     constructor(address _uniswap_v3_factory, address _uniswap_v3_swap_router) {
         uniswapV3Factory = _uniswap_v3_factory;
         swapRouter = ISwapRouter02(_uniswap_v3_swap_router);
@@ -68,10 +72,11 @@ contract DebtSwap is Ownable {
         bytes calldata _fromExtraData,
         bytes calldata _toExtraData
     ) public {
+        require(_fromAsset != address(0), "Invalid from asset address");
+        require(_toAsset != address(0), "Invalid to asset address");
+
         pool = IUniswapV3Pool(_flashloanPool);
         uint256 debtAmount = _amount;
-
-        console.log("collateralAmount:", _collateralAssets[0].amount);
 
         if (_amount == type(uint256).max) {
             address handler = protocolRegistry.getHandler(_fromProtocol);
@@ -88,7 +93,13 @@ contract DebtSwap is Ownable {
             console.log("on-chain debtAmount:", debtAmount);
         }
 
-        address token0 = pool.token0();
+        address token0;
+        try pool.token0() returns (address result) {
+            token0 = result;
+        } catch {
+            revert("Invalid flashloan pool address");
+        }
+
         uint256 amount0 = _fromAsset == token0 ? debtAmount : 0;
         uint256 amount1 = _fromAsset == token0 ? 0 : debtAmount;
 
@@ -201,12 +212,12 @@ contract DebtSwap is Ownable {
             );
         }
 
+        // repay flashloan
         IERC20 fromToken = IERC20(decoded.fromAsset);
-        IERC20 toToken = IERC20(decoded.toAsset);
-
         fromToken.transfer(address(pool), decoded.amount + totalFee);
 
         // repay remaining amount
+        IERC20 toToken = IERC20(decoded.toAsset);
         uint256 remainingBalance = toToken.balanceOf(address(this));
         console.log("remainingBalance:", remainingBalance);
 
@@ -228,6 +239,15 @@ contract DebtSwap is Ownable {
 
         uint256 remainingBalanceAfter = toToken.balanceOf(address(this));
         console.log("remainingBalanceAfter:", remainingBalanceAfter);
+
+        emit DebtSwapped(
+            decoded.onBehalfOf,
+            decoded.fromProtocol,
+            decoded.toProtocol,
+            decoded.fromAsset,
+            decoded.toAsset,
+            decoded.amount
+        );
     }
 
     function swapToken(

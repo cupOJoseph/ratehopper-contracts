@@ -4,18 +4,15 @@ import { ethers } from "hardhat";
 
 import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { DebtSwap, LeveragedPosition } from "../typechain-types";
-import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
+import { LeveragedPosition } from "../typechain-types";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
-import { approve, deployContractFixture, formatAmount, getAmountInMax, wrapETH } from "./utils";
+import { approve, deployContractFixture, formatAmount, protocolHelperMap } from "./utils";
 
 import {
     USDC_ADDRESS,
     USDbC_ADDRESS,
     cbETH_ADDRESS,
     TEST_ADDRESS,
-    USDC_hyUSD_POOL,
-    ETH_USDbC_POOL,
     Protocols,
     WETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
@@ -41,7 +38,8 @@ describe("Create leveraged position", function () {
     const slipage = 10;
     const defaultTargetSupplyAmount = "0.002";
     const sampleEthPrice = 3300;
-    const sampleBtcPrice = 101000;
+    const sampleBtcPrice = 103000;
+    const USDCDecimals = 6;
     const cbBTCDecimals = 8;
 
     this.beforeEach(async () => {
@@ -67,11 +65,108 @@ describe("Create leveraged position", function () {
         supplyTokenPrice: number,
     ): bigint {
         const amountDiff = targetSupplyAmount - principleSupplyAmount;
-        // add buffer of 20%. remaining amount is repaid on contract
-        const amountToBorrow = amountDiff * supplyTokenPrice * 1.2;
+        // add buffer of 10%. remaining amount is repaid on contract
+        const amountToBorrow = amountDiff * supplyTokenPrice * 1.1;
         const roundedAmount = parseFloat(amountToBorrow.toFixed(borrowTokenDecimal));
 
-        return ethers.parseUnits(roundedAmount.toString(), borrowTokenDecimal);
+        const borrowAmount = ethers.parseUnits(roundedAmount.toString(), borrowTokenDecimal);
+
+        console.log("borrowAmount: ", formatAmount(borrowAmount));
+
+        return borrowAmount;
+    }
+
+    async function createLeveragedPosition(
+        flashloanPool: string,
+        protocol: Protocols,
+        collateralAddress: string,
+        principleAmount: number,
+        targetAmount: number,
+        collateralDecimals: number,
+        price: number,
+        marketId?: string,
+    ) {
+        const Helper = protocolHelperMap.get(protocol)!;
+        const protocolHelper = new Helper(impersonatedSigner);
+
+        await approve(collateralAddress, deployedContractAddress, impersonatedSigner);
+
+        switch (protocol) {
+            case Protocols.AAVE_V3:
+                await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
+                break;
+            case Protocols.COMPOUND:
+                await compoundHelper.allow(USDC_ADDRESS, deployedContractAddress);
+                break;
+            case Protocols.MORPHO:
+                const morphoContract = new ethers.Contract(
+                    MORPHO_ADDRESS,
+                    morphoAbi,
+                    impersonatedSigner,
+                );
+                await morphoContract.setAuthorization(deployedContractAddress, true);
+                break;
+        }
+
+        let extraData = "0x";
+
+        switch (protocol) {
+            case Protocols.COMPOUND:
+                extraData = compoundHelper.encodeExtraData(USDC_COMET_ADDRESS);
+                break;
+            case Protocols.MORPHO:
+                extraData = morphoHelper.encodeExtraData(marketId!, BigInt(0));
+                break;
+        }
+
+        const parsedTargetAmount = ethers.parseUnits(targetAmount.toString(), collateralDecimals);
+
+        const borrowAmount = calculateBorrowAmount(
+            principleAmount,
+            targetAmount,
+            USDCDecimals,
+            price,
+        );
+
+        await myContract.createLeveragedPosition(
+            flashloanPool,
+            protocol,
+            collateralAddress,
+            ethers.parseUnits(principleAmount.toString(), collateralDecimals),
+            parsedTargetAmount,
+            USDC_ADDRESS,
+            borrowAmount,
+            slipage,
+            3000,
+            extraData,
+        );
+
+        const debtAmountParameter = protocol === Protocols.MORPHO ? marketId! : USDC_ADDRESS;
+        const debtAmount = await protocolHelper.getDebtAmount(debtAmountParameter);
+        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
+
+        // const collateralAmount = await aaveV3Helper.getCollateralAmount(collateralAddress);
+        let collateralAmount: bigint;
+        switch (protocol) {
+            case Protocols.AAVE_V3:
+                collateralAmount = await aaveV3Helper.getCollateralAmount(collateralAddress);
+                break;
+            case Protocols.COMPOUND:
+                collateralAmount = await compoundHelper.getCollateralAmount(
+                    USDC_COMET_ADDRESS,
+                    collateralAddress,
+                );
+                break;
+            case Protocols.MORPHO:
+                collateralAmount = await morphoHelper.getCollateralAmount(marketId!);
+                break;
+            default:
+                throw new Error("Unsupported protocol");
+        }
+        console.log("collateralAmount: ", ethers.formatUnits(collateralAmount, collateralDecimals));
+
+        expect(debtAmount).to.be.gt(0);
+        expect(Number(collateralAmount)).to.be.equal(parsedTargetAmount);
     }
 
     it("calculate borrow amount", async function () {
@@ -80,253 +175,98 @@ describe("Create leveraged position", function () {
     });
 
     it("should create on Aave with cbETH", async function () {
-        await approve(cbETH_ADDRESS, deployedContractAddress, impersonatedSigner);
-        await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
-
-        const borrowAmount = calculateBorrowAmount(
-            Number(DEFAULT_SUPPLY_AMOUNT),
-            Number(defaultTargetSupplyAmount),
-            6,
-            sampleEthPrice,
-        );
-
-        await myContract.createLeveragedPosition(
+        await createLeveragedPosition(
             cbETH_ETH_POOL,
             Protocols.AAVE_V3,
             cbETH_ADDRESS,
-            ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
-            ethers.parseEther(defaultTargetSupplyAmount),
-            USDC_ADDRESS,
-            borrowAmount,
-            slipage,
-            3000,
-            "0x",
+            Number(DEFAULT_SUPPLY_AMOUNT),
+            Number(defaultTargetSupplyAmount),
+            18,
+            sampleEthPrice,
         );
-
-        const debtAmount = await aaveV3Helper.getDebtAmount(USDC_ADDRESS);
-        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
-
-        const collateralAmount = await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS);
-        console.log("collateralAmount: ", ethers.formatEther(collateralAmount));
     });
 
     it("should create on Aave with cbBTC", async function () {
-        await approve(cbBTC_ADDRESS, deployedContractAddress, impersonatedSigner);
-        await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
-
         const principleAmount = 0.00006;
         const targetAmount = principleAmount * 2;
 
-        const borrowAmount = calculateBorrowAmount(
-            Number(principleAmount),
-            Number(targetAmount),
-            6,
-            sampleBtcPrice,
-        );
-
-        console.log("borrowAmount: ", borrowAmount);
-
-        await myContract.createLeveragedPosition(
+        await createLeveragedPosition(
             cbBTC_USDC_POOL,
             Protocols.AAVE_V3,
             cbBTC_ADDRESS,
-            ethers.parseUnits(principleAmount.toString(), cbBTCDecimals),
-            ethers.parseUnits(targetAmount.toString(), cbBTCDecimals),
-            USDC_ADDRESS,
-            borrowAmount,
-            slipage,
-            3000,
-            "0x",
+            principleAmount,
+            targetAmount,
+            cbBTCDecimals,
+            sampleBtcPrice,
         );
-
-        const debtAmount = await aaveV3Helper.getDebtAmount(USDC_ADDRESS);
-        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
-
-        const collateralAmount = await aaveV3Helper.getCollateralAmount(cbBTC_ADDRESS);
-        console.log("collateralAmount: ", ethers.formatUnits(collateralAmount, cbBTCDecimals));
     });
 
-    it.only("should create on Aave with cbBTC more leverage", async function () {
-        await approve(cbBTC_ADDRESS, deployedContractAddress, impersonatedSigner);
-        await aaveV3Helper.approveDelegation(USDC_ADDRESS, deployedContractAddress);
-
+    it("should create on Aave with cbBTC more leverage", async function () {
         const principleAmount = 0.00006;
-        const targetAmount = 0.00014;
+        const targetAmount = 0.00015;
 
-        const borrowAmount = calculateBorrowAmount(
-            Number(principleAmount),
-            Number(targetAmount),
-            6,
-            sampleBtcPrice,
-        );
-
-        console.log("borrowAmount: ", borrowAmount);
-
-        await myContract.createLeveragedPosition(
+        await createLeveragedPosition(
             cbBTC_USDC_POOL,
             Protocols.AAVE_V3,
             cbBTC_ADDRESS,
-            ethers.parseUnits(principleAmount.toString(), cbBTCDecimals),
-            ethers.parseUnits(targetAmount.toString(), cbBTCDecimals),
-            USDC_ADDRESS,
-            borrowAmount,
-            slipage,
-            3000,
-            "0x",
+            principleAmount,
+            targetAmount,
+            cbBTCDecimals,
+            sampleBtcPrice,
         );
-
-        const debtAmount = await aaveV3Helper.getDebtAmount(USDC_ADDRESS);
-        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
-
-        const collateralAmount = await aaveV3Helper.getCollateralAmount(cbBTC_ADDRESS);
-        console.log("collateralAmount: ", ethers.formatUnits(collateralAmount, cbBTCDecimals));
     });
 
     it("should create on Compoud with cbETH", async function () {
-        await approve(cbETH_ADDRESS, deployedContractAddress, impersonatedSigner);
-        await compoundHelper.allow(USDC_ADDRESS, deployedContractAddress);
-        const extraData = compoundHelper.encodeExtraData(USDC_COMET_ADDRESS);
-
-        const borrowAmount = calculateBorrowAmount(
-            Number(DEFAULT_SUPPLY_AMOUNT),
-            Number(defaultTargetSupplyAmount),
-            6,
-            sampleEthPrice,
-        );
-
-        await myContract.createLeveragedPosition(
+        await createLeveragedPosition(
             cbETH_ETH_POOL,
             Protocols.COMPOUND,
             cbETH_ADDRESS,
-            ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
-            ethers.parseEther(defaultTargetSupplyAmount),
-            USDC_ADDRESS,
-            borrowAmount,
-            slipage,
-            3000,
-            extraData,
+            Number(DEFAULT_SUPPLY_AMOUNT),
+            Number(defaultTargetSupplyAmount),
+            18,
+            sampleEthPrice,
         );
-
-        const debtAmount = await compoundHelper.getDebtAmount(USDC_ADDRESS);
-        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
-
-        const collateralAmount = await compoundHelper.getCollateralAmount(
-            USDC_COMET_ADDRESS,
-            cbETH_ADDRESS,
-        );
-        console.log("collateralAmount: ", ethers.formatEther(collateralAmount));
     });
 
     it("should create on Compound with cbBTC", async function () {
-        await approve(cbBTC_ADDRESS, deployedContractAddress, impersonatedSigner);
-        await compoundHelper.allow(USDC_ADDRESS, deployedContractAddress);
-        const extraData = compoundHelper.encodeExtraData(USDC_COMET_ADDRESS);
-
         const principleAmount = 0.00006;
         const targetAmount = principleAmount * 2;
-
-        const borrowAmount = calculateBorrowAmount(
-            Number(principleAmount),
-            Number(targetAmount),
-            6,
-            sampleBtcPrice,
-        );
-
-        console.log("borrowAmount: ", borrowAmount);
-
-        await myContract.createLeveragedPosition(
+        await createLeveragedPosition(
             cbBTC_USDC_POOL,
             Protocols.COMPOUND,
             cbBTC_ADDRESS,
-            ethers.parseUnits(principleAmount.toString(), cbBTCDecimals),
-            ethers.parseUnits(targetAmount.toString(), cbBTCDecimals),
-            USDC_ADDRESS,
-            borrowAmount,
-            slipage,
-            3000,
-            extraData,
+            principleAmount,
+            targetAmount,
+            cbBTCDecimals,
+            sampleBtcPrice,
         );
-
-        const debtAmount = await compoundHelper.getDebtAmount(USDC_ADDRESS);
-        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
-
-        const collateralAmount = await compoundHelper.getCollateralAmount(
-            USDC_COMET_ADDRESS,
-            cbBTC_ADDRESS,
-        );
-        console.log("collateralAmount: ", ethers.formatUnits(collateralAmount, cbBTCDecimals));
     });
 
     it("should create on Morpho with cbETH", async function () {
-        await approve(cbETH_ADDRESS, deployedContractAddress, impersonatedSigner);
-
-        const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, impersonatedSigner);
-        await morphoContract.setAuthorization(deployedContractAddress, true);
-
-        const extraData = morphoHelper.encodeExtraData(morphoMarket1Id, BigInt(0));
-
-        const borrowAmount = calculateBorrowAmount(
-            Number(DEFAULT_SUPPLY_AMOUNT),
-            Number(defaultTargetSupplyAmount),
-            6,
-            sampleEthPrice,
-        );
-
-        await myContract.createLeveragedPosition(
+        await createLeveragedPosition(
             cbETH_ETH_POOL,
             Protocols.MORPHO,
             cbETH_ADDRESS,
-            ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
-            ethers.parseEther(defaultTargetSupplyAmount),
-            USDC_ADDRESS,
-            borrowAmount,
-            slipage,
-            3000,
-            extraData,
+            Number(DEFAULT_SUPPLY_AMOUNT),
+            Number(defaultTargetSupplyAmount),
+            18,
+            sampleEthPrice,
+            morphoMarket1Id,
         );
-
-        const debtAmount = await morphoHelper.getDebtAmount(morphoMarket1Id);
-        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
-
-        const collateralAmount = await morphoHelper.getCollateralAmount(morphoMarket1Id);
-        console.log("collateralAmount: ", ethers.formatEther(collateralAmount));
     });
 
     it("should create on Morpho with cbBTC", async function () {
-        await approve(cbBTC_ADDRESS, deployedContractAddress, impersonatedSigner);
-
-        const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, impersonatedSigner);
-        await morphoContract.setAuthorization(deployedContractAddress, true);
-
         const principleAmount = 0.00006;
         const targetAmount = principleAmount * 2;
-
-        const extraData = morphoHelper.encodeExtraData(morphoMarket4Id, BigInt(0));
-
-        const borrowAmount = calculateBorrowAmount(
-            Number(principleAmount),
-            Number(targetAmount),
-            6,
-            sampleBtcPrice,
-        );
-
-        await myContract.createLeveragedPosition(
+        await createLeveragedPosition(
             cbBTC_USDC_POOL,
             Protocols.MORPHO,
             cbBTC_ADDRESS,
-            ethers.parseUnits(principleAmount.toString(), cbBTCDecimals),
-            ethers.parseUnits(targetAmount.toString(), cbBTCDecimals),
-            USDC_ADDRESS,
-            borrowAmount,
-            slipage,
-            3000,
-            extraData,
+            principleAmount,
+            targetAmount,
+            cbBTCDecimals,
+            sampleBtcPrice,
+            morphoMarket4Id,
         );
-
-        const debtAmount = await morphoHelper.getDebtAmount(morphoMarket4Id);
-        console.log("debtAmount: ", ethers.formatUnits(debtAmount, 6));
-
-        const collateralAmount = await morphoHelper.getCollateralAmount(morphoMarket4Id);
-        console.log("collateralAmount: ", ethers.formatEther(collateralAmount));
     });
 });
