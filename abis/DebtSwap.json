@@ -3,22 +3,78 @@
         "inputs": [
             {
                 "internalType": "address",
-                "name": "registry",
+                "name": "_uniswap_v3_factory",
                 "type": "address"
             },
             {
                 "internalType": "address",
-                "name": "uniswap_v3_factory",
-                "type": "address"
-            },
-            {
-                "internalType": "address",
-                "name": "uniswap_v3_swap_router",
+                "name": "_uniswap_v3_swap_router",
                 "type": "address"
             }
         ],
         "stateMutability": "nonpayable",
         "type": "constructor"
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "onBehalfOf",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Protocol",
+                "name": "fromProtocol",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Protocol",
+                "name": "toProtocol",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "address",
+                "name": "fromAsset",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "address",
+                "name": "toAsset",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+            }
+        ],
+        "name": "DebtSwapped",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "previousOwner",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "OwnershipTransferred",
+        "type": "event"
     },
     {
         "inputs": [
@@ -28,12 +84,12 @@
                 "type": "address"
             },
             {
-                "internalType": "enum DebtSwap.Protocol",
+                "internalType": "enum Protocol",
                 "name": "_fromProtocol",
                 "type": "uint8"
             },
             {
-                "internalType": "enum DebtSwap.Protocol",
+                "internalType": "enum Protocol",
                 "name": "_toProtocol",
                 "type": "uint8"
             },
@@ -53,9 +109,26 @@
                 "type": "uint256"
             },
             {
-                "internalType": "uint256",
-                "name": "_amountInMaximum",
-                "type": "uint256"
+                "internalType": "uint16",
+                "name": "_allowedSlippage",
+                "type": "uint16"
+            },
+            {
+                "components": [
+                    {
+                        "internalType": "address",
+                        "name": "asset",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "amount",
+                        "type": "uint256"
+                    }
+                ],
+                "internalType": "struct CollateralAsset[]",
+                "name": "_collateralAssets",
+                "type": "tuple[]"
             },
             {
                 "internalType": "bytes",
@@ -75,6 +148,19 @@
     },
     {
         "inputs": [],
+        "name": "owner",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
         "name": "pool",
         "outputs": [
             {
@@ -88,6 +174,39 @@
     },
     {
         "inputs": [],
+        "name": "protocolRegistry",
+        "outputs": [
+            {
+                "internalType": "contract ProtocolRegistry",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "renounceOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_registry",
+                "type": "address"
+            }
+        ],
+        "name": "setRegistry",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
         "name": "swapRouter",
         "outputs": [
             {
@@ -97,6 +216,19 @@
             }
         ],
         "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "transferOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
         "type": "function"
     },
     {
