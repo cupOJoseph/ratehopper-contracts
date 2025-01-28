@@ -16,9 +16,9 @@ import { DebtSwap } from "../typechain-types";
 
 async function main() {
     const provider = new ethers.JsonRpcProvider("https://base.llamarpc.com");
-    const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, provider);
+    const signer = new ethers.Wallet(process.env.MY_PRIVATE_KEY!, provider);
 
-    const debtSwapAddress = "0x758623a3874d518E60C7b30A88F353Ca0900ce94";
+    const debtSwapAddress = "0xc59d0C394fAF06df813319767cA0A55DB3eA46e1";
     const aaveV3Helper = new AaveV3Helper(signer);
     await aaveV3Helper.approveDelegation(USDbC_ADDRESS, debtSwapAddress);
 

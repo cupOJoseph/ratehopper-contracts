@@ -24,7 +24,6 @@ contract DebtSwap is Ownable {
     using GPv2SafeERC20 for IERC20;
     ProtocolRegistry public protocolRegistry;
 
-    IUniswapV3Pool public pool;
     ISwapRouter02 public immutable swapRouter;
     address public immutable uniswapV3Factory;
 
@@ -75,7 +74,7 @@ contract DebtSwap is Ownable {
         require(_fromAsset != address(0), "Invalid from asset address");
         require(_toAsset != address(0), "Invalid to asset address");
 
-        pool = IUniswapV3Pool(_flashloanPool);
+        IUniswapV3Pool pool = IUniswapV3Pool(_flashloanPool);
         uint256 debtAmount = _amount;
 
         if (_amount == type(uint256).max) {
@@ -214,7 +213,10 @@ contract DebtSwap is Ownable {
 
         // repay flashloan
         IERC20 fromToken = IERC20(decoded.fromAsset);
-        fromToken.transfer(address(pool), decoded.amount + totalFee);
+        fromToken.transfer(
+            address(decoded.flashloanPool),
+            decoded.amount + totalFee
+        );
 
         // repay remaining amount
         IERC20 toToken = IERC20(decoded.toAsset);
