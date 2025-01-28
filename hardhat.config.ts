@@ -3,7 +3,6 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-contract-sizer";
 import "hardhat-gas-reporter";
-import "@nomicfoundation/hardhat-verify";
 import dotenv from "dotenv";
 dotenv.config();
 require("hardhat-tracer");
