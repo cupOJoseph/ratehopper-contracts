@@ -6,12 +6,12 @@ import "./Types.sol";
 contract ProtocolRegistry is Ownable {
     mapping(Protocol => address) private protocolHandlers;
 
-    function setHandler(Protocol protocol, address handler) external onlyOwner {
+    function setHandler(Protocol protocol, address handler) public onlyOwner {
         require(handler != address(0), "Invalid handler address");
         protocolHandlers[protocol] = handler;
     }
 
-    function getHandler(Protocol protocol) external view returns (address) {
+    function getHandler(Protocol protocol) public view returns (address) {
         return protocolHandlers[protocol];
     }
 }

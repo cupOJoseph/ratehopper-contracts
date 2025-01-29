@@ -60,6 +60,7 @@ const config: HardhatUserConfig = {
             timeout: 100_000_000,
         },
         hardhat: {
+            chainId: 8453,
             chains: {
                 8453: {
                     hardforkHistory: {

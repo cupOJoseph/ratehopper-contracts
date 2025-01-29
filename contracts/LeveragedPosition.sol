@@ -24,7 +24,6 @@ contract LeveragedPosition is Ownable {
     using GPv2SafeERC20 for IERC20;
     ProtocolRegistry private protocolRegistry;
 
-    IUniswapV3Pool public pool;
     ISwapRouter02 public immutable swapRouter;
     address public immutable uniswapV3Factory;
 
@@ -84,7 +83,7 @@ contract LeveragedPosition is Ownable {
             _principleCollateralAmount
         );
 
-        pool = IUniswapV3Pool(_flashloanPool);
+        IUniswapV3Pool pool = IUniswapV3Pool(_flashloanPool);
 
         uint256 flashloanBorrowAmount = _targetCollateralAmount -
             _principleCollateralAmount;
@@ -179,7 +178,10 @@ contract LeveragedPosition is Ownable {
 
         IERC20 token = IERC20(decoded.collateralAsset);
 
-        token.transfer(address(pool), flashloanBorrowAmount + totalFee);
+        token.transfer(
+            address(decoded.flashloanPool),
+            flashloanBorrowAmount + totalFee
+        );
 
         // repay remaining amount
         IERC20 debtToken = IERC20(decoded.debtAsset);
