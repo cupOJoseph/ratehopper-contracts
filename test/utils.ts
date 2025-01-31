@@ -4,6 +4,7 @@ import {
     AAVE_V3_DATA_PROVIDER_ADDRESS,
     AAVE_V3_POOL_ADDRESS,
     Protocols,
+    TEST_ADDRESS,
     UNISWAP_V3_FACTORY_ADRESS,
     UNISWAP_V3_SWAP_ROUTER_ADDRESS,
     WETH_ADDRESS,
@@ -31,6 +32,14 @@ export async function deployContractFixture() {
     // const [owner, otherAccount] = await hre.ethers.getSigners();
     const feeData = await ethers.provider.getFeeData();
     const gasPrice = feeData.gasPrice!;
+
+    const SafeModule = await hre.ethers.getContractFactory("SafeModule");
+    const safeModule = await SafeModule.deploy(TEST_ADDRESS);
+
+    const TargetContract = await hre.ethers.getContractFactory("TargetContract");
+    const targetContract = await TargetContract.deploy();
+
+    console.log("SafeModule deployed to:", await safeModule.getAddress());
 
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
     const aaveV3Handler = await AaveV3Handler.deploy(
@@ -80,6 +89,8 @@ export async function deployContractFixture() {
     return {
         debtSwap,
         leveragedPosition,
+        safeModule,
+        targetContract,
     };
 }
 

@@ -23,7 +23,6 @@ async function main() {
     };
 
     const protocolKit = await Safe.init({
-        // provider: "http://localhost:8545",
         // provider: "https://ethereum-sepolia-rpc.publicnode.com",
         // provider: sepolia.rpcUrls.default.http[0],
         // provider: base.rpcUrls.default.http[0],

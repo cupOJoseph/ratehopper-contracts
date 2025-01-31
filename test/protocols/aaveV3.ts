@@ -35,10 +35,10 @@ export class AaveV3Helper {
         return result.currentATokenBalance;
     }
 
-    async getDebtAmount(assetAddress: string): Promise<bigint> {
+    async getDebtAmount(assetAddress: string, userAddress?: string): Promise<bigint> {
         const result = await this.protocolDataProvider.getUserReserveData(
             assetAddress,
-            this.signer,
+            userAddress || this.signer,
         );
         return result.currentVariableDebt;
     }

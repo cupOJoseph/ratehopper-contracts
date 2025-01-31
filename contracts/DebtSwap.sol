@@ -63,16 +63,16 @@ contract DebtSwap is Ownable {
         address _flashloanPool,
         Protocol _fromProtocol,
         Protocol _toProtocol,
-        address _fromAsset,
-        address _toAsset,
+        address _fromDebtAsset,
+        address _toDebtAsset,
         uint256 _amount,
         uint16 _allowedSlippage,
         CollateralAsset[] calldata _collateralAssets,
         bytes calldata _fromExtraData,
         bytes calldata _toExtraData
     ) public {
-        require(_fromAsset != address(0), "Invalid from asset address");
-        require(_toAsset != address(0), "Invalid to asset address");
+        require(_fromDebtAsset != address(0), "Invalid from asset address");
+        require(_toDebtAsset != address(0), "Invalid to asset address");
 
         IUniswapV3Pool pool = IUniswapV3Pool(_flashloanPool);
         uint256 debtAmount = _amount;
@@ -80,15 +80,11 @@ contract DebtSwap is Ownable {
         if (_amount == type(uint256).max) {
             address handler = protocolRegistry.getHandler(_fromProtocol);
 
-            // TODO: remove delegateCall?
-            (bool success, bytes memory returnData) = handler.delegatecall(
-                abi.encodeCall(
-                    IProtocolHandler.getDebtAmount,
-                    (_fromAsset, msg.sender, _fromExtraData)
-                )
+            debtAmount = IProtocolHandler(handler).getDebtAmount(
+                _fromDebtAsset,
+                msg.sender,
+                _fromExtraData
             );
-            require(success);
-            debtAmount = abi.decode(returnData, (uint256));
             console.log("on-chain debtAmount:", debtAmount);
         }
 
@@ -99,16 +95,16 @@ contract DebtSwap is Ownable {
             revert("Invalid flashloan pool address");
         }
 
-        uint256 amount0 = _fromAsset == token0 ? debtAmount : 0;
-        uint256 amount1 = _fromAsset == token0 ? 0 : debtAmount;
+        uint256 amount0 = _fromDebtAsset == token0 ? debtAmount : 0;
+        uint256 amount1 = _fromDebtAsset == token0 ? 0 : debtAmount;
 
         bytes memory data = abi.encode(
             FlashCallbackData({
                 flashloanPool: _flashloanPool,
                 fromProtocol: _fromProtocol,
                 toProtocol: _toProtocol,
-                fromAsset: _fromAsset,
-                toAsset: _toAsset,
+                fromAsset: _fromDebtAsset,
+                toAsset: _toDebtAsset,
                 amount: debtAmount,
                 allowedSlippage: _allowedSlippage,
                 onBehalfOf: msg.sender,
@@ -132,7 +128,10 @@ contract DebtSwap is Ownable {
         );
 
         // implement the same logic as CallbackValidation.verifyCallback()
-        require(msg.sender == address(decoded.flashloanPool));
+        require(
+            msg.sender == address(decoded.flashloanPool),
+            "Caller is not flashloan pool"
+        );
 
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
