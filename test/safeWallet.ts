@@ -30,7 +30,9 @@ import { AaveV3Helper } from "../test/protocols/aaveV3";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { deployContractFixture } from "./utils";
 
-describe.only("Safe wallet", function () {
+const McbETH = "0x3bf93770f2d4a794c3d9ebefbaebae2a8f09a5e5";
+
+describe("Safe wallet", function () {
     let safeAddress;
     let signer;
     let safeWallet;
@@ -89,46 +91,6 @@ describe.only("Safe wallet", function () {
 
         const balance = await ethers.provider.getBalance(safeAddress);
         console.log(`Balance:`, ethers.formatEther(balance), "ETH");
-    });
-
-    it("Should enable module", async function () {
-        const { safeModule, targetContract } = await loadFixture(deployContractFixture);
-        const safeModuleAddress = await safeModule.getAddress();
-        const targetContractAddress = await targetContract.getAddress();
-
-        // const options: SafeTransactionOptionalProps = {
-        //     safeTxGas: '123', // Optional
-        //     baseGas: '123', // Optional
-        //     gasPrice: '123', // Optional
-        //     gasToken: '0x...', // Optional
-        //     refundReceiver: '0x...', // Optional
-        //     nonce: 123 // Optional
-        //   }
-
-        safeWallet = await Safe.init({
-            provider: eip1193Provider,
-            signer: process.env.PRIVATE_KEY,
-            safeAddress: safeAddress,
-        });
-
-        const enableModuleTx = await safeWallet.createEnableModuleTx(
-            safeModuleAddress,
-            // options // Optional
-        );
-        const safeTxHash = await safeWallet.executeTransaction(enableModuleTx);
-        console.log("Safe enable module transaction hash:", safeTxHash);
-
-        console.log("Modules:", await safeWallet.getModules());
-
-        signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);
-        const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
-
-        // const iface = new ethers.Interface(["function performAction()"]);
-        // const data = iface.encodeFunctionData("performAction");
-
-        const data = targetContract.interface.encodeFunctionData("performAction");
-
-        await moduleContract.executeTransaction(safeAddress, targetContractAddress, data);
     });
 
     it.skip("Should send a transaction", async function () {
@@ -210,6 +172,93 @@ describe.only("Safe wallet", function () {
         const aaveV3Helper = new AaveV3Helper(signer);
         const debt = await aaveV3Helper.getDebtAmount(USDC_ADDRESS, safeAddress);
         console.log("debt:", ethers.formatUnits(debt, 6));
+    });
+
+    it("Should supply and borrow on Moonwell", async function () {
+        signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);
+        const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, signer);
+        const tx = await cbETHContract.transfer(safeAddress, ethers.parseEther("0.001"));
+        await tx.wait();
+
+        const balance = await cbETHContract.balanceOf(safeAddress);
+        console.log(`Balance:`, ethers.formatEther(balance), "cbETH");
+
+        safeWallet = await Safe.init({
+            provider: eip1193Provider,
+            signer: process.env.PRIVATE_KEY,
+            safeAddress: safeAddress,
+        });
+
+        const safeTransaction = await safeWallet.createTransaction({
+            transactions: [],
+        });
+
+        const safeTxHash = await safeWallet.executeTransaction(safeTransaction);
+        console.log("Safe transaction hash:", safeTxHash);
+
+        const balanceAfter = await cbETHContract.balanceOf(safeAddress);
+        console.log(`Balance after:`, ethers.formatEther(balanceAfter), "cbETH");
+
+        const aaveV3Helper = new AaveV3Helper(signer);
+        const debt = await aaveV3Helper.getDebtAmount(USDC_ADDRESS, safeAddress);
+        console.log("debt:", ethers.formatUnits(debt, 6));
+    });
+
+    it("Should enable module", async function () {
+        const { safeModule, targetContract } = await loadFixture(deployContractFixture);
+        const safeModuleAddress = await safeModule.getAddress();
+        const targetContractAddress = await targetContract.getAddress();
+
+        // const options: SafeTransactionOptionalProps = {
+        //     safeTxGas: '123', // Optional
+        //     baseGas: '123', // Optional
+        //     gasPrice: '123', // Optional
+        //     gasToken: '0x...', // Optional
+        //     refundReceiver: '0x...', // Optional
+        //     nonce: 123 // Optional
+        //   }
+
+        safeWallet = await Safe.init({
+            provider: eip1193Provider,
+            signer: process.env.PRIVATE_KEY,
+            safeAddress: safeAddress,
+        });
+
+        const enableModuleTx = await safeWallet.createEnableModuleTx(
+            safeModuleAddress,
+            // options // Optional
+        );
+        const safeTxHash = await safeWallet.executeTransaction(enableModuleTx);
+        console.log("Safe enable module transaction hash:", safeTxHash);
+
+        console.log("Modules:", await safeWallet.getModules());
+
+        signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);
+        const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
+
+        // const iface = new ethers.Interface(["function performAction()"]);
+        // const data = iface.encodeFunctionData("performAction");
+
+        // const data = targetContract.interface.encodeFunctionData("performAction");
+
+        const aaveV3Helper = new AaveV3Helper(signer);
+        const debtAmount = await aaveV3Helper.getDebtAmount(USDC_ADDRESS, safeAddress);
+
+        await moduleContract.executeDebtSwap(
+            USDC_hyUSD_POOL,
+            Protocols.AAVE_V3,
+            Protocols.AAVE_V3,
+            USDC_ADDRESS,
+            USDbC_ADDRESS,
+            debtAmount,
+            100,
+            [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+            "0x",
+            "0x",
+        );
+
+        const debtAmountAfter = await aaveV3Helper.getDebtAmount(USDC_ADDRESS, safeAddress);
+        console.log("debtAmountAfter:", debtAmountAfter);
     });
 
     it.skip("Should execute debt swap", async function () {

@@ -85,6 +85,7 @@ export async function deployContractFixture() {
 
     console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
     await leveragedPosition.setRegistry(protocolRegistry.getAddress());
+    await safeModule.setRegistry(protocolRegistry.getAddress());
 
     return {
         debtSwap,
@@ -100,7 +101,7 @@ export async function approve(
     signer: HardhatEthersSigner,
 ) {
     const token = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
-    const approveTx = await token.approve(spenderAddress, MaxUint256);
+    const approveTx = await token.approve(spenderAddress, MaxUint256, { maxFeePerGas: 40_000_000 });
     await approveTx.wait();
     console.log("approve:" + tokenAddress + "token to " + spenderAddress);
 }

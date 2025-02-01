@@ -550,6 +550,17 @@
     tweetnacl "^1.0.3"
     tweetnacl-util "^0.15.1"
 
+"@moonwell-fi/moonwell-sdk@^0.5.24":
+  version "0.5.24"
+  resolved "https://registry.yarnpkg.com/@moonwell-fi/moonwell-sdk/-/moonwell-sdk-0.5.24.tgz#a317ddcf5b1eda567f950b526d8155b00a1c1071"
+  integrity sha512-tD2jfY9U+jI3dGU/11kcFvz9UM4PPiLDUWNoj8hEBDtepR17r+7TyXQvMAaKB8QmGp6cC0cKHlO+1GZKitOYQQ==
+  dependencies:
+    "@types/lodash" "^4.17.9"
+    axios "^1.7.7"
+    dayjs "^1.11.13"
+    lodash "^4.17.21"
+    viem "^2.21.16"
+
 "@morpho-org/bundler-sdk-ethers@^1.0.3":
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/@morpho-org/bundler-sdk-ethers/-/bundler-sdk-ethers-1.0.3.tgz#39553ca9323778ae21217b24bd5d8675aed8631d"
@@ -1212,6 +1223,11 @@
   version "0.0.29"
   resolved "https://registry.yarnpkg.com/@types/json5/-/json5-0.0.29.tgz#ee28707ae94e11d2b827bcbe5270bcea7f3e71ee"
   integrity sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==
+
+"@types/lodash@^4.17.9":
+  version "4.17.15"
+  resolved "https://registry.yarnpkg.com/@types/lodash/-/lodash-4.17.15.tgz#12d4af0ed17cc7600ce1f9980cec48fc17ad1e89"
+  integrity sha512-w/P33JFeySuhN6JLkysYUK2gEmy9kHHFN7E8ro0tkfmlDOgxBDzWEZ/J8cWA+fHqFevpswDTFZnDx+R9lbL6xw==
 
 "@types/lru-cache@^5.1.0":
   version "5.1.1"
@@ -2160,6 +2176,11 @@ data-view-byte-offset@^1.0.1:
     call-bound "^1.0.2"
     es-errors "^1.3.0"
     is-data-view "^1.0.1"
+
+dayjs@^1.11.13:
+  version "1.11.13"
+  resolved "https://registry.yarnpkg.com/dayjs/-/dayjs-1.11.13.tgz#92430b0139055c3ebb60150aa13e860a4b5a366c"
+  integrity sha512-oaMBel6gjolK862uaPQOVTA7q3TZhuSvuMQAAglQDOWYO9A91IrAOUJEyKVlqJlHE0vq5p5UXxzdPfMH/x6xNg==
 
 death@^1.1.0:
   version "1.1.0"
@@ -5591,7 +5612,7 @@ viem@2.7.14:
     isows "1.0.3"
     ws "8.13.0"
 
-viem@^2.21.8, viem@^2.22.17:
+viem@^2.21.16, viem@^2.21.8, viem@^2.22.17:
   version "2.22.17"
   resolved "https://registry.yarnpkg.com/viem/-/viem-2.22.17.tgz#71cb5793d898e7850d440653b0043803c2d00c8d"
   integrity sha512-eqNhlPGgRLR29XEVUT2uuaoEyMiaQZEKx63xT1py9OYsE+ZwlVgjnfrqbXad7Flg2iJ0Bs5Hh7o0FfRWUJGHvg==

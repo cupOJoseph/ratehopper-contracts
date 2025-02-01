@@ -1,89 +1,64 @@
-// import { time, loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-// const { expect } = require("chai");
-// import { ethers } from "hardhat";
-// import hre from "hardhat";
+import { time, loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
+const { expect } = require("chai");
+import { ethers } from "hardhat";
+import hre from "hardhat";
 
-// import "dotenv/config";
-// import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-// import { DebtSwap } from "../typechain-types";
-// import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-// import { getAmountInMax } from "./utils";
-// import { Contract, MaxUint256 } from "ethers";
+import "dotenv/config";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { DebtSwap } from "../typechain-types";
+import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
+import { approve, formatAmount, getAmountInMax } from "./utils";
+import { Contract, MaxUint256 } from "ethers";
+import { MoonwellHelper } from "./protocols/moonwell";
+import {
+    cbBTC_ADDRESS,
+    cbETH_ADDRESS,
+    DEFAULT_SUPPLY_AMOUNT,
+    TEST_ADDRESS,
+    USDC_ADDRESS,
+} from "./constants";
+import { DEFAULT_CIPHERS } from "tls";
 
-// const MErc20DelegatorAbi = require("../externalAbi/moonwell/MErc20Delegator.json");
+const mcbETH = "0x3bf93770f2d4a794c3d9ebefbaebae2a8f09a5e5";
+const mUSDC = "0xedc817a28e8b93b03976fbd4a3ddbc9f7d176c22";
 
-// describe("Moonwell DebtSwap", function () {
-//     let myContract: DebtSwap;
-//     let impersonatedSigner: HardhatEthersSigner;
-//     let deployedContractAddress: string;
-//     const USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // Circle
-//     const mUSDC_ADDRESS = "0xedc817a28e8b93b03976fbd4a3ddbc9f7d176c22";
+describe("Moonwell DebtSwap", function () {
+    let myContract: DebtSwap;
+    let impersonatedSigner: HardhatEthersSigner;
+    let deployedContractAddress: string;
 
-//     const AAVE_V3_POOL_ADDRESS = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
-//     const UNISWAP_V3_FACTORY_ADRESS = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
-//     const UNISWAP_V3_SWAP_ROUTER_ADDRESS = "0x2626664c2603336E57B271c5C0b26F421741e481";
+    this.beforeEach(async () => {
+        impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
+    });
 
-//     // should be replaced by hardhat test account
-//     const TEST_ADDRESS = "0x50fe1109188A0B666c4d78908E3E539D73F97E33";
+    it.only("should execute supply and borrow", async function () {
+        const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
+        const beforeBalance = await usdcContract.balanceOf(TEST_ADDRESS);
+        const moonwellHelper = new MoonwellHelper(impersonatedSigner);
+        await approve(cbETH_ADDRESS, mcbETH, impersonatedSigner);
+        const tx = await moonwellHelper.supply(mcbETH);
+        await moonwellHelper.enableCollateral(mcbETH);
+        await moonwellHelper.getDebtAmount(mUSDC);
 
-//     this.timeout(3000000);
+        await moonwellHelper.borrow(mUSDC);
+        await moonwellHelper.getCollateralAmount(mcbETH);
 
-//     async function deployContractFixture() {
-//         const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
-//         const debtSwap = await DebtSwap.deploy(
-//             AAVE_V3_POOL_ADDRESS,
-//             UNISWAP_V3_FACTORY_ADRESS,
-//             UNISWAP_V3_SWAP_ROUTER_ADDRESS,
-//         );
+        await moonwellHelper.getDebtAmount(mUSDC);
 
-//         return {
-//             debtSwap,
-//         };
-//     }
+        const afterBalance = await usdcContract.balanceOf(TEST_ADDRESS);
 
-//     async function approve() {
-//         const token = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
-//         const approveTx = await token.approve(deployedContractAddress, ethers.parseUnits("1", 6));
-//         await approveTx.wait();
-//         // console.log("approveTx:", approveTx);
-//     }
+        console.log(
+            `USDC balance:`,
+            formatAmount(beforeBalance),
+            " -> ",
+            formatAmount(afterBalance),
+        );
 
-//     async function getDebtAmount(assetAddress: string): Promise<bigint> {
-//         const mToken = new ethers.Contract(assetAddress, MErc20DelegatorAbi, impersonatedSigner);
+        await approve(USDC_ADDRESS, mUSDC, impersonatedSigner);
+        await moonwellHelper.repay(mUSDC, "1");
+        await moonwellHelper.getDebtAmount(mUSDC);
 
-//         const debtAmount = await mToken.borrowBalanceStored(TEST_ADDRESS);
-//         console.log(debtAmount);
-//         return debtAmount;
-//     }
-
-//     function formatAmount(amount: bigint): string {
-//         return ethers.formatUnits(String(amount), 6);
-//     }
-
-//     async function borrow(tokenAddress: string) {
-//         const mToken = new ethers.Contract(tokenAddress, MErc20DelegatorAbi, impersonatedSigner);
-//         const tx = await mToken.borrow(ethers.parseUnits("1", 6));
-//         const result = await tx.wait();
-//         console.log("result:", result);
-//         await getDebtAmount(mUSDC_ADDRESS);
-//     }
-
-//     this.beforeEach(async () => {
-//         impersonatedSigner = await ethers.getImpersonatedSigner(TEST_ADDRESS);
-
-//         const { debtSwap } = await loadFixture(deployContractFixture);
-//         deployedContractAddress = await debtSwap.getAddress();
-
-//         myContract = await ethers.getContractAt(
-//             "DebtSwap",
-//             deployedContractAddress,
-//             impersonatedSigner,
-//         );
-//     });
-
-//     it("should return current debt amount", async function () {
-//         await getDebtAmount(mUSDC_ADDRESS);
-//         await myContract.moonwellBorrow(mUSDC_ADDRESS, ethers.parseUnits("1", 6));
-//         await getDebtAmount(mUSDC_ADDRESS);
-//     });
-// });
+        await moonwellHelper.withdrawCollateral(mcbETH, DEFAULT_SUPPLY_AMOUNT);
+        await moonwellHelper.getCollateralAmount(mcbETH);
+    });
+});

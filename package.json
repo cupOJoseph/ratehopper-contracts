@@ -16,6 +16,7 @@
     "license": "ISC",
     "dependencies": {
         "@aave/core-v3": "^1.19.3",
+        "@moonwell-fi/moonwell-sdk": "^0.5.24",
         "@morpho-org/bundler-sdk-ethers": "^1.0.3",
         "@morpho-org/morpho-blue-bundlers": "^1.1.2",
         "@openzeppelin/contracts": "^4.9.3",
