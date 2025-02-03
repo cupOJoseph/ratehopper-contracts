@@ -8,5 +8,7 @@ interface IMToken {
         uint repayAmount
     ) external virtual returns (uint);
 
-    function underlying() external view returns (address);
+    function mint(uint256 mintAmount) external returns (uint256);
+
+    function repayBorrow(uint256 repayAmount) external returns (uint256);
 }

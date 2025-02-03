@@ -4,8 +4,9 @@ pragma solidity =0.8.27;
 enum Protocol {
     COMPOUND,
     AAVE_V3,
-    MORPHO
-    // FLUID
+    MORPHO,
+    FLUID,
+    MOONWELL
 }
 
 struct CollateralAsset {

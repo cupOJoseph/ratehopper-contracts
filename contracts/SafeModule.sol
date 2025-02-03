@@ -12,7 +12,6 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 import {IMToken} from "./interfaces/moonwell/IMToken.sol";
 import {ISwapRouter02} from "./interfaces/uniswapV3/ISwapRouter02.sol";
 import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
-import {IComet} from "./interfaces/compound/IComet.sol";
 import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
 import {ProtocolRegistry} from "./ProtocolRegistry.sol";
@@ -129,24 +128,88 @@ contract SafeModule is Ownable {
             "Caller is not flashloan pool"
         );
 
-        console.log("callback is called");
+        address fromContract = abi.decode(decoded.fromExtraData, (address));
+        address toContract = abi.decode(decoded.toExtraData, (address));
 
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
-        // uint8 fromDecimals = IERC20(decoded.fromAsset).decimals();
-        // uint8 toDecimals = IERC20(decoded.toAsset).decimals();
-        // uint8 decimalDiff = fromDecimals > toDecimals
-        //     ? fromDecimals - toDecimals
-        //     : toDecimals - fromDecimals;
+        uint8 fromDecimals = IERC20(decoded.fromAsset).decimals();
+        uint8 toDecimals = IERC20(decoded.toAsset).decimals();
+        uint8 decimalDiff = fromDecimals > toDecimals
+            ? fromDecimals - toDecimals
+            : toDecimals - fromDecimals;
 
-        // uint256 amountInMax = (decoded.amount *
-        //     (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
+        uint256 amountInMax = (decoded.amount *
+            (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
 
-        // if (decimalDiff > 0) {
-        //     amountInMax = amountInMax * 10 ** decimalDiff;
-        // }
-        // console.log("amountInMax:", amountInMax);
+        if (decimalDiff > 0) {
+            amountInMax = amountInMax * 10 ** decimalDiff;
+        }
+        console.log("amountInMax:", amountInMax);
+
+        uint256 fromAssetBalance = IERC20(decoded.fromAsset).balanceOf(
+            address(this)
+        );
+        console.log("fromAsset balance:", fromAssetBalance);
+
+        IERC20(decoded.fromAsset).approve(
+            address(fromContract),
+            type(uint256).max
+        );
+
+        IMToken(fromContract).repayBorrowBehalf(
+            0x2f9054Eb6209bb5B94399115117044E4f150B2De,
+            decoded.amount
+        );
+
+        console.log("repay done");
+
+        uint256 borrowAmount = amountInMax + totalFee;
+
+        bytes memory borrowData = abi.encodeCall(
+            IMToken.borrow,
+            (borrowAmount)
+        );
+        bool successBorrow = ISafe(0x2f9054Eb6209bb5B94399115117044E4f150B2De)
+            .execTransactionFromModule(
+                toContract,
+                0,
+                borrowData,
+                ISafe.Operation.Call
+            );
+        console.log("successBorrow: ", successBorrow);
+
+        bytes memory transferData = abi.encodeCall(
+            IERC20(decoded.toAsset).transfer,
+            (address(this), borrowAmount)
+        );
+        bool successTransfer = ISafe(0x2f9054Eb6209bb5B94399115117044E4f150B2De)
+            .execTransactionFromModule(
+                decoded.toAsset,
+                0,
+                transferData,
+                ISafe.Operation.Call
+            );
+        console.log("successTransfer: ", successTransfer);
+
+        if (decoded.fromAsset != decoded.toAsset) {
+            swapToken(
+                address(decoded.toAsset),
+                address(decoded.fromAsset),
+                decoded.amount + totalFee,
+                amountInMax
+            );
+        }
+
+        // // repay flashloan
+        IERC20 fromToken = IERC20(decoded.fromAsset);
+        console.log("balance: ", fromToken.balanceOf(address(this)));
+        console.log("amount: ", decoded.amount + totalFee);
+        fromToken.transfer(
+            address(decoded.flashloanPool),
+            decoded.amount + totalFee
+        );
 
         // if (decoded.fromProtocol == decoded.toProtocol) {
         //     address handler = protocolRegistry.getHandler(decoded.fromProtocol);
@@ -199,122 +262,69 @@ contract SafeModule is Ownable {
         //     );
         // }
 
-        // if (decoded.fromAsset != decoded.toAsset) {
-        //     swapToken(
-        //         address(decoded.toAsset),
-        //         address(decoded.fromAsset),
-        //         decoded.amount + totalFee,
-        //         amountInMax
-        //     );
-        // }
-
-        // bytes memory approveData = abi.encodeCall(
-        //     IERC20(decoded.fromAsset).approve,
-        //     (address(this), 10)
-        // );
-
-        // bool successA = ISafe(0x2f9054Eb6209bb5B94399115117044E4f150B2De)
-        //     .execTransactionFromModule(
-        //         decoded.fromAsset,
-        //         0,
-        //         approveData,
-        //         ISafe.Operation.Call
-        //     );
-        // console.log("successA: ", successA);
-
-        bytes memory borrowData = abi.encodeCall(
-            IPoolV3.borrow,
-            (
-                decoded.fromAsset,
-                10,
-                2,
-                0,
-                0x2f9054Eb6209bb5B94399115117044E4f150B2De
-            )
-        );
-
-        bool success2 = ISafe(0x2f9054Eb6209bb5B94399115117044E4f150B2De)
-            .execTransactionFromModule(
-                0xA238Dd80C259a72e81d7e4664a9801593F98d1c5,
-                0,
-                borrowData,
-                ISafe.Operation.Call
-            );
-
-        console.log("success2: ", success2);
-
-        bytes memory transferData = abi.encodeCall(
-            IERC20(decoded.fromAsset).transfer,
-            (address(this), 10)
-        );
-        bool success = ISafe(0x2f9054Eb6209bb5B94399115117044E4f150B2De)
-            .execTransactionFromModule(
-                decoded.fromAsset,
-                0,
-                transferData,
-                ISafe.Operation.Call
-            );
-        console.log("success1: ", success);
-
-        // bytes memory repayData = abi.encodeCall(
-        //     IPoolV3.repay,
-        //     (
-        //         decoded.fromAsset,
-        //         10,
-        //         2,
-        //         0x2f9054Eb6209bb5B94399115117044E4f150B2De
-        //     )
-        // );
-
-        // // repay flashloan
-        IERC20 fromToken = IERC20(decoded.fromAsset);
-        console.log("balance: ", fromToken.balanceOf(address(this)));
-        console.log("amount: ", decoded.amount + totalFee);
-        fromToken.transfer(
-            address(decoded.flashloanPool),
-            decoded.amount + totalFee
-        );
-
         // // repay remaining amount
-        // IERC20 toToken = IERC20(decoded.toAsset);
-        // uint256 remainingBalance = toToken.balanceOf(address(this));
-        // console.log("remainingBalance:", remainingBalance);
+        IERC20 toToken = IERC20(decoded.toAsset);
+        uint256 remainingBalance = toToken.balanceOf(address(this));
+        console.log("remainingBalance:", remainingBalance);
 
-        // if (remainingBalance > 0) {
-        //     address handler = protocolRegistry.getHandler(decoded.toProtocol);
+        if (remainingBalance > 0) {
+            IERC20(decoded.toAsset).approve(
+                address(toContract),
+                type(uint256).max
+            );
 
-        //     handler.delegatecall(
-        //         abi.encodeCall(
-        //             IProtocolHandler.repay,
-        //             (
-        //                 decoded.toAsset,
-        //                 remainingBalance,
-        //                 decoded.onBehalfOf,
-        //                 decoded.toExtraData
-        //             )
-        //         )
-        //     );
-        // }
+            IMToken(toContract).repayBorrowBehalf(
+                0x2f9054Eb6209bb5B94399115117044E4f150B2De,
+                remainingBalance
+            );
 
-        // uint256 remainingBalanceAfter = toToken.balanceOf(address(this));
-        // console.log("remainingBalanceAfter:", remainingBalanceAfter);
+            console.log("repay remaining done");
+            // address handler = protocolRegistry.getHandler(decoded.toProtocol);
+
+            // handler.delegatecall(
+            //     abi.encodeCall(
+            //         IProtocolHandler.repay,
+            //         (
+            //             decoded.toAsset,
+            //             remainingBalance,
+            //             decoded.onBehalfOf,
+            //             decoded.toExtraData
+            //         )
+            //     )
+            // );
+        }
+
+        uint256 remainingBalanceAfter = toToken.balanceOf(address(this));
+        console.log("remainingBalanceAfter:", remainingBalanceAfter);
     }
 
-    function executeTransaction(
-        address _safeAddr,
-        address _target,
-        bytes calldata data
-    ) external onlySafe returns (bool success) {
-        console.log("executing");
-        bool success = ISafe(_safeAddr).execTransactionFromModule(
-            _target,
-            0,
-            data,
-            ISafe.Operation.Call
+    function swapToken(
+        address inputToken,
+        address outputToken,
+        uint256 amountOut,
+        uint256 amountInMaximum
+    ) internal {
+        IERC20(inputToken).approve(
+            address(0x2626664c2603336E57B271c5C0b26F421741e481),
+            type(uint256).max
         );
-        // (success, ) = target.call(data);
-        // require(success, "SafeModule: Transaction failed");
 
-        // emit TransactionExecuted(target, data);
+        IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter
+            .ExactOutputSingleParams({
+                tokenIn: inputToken,
+                tokenOut: outputToken,
+                fee: 100,
+                recipient: address(this),
+                amountOut: amountOut,
+                amountInMaximum: amountInMaximum,
+                sqrtPriceLimitX96: 0
+            });
+
+        ISwapRouter02 swapRouter = ISwapRouter02(
+            0x2626664c2603336E57B271c5C0b26F421741e481
+        );
+        uint256 amountIn = swapRouter.exactOutputSingle(params);
+
+        console.log("swap from ", inputToken, " to ", outputToken);
     }
 }

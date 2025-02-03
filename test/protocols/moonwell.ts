@@ -9,7 +9,7 @@ import { approve, formatAmount } from "../utils";
 const MErc20DelegatorAbi = require("../../externalAbi/moonwell/MErc20Delegator.json");
 const ComptrollerAbi = require("../../externalAbi/moonwell/comptroller.json");
 const ViewAbi = require("../../externalAbi/moonwell/moonwellViewsV3.json");
-const comptroller_address = "0xfbb21d0380bee3312b33c4353c8936a0f13ef26c";
+export const COMPTROLLER_ADDRESS = "0xfbb21d0380bee3312b33c4353c8936a0f13ef26c";
 const view_address = "0x821ff3a967b39bcbe8a018a9b1563eaf878bad39";
 
 export class MoonwellHelper {
@@ -42,7 +42,7 @@ export class MoonwellHelper {
         const debtEntry = borrows.find((borrow) => borrow[1].toLowerCase() === mContractAddress);
         const debtAmount = debtEntry ? debtEntry[0] : BigInt(0);
 
-        console.log("debtAmount:", ethers.formatUnits(debtAmount, 6));
+        console.log("debtAmount:", debtAmount);
         return debtAmount;
     }
 
@@ -56,7 +56,7 @@ export class MoonwellHelper {
     }
 
     async enableCollateral(mContractAddress: string) {
-        const comptroller = new ethers.Contract(comptroller_address, ComptrollerAbi, this.signer);
+        const comptroller = new ethers.Contract(COMPTROLLER_ADDRESS, ComptrollerAbi, this.signer);
         const tx = await comptroller.enterMarkets([mContractAddress]);
         await tx.wait();
         console.log("enabled collateral on moonwell:", mContractAddress);
