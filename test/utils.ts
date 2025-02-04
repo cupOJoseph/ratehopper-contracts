@@ -33,25 +33,29 @@ export async function deployContractFixture() {
     const feeData = await ethers.provider.getFeeData();
     const gasPrice = feeData.gasPrice!;
 
-    const SafeModule = await hre.ethers.getContractFactory("SafeModule");
-    const safeModule = await SafeModule.deploy(TEST_ADDRESS);
+    const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
+    const moonwellHandler = await MoonwellHandler.deploy({
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
+    console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());
 
-    const TargetContract = await hre.ethers.getContractFactory("TargetContract");
-    const targetContract = await TargetContract.deploy();
+    const SafeModule = await hre.ethers.getContractFactory("SafeModule");
+    const safeModule = await SafeModule.deploy(UNISWAP_V3_SWAP_ROUTER_ADDRESS, await moonwellHandler.getAddress(), {
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
 
     console.log("SafeModule deployed to:", await safeModule.getAddress());
 
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
-    const aaveV3Handler = await AaveV3Handler.deploy(
-        AAVE_V3_POOL_ADDRESS,
-        AAVE_V3_DATA_PROVIDER_ADDRESS,
-        {
-            maxFeePerGas: gasPrice * BigInt(5),
-        },
-    );
+    const aaveV3Handler = await AaveV3Handler.deploy(AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS, {
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
+    console.log("AaveV3Handler deployed to:", await aaveV3Handler.getAddress());
 
     const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
-    const compoundHandler = await CompoundHandler.deploy();
+    const compoundHandler = await CompoundHandler.deploy({
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
 
     const MorphoHandler = await hre.ethers.getContractFactory("MorphoHandler");
     const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS);
@@ -60,20 +64,18 @@ export async function deployContractFixture() {
     // const fluidHandler = await FluidHandler.deploy();
 
     const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
-    const protocolRegistry = await ProtocolRegistry.deploy();
+    const protocolRegistry = await ProtocolRegistry.deploy({
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
 
     await protocolRegistry.setHandler(Protocols.AAVE_V3, aaveV3Handler.getAddress());
     await protocolRegistry.setHandler(Protocols.COMPOUND, compoundHandler.getAddress());
     await protocolRegistry.setHandler(Protocols.MORPHO, morphoHandler.getAddress());
 
     const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
-    const debtSwap = await DebtSwap.deploy(
-        UNISWAP_V3_FACTORY_ADRESS,
-        UNISWAP_V3_SWAP_ROUTER_ADDRESS,
-        {
-            maxFeePerGas: gasPrice * BigInt(5),
-        },
-    );
+    const debtSwap = await DebtSwap.deploy(UNISWAP_V3_FACTORY_ADRESS, UNISWAP_V3_SWAP_ROUTER_ADDRESS, {
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
     console.log("DebtSwap deployed to:", await debtSwap.getAddress());
     await debtSwap.setRegistry(protocolRegistry.getAddress());
 
@@ -81,6 +83,9 @@ export async function deployContractFixture() {
     const leveragedPosition = await LeveragedPosition.deploy(
         UNISWAP_V3_FACTORY_ADRESS,
         UNISWAP_V3_SWAP_ROUTER_ADDRESS,
+        {
+            maxFeePerGas: gasPrice * BigInt(5),
+        },
     );
 
     console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
@@ -91,15 +96,10 @@ export async function deployContractFixture() {
         debtSwap,
         leveragedPosition,
         safeModule,
-        targetContract,
     };
 }
 
-export async function approve(
-    tokenAddress: string,
-    spenderAddress: string,
-    signer: HardhatEthersSigner,
-) {
+export async function approve(tokenAddress: string, spenderAddress: string, signer: HardhatEthersSigner) {
     const token = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
     const approveTx = await token.approve(spenderAddress, MaxUint256, { maxFeePerGas: 40_000_000 });
     await approveTx.wait();

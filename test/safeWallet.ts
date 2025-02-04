@@ -1,3 +1,4 @@
+import { SafeModule } from "./../typechain-types/contracts/SafeModule";
 import { sepolia, base, hardhat } from "viem/chains";
 import { createPublicClient, http, custom, createWalletClient } from "viem";
 import { ethers } from "hardhat";
@@ -39,6 +40,7 @@ describe.only("Safe wallet", function () {
     const safeAddress = "0x2f9054Eb6209bb5B94399115117044E4f150B2De";
     let signer;
     let safeWallet;
+    let safeModule;
 
     const eip1193Provider: Eip1193Provider = {
         request: async (args: RequestArguments) => {
@@ -61,7 +63,7 @@ describe.only("Safe wallet", function () {
         console.log(`Balance:`, ethers.formatEther(balance), "ETH");
     });
 
-    it("Should supply and borrow on Moonwell", async function () {
+    it("Should supply and borrow on Moonwell on Safe", async function () {
         signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);
         const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, signer);
         const tx = await cbETHContract.transfer(safeAddress, ethers.parseEther("0.001"));
@@ -79,10 +81,7 @@ describe.only("Safe wallet", function () {
         const approveTransactionData: MetaTransactionData = {
             to: cbETH_ADDRESS,
             value: "0",
-            data: cbETHContract.interface.encodeFunctionData("approve", [
-                mcbETH,
-                ethers.parseEther("1"),
-            ]),
+            data: cbETHContract.interface.encodeFunctionData("approve", [mcbETH, ethers.parseEther("1")]),
             operation: OperationType.Call,
         };
 
@@ -91,9 +90,7 @@ describe.only("Safe wallet", function () {
         const supplyTransactionData: MetaTransactionData = {
             to: mcbETH,
             value: "0",
-            data: cbETHmToken.interface.encodeFunctionData("mint", [
-                ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
-            ]),
+            data: cbETHmToken.interface.encodeFunctionData("mint", [ethers.parseEther(DEFAULT_SUPPLY_AMOUNT)]),
             operation: OperationType.Call,
         };
 
@@ -120,10 +117,7 @@ describe.only("Safe wallet", function () {
         const transferTransactionData: MetaTransactionData = {
             to: USDC_ADDRESS,
             value: "0",
-            data: usdcContract.interface.encodeFunctionData("transfer", [
-                TEST_ADDRESS,
-                ethers.parseUnits("1", 6),
-            ]),
+            data: usdcContract.interface.encodeFunctionData("transfer", [TEST_ADDRESS, ethers.parseUnits("1", 6)]),
             operation: OperationType.Call,
         };
 
@@ -158,8 +152,9 @@ describe.only("Safe wallet", function () {
         console.log("USDC Balance on user:", ethers.formatUnits(userUsdcBalance, 6));
     });
 
-    it("Should enable module and execute debt swap", async function () {
-        const { safeModule, targetContract } = await loadFixture(deployContractFixture);
+    it("Should enable module and set safe owner", async function () {
+        const { safeModule } = await loadFixture(deployContractFixture);
+        this.safeModule = safeModule;
         const safeModuleAddress = await safeModule.getAddress();
 
         const enableModuleTx = await safeWallet.createEnableModuleTx(
@@ -173,10 +168,57 @@ describe.only("Safe wallet", function () {
 
         const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
 
+        const setSafeTransactionData: MetaTransactionData = {
+            to: safeModuleAddress,
+            value: "0",
+            data: moduleContract.interface.encodeFunctionData("setSafe", []),
+            operation: OperationType.Call,
+        };
+        const safeTransaction = await safeWallet.createTransaction({
+            transactions: [setSafeTransactionData],
+        });
+        const setSafeTxHash = await safeWallet.executeTransaction(safeTransaction);
+        console.log("Safe setSafe transaction hash:", setSafeTxHash);
+    });
+
+    it.skip("Should execute debt swap", async function () {
+        const aaveV3Helper = new AaveV3Helper(signer);
+
+        // const debtAmount = await aaveV3Helper.getDebtAmount(mUSDC, safeAddress);
+        // console.log("debt amount before:", ethers.formatUnits(debtAmount, 6));
+
+        const safeModuleAddress = await this.safeModule.getAddress();
+        const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
+
+        await moduleContract.executeDebtSwap(
+            USDC_hyUSD_POOL,
+            Protocols.AAVE_V3,
+            Protocols.AAVE_V3,
+            USDC_ADDRESS,
+            DAI_ADDRESS,
+            100000,
+            100,
+            [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+            ethers.AbiCoder.defaultAbiCoder().encode(["address"], [mUSDC]),
+            ethers.AbiCoder.defaultAbiCoder().encode(["address"], [mDAI]),
+        );
+
+        const debtAmountAfter = await aaveV3Helper.getDebtAmount(mUSDC, safeAddress);
+
+        console.log("debtAmountAfter:", debtAmountAfter);
+
+        const DAIdebtAmount = await aaveV3Helper.getDebtAmount(mDAI, safeAddress);
+        console.log("DAI debt amount:", ethers.formatEther(DAIdebtAmount));
+    });
+
+    it("Should execute debt swap", async function () {
         const moonwellHelper = new MoonwellHelper(signer);
 
         const debtAmount = await moonwellHelper.getDebtAmount(mUSDC, safeAddress);
         console.log("debt amount before:", ethers.formatUnits(debtAmount, 6));
+
+        const safeModuleAddress = await this.safeModule.getAddress();
+        const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
 
         await moduleContract.executeDebtSwap(
             USDC_hyUSD_POOL,
@@ -189,6 +231,36 @@ describe.only("Safe wallet", function () {
             [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
             ethers.AbiCoder.defaultAbiCoder().encode(["address"], [mUSDC]),
             ethers.AbiCoder.defaultAbiCoder().encode(["address"], [mDAI]),
+        );
+
+        const debtAmountAfter = await moonwellHelper.getDebtAmount(mUSDC, safeAddress);
+
+        console.log("debtAmountAfter:", debtAmountAfter);
+
+        const DAIdebtAmount = await moonwellHelper.getDebtAmount(mDAI, safeAddress);
+        console.log("DAI debt amount:", ethers.formatEther(DAIdebtAmount));
+    });
+
+    it.skip("Should execute debt swap from Moonwell", async function () {
+        const moonwellHelper = new MoonwellHelper(signer);
+
+        const debtAmount = await moonwellHelper.getDebtAmount(mUSDC, safeAddress);
+        console.log("debt amount before:", ethers.formatUnits(debtAmount, 6));
+
+        const safeModuleAddress = await this.safeModule.getAddress();
+        const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
+
+        await moduleContract.executeDebtSwap(
+            USDC_hyUSD_POOL,
+            Protocols.MOONWELL,
+            Protocols.AAVE_V3,
+            USDC_ADDRESS,
+            USDC_ADDRESS,
+            debtAmount,
+            100,
+            [{ asset: mcbETH, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+            ethers.AbiCoder.defaultAbiCoder().encode(["address"], [mUSDC]),
+            ethers.AbiCoder.defaultAbiCoder().encode(["address"], [mUSDC]),
         );
 
         const debtAmountAfter = await moonwellHelper.getDebtAmount(mUSDC, safeAddress);
