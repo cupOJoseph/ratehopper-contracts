@@ -19,31 +19,24 @@ export class MoonwellHelper {
         const viewContract = new ethers.Contract(view_address, ViewAbi, this.signer);
         const collaterals = await viewContract.getUserBalances(userAddress || TEST_ADDRESS);
 
-        const collateralEntry = collaterals.find(
-            (collateral) => collateral[1].toLowerCase() === mContractAddress,
-        );
+        const collateralEntry = collaterals.find((collateral) => collateral[1].toLowerCase() === mContractAddress);
 
         const mToken = new ethers.Contract(mContractAddress, MErc20DelegatorAbi, this.signer);
         const exchangeRate = await mToken.exchangeRateStored();
         const rate = ethers.formatEther(exchangeRate);
 
-        const collateralAmount = collateralEntry
-            ? collateralEntry[0] * BigInt(Number(rate).toFixed())
-            : 0;
+        const collateralAmount = collateralEntry ? collateralEntry[0] * BigInt(Number(rate).toFixed()) : 0;
 
         console.log("collateralAmount:", ethers.formatUnits(collateralAmount, 18));
         return BigInt(collateralAmount);
     }
 
     async getDebtAmount(mContractAddress: string, userAddress?: string): Promise<bigint> {
-        const viewContract = new ethers.Contract(view_address, ViewAbi, this.signer);
-        const borrows = await viewContract.getUserBorrowsBalances(userAddress || TEST_ADDRESS);
-
-        const debtEntry = borrows.find((borrow) => borrow[1].toLowerCase() === mContractAddress);
-        const debtAmount = debtEntry ? debtEntry[0] : BigInt(0);
+        const mToken = new ethers.Contract(mContractAddress, MErc20DelegatorAbi, this.signer);
+        const debtAmount = await mToken.borrowBalanceStored(userAddress || TEST_ADDRESS);
 
         console.log("debtAmount:", debtAmount);
-        return debtAmount;
+        return BigInt(debtAmount);
     }
 
     async supply(mContractAddress: string) {

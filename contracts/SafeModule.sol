@@ -13,19 +13,15 @@ import {IMToken} from "./interfaces/moonwell/IMToken.sol";
 import {ISwapRouter02} from "./interfaces/uniswapV3/ISwapRouter02.sol";
 import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
 import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
-import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
 import {ProtocolRegistry} from "./ProtocolRegistry.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Types.sol";
 import "./interfaces/safe/ISafe.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
-import "./libraries/MoonwellLib.sol";
-import "./libraries/AaveV3Lib.sol";
-// import {MoonwellHandler} from "./libraries/MoonwellHandler.sol";
 
 import "hardhat/console.sol";
 
-contract SafeModule is Ownable {
+contract SafeModule {
     ISwapRouter02 public immutable swapRouter;
     ProtocolRegistry public protocolRegistry;
     address public immutable moonwellHandler;
@@ -54,9 +50,9 @@ contract SafeModule is Ownable {
         _;
     }
 
-    constructor(address _uniswap_v3_swap_router, address _moonwell_handler) {
+    constructor(address _uniswap_v3_swap_router, address _protocol_registry) {
         swapRouter = ISwapRouter02(_uniswap_v3_swap_router);
-        moonwellHandler = _moonwell_handler;
+        protocolRegistry = ProtocolRegistry(_protocol_registry);
     }
 
     // suppose this function is called from Safe wallet
@@ -64,10 +60,6 @@ contract SafeModule is Ownable {
         ISafe safe = ISafe(msg.sender);
         address[] memory owners = safe.getOwners();
         ownerToSafe[owners[0]] = msg.sender;
-    }
-
-    function setRegistry(address _registry) public onlyOwner {
-        protocolRegistry = ProtocolRegistry(_registry);
     }
 
     function executeDebtSwap(
@@ -91,7 +83,11 @@ contract SafeModule is Ownable {
         if (_amount == type(uint256).max) {
             address handler = protocolRegistry.getHandler(_fromProtocol);
 
-            debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, msg.sender, _fromExtraData);
+            debtAmount = IProtocolHandler(handler).getDebtAmount(
+                _fromDebtAsset,
+                ownerToSafe[msg.sender],
+                _fromExtraData
+            );
             console.log("on-chain debtAmount:", debtAmount);
         }
 
@@ -146,7 +142,9 @@ contract SafeModule is Ownable {
         console.log("amountInMax:", amountInMax);
 
         if (decoded.fromProtocol == decoded.toProtocol) {
-            moonwellHandler.delegatecall(
+            address handler = protocolRegistry.getHandler(decoded.fromProtocol);
+
+            handler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchIn,
                     (
@@ -163,15 +161,33 @@ contract SafeModule is Ownable {
                 )
             );
         } else {
-            if (decoded.toProtocol == Protocol.AAVE_V3) {
-                MoonwellLib.switchTo(
-                    decoded.safe,
-                    decoded.toAsset,
-                    abi.decode(decoded.toExtraData, (address)),
-                    decoded.collateralAssets,
-                    decoded.amount
-                );
-            } else {}
+            address fromHandler = protocolRegistry.getHandler(decoded.fromProtocol);
+            fromHandler.delegatecall(
+                abi.encodeCall(
+                    IProtocolHandler.switchFrom,
+                    (
+                        decoded.fromAsset,
+                        decoded.amount,
+                        address(decoded.safe),
+                        decoded.collateralAssets,
+                        decoded.fromExtraData
+                    )
+                )
+            );
+
+            address toHandler = protocolRegistry.getHandler(decoded.toProtocol);
+            toHandler.delegatecall(
+                abi.encodeCall(
+                    IProtocolHandler.switchTo,
+                    (
+                        decoded.toAsset,
+                        amountInMax + totalFee,
+                        address(decoded.safe),
+                        decoded.collateralAssets,
+                        decoded.toExtraData
+                    )
+                )
+            );
         }
 
         if (decoded.fromAsset != decoded.toAsset) {
@@ -187,11 +203,13 @@ contract SafeModule is Ownable {
         console.log("remainingBalance:", remainingBalance);
 
         if (remainingBalance > 0) {
-            MoonwellLib.repay(
-                decoded.safe,
-                decoded.toAsset,
-                abi.decode(decoded.toExtraData, (address)),
-                remainingBalance
+            address handler = protocolRegistry.getHandler(decoded.toProtocol);
+
+            handler.delegatecall(
+                abi.encodeCall(
+                    IProtocolHandler.repay,
+                    (decoded.toAsset, remainingBalance, address(decoded.safe), decoded.toExtraData)
+                )
             );
         }
 

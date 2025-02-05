@@ -10,4 +10,6 @@ interface IMToken {
     function repayBorrow(uint256 repayAmount) external returns (uint256);
 
     function redeemUnderlying(uint256 amount) external returns (uint256);
+
+    function borrowBalanceStored(address account) external view returns (uint256);
 }

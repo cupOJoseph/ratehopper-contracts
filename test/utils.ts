@@ -33,19 +33,6 @@ export async function deployContractFixture() {
     const feeData = await ethers.provider.getFeeData();
     const gasPrice = feeData.gasPrice!;
 
-    const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
-    const moonwellHandler = await MoonwellHandler.deploy({
-        maxFeePerGas: gasPrice * BigInt(5),
-    });
-    console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());
-
-    const SafeModule = await hre.ethers.getContractFactory("SafeModule");
-    const safeModule = await SafeModule.deploy(UNISWAP_V3_SWAP_ROUTER_ADDRESS, await moonwellHandler.getAddress(), {
-        maxFeePerGas: gasPrice * BigInt(5),
-    });
-
-    console.log("SafeModule deployed to:", await safeModule.getAddress());
-
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
     const aaveV3Handler = await AaveV3Handler.deploy(AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS, {
         maxFeePerGas: gasPrice * BigInt(5),
@@ -90,11 +77,44 @@ export async function deployContractFixture() {
 
     console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
     await leveragedPosition.setRegistry(protocolRegistry.getAddress());
-    await safeModule.setRegistry(protocolRegistry.getAddress());
 
     return {
         debtSwap,
         leveragedPosition,
+    };
+}
+
+export async function deploySafeContractFixture() {
+    const feeData = await ethers.provider.getFeeData();
+    const gasPrice = feeData.gasPrice!;
+    const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
+    const protocolRegistry = await ProtocolRegistry.deploy({
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
+
+    const AaveV3SafeHandler = await hre.ethers.getContractFactory("AaveV3SafeHandler");
+    const aaveV3Handler = await AaveV3SafeHandler.deploy(AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS, {
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
+    console.log("AaveV3Handler deployed to:", await aaveV3Handler.getAddress());
+
+    const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
+    const moonwellHandler = await MoonwellHandler.deploy({
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
+    console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());
+
+    await protocolRegistry.setHandler(Protocols.AAVE_V3, aaveV3Handler.getAddress());
+    await protocolRegistry.setHandler(Protocols.MOONWELL, moonwellHandler.getAddress());
+
+    const SafeModule = await hre.ethers.getContractFactory("SafeModule");
+    const safeModule = await SafeModule.deploy(UNISWAP_V3_SWAP_ROUTER_ADDRESS, protocolRegistry.getAddress(), {
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
+
+    console.log("SafeModule deployed to:", await safeModule.getAddress());
+
+    return {
         safeModule,
     };
 }

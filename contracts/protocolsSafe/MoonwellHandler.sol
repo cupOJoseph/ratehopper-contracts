@@ -18,7 +18,9 @@ contract MoonwellHandler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata extraData
     ) external view returns (uint256) {
-        console.log("aa");
+        address mContract = abi.decode(extraData, (address));
+
+        return IMToken(mContract).borrowBalanceStored(onBehalfOf);
     }
 
     function switchIn(
@@ -63,23 +65,22 @@ contract MoonwellHandler is IProtocolHandler {
     }
 
     function switchFrom(
-        // address safe,
-        // address fromAsset,
-        // address fromContract,
-        // CollateralAsset[] memory collateralAssets,
-        // uint256 amount
         address fromAsset,
         uint256 amount,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external override {
-        // IERC20(fromAsset).approve(address(fromContract), type(uint256).max);
-        // IMToken(fromContract).repayBorrowBehalf(safe, amount);
-        // console.log("repay done");
+        (address fromContract, address collateralContract, uint256 collateralAmount) = abi.decode(
+            extraData,
+            (address, address, uint256)
+        );
+        IERC20(fromAsset).approve(address(fromContract), type(uint256).max);
+        IMToken(fromContract).repayBorrowBehalf(onBehalfOf, amount);
+        console.log("repay done");
         // for (uint256 i = 0; i < collateralAssets.length; i++) {
         //     bytes memory withdrawData = abi.encodeCall(IMToken.redeemUnderlying, (collateralAssets[i].amount));
-        //     bool successWithdraw = ISafe(safe).execTransactionFromModule(
+        //     bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
         //         collateralAssets[i].asset,
         //         0,
         //         withdrawData,
@@ -87,35 +88,51 @@ contract MoonwellHandler is IProtocolHandler {
         //     );
         //     console.log("successWithdraw: ", successWithdraw);
         // }
-        // return true;
+
+        bytes memory withdrawData = abi.encodeCall(IMToken.redeemUnderlying, (collateralAmount));
+        bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
+            collateralContract,
+            0,
+            withdrawData,
+            ISafe.Operation.Call
+        );
+        console.log("successWithdraw: ", successWithdraw);
+
+        console.log("collateralAmount on safe: ", IERC20(collateralAssets[0].asset).balanceOf(onBehalfOf));
+        // console.log("collateralAmount on this: ", IERC20(collateralContract).balanceOf(address(this)));
     }
 
     function switchTo(
-        // address safe,
-        // address toAsset,
-        // address toContract,
-        // CollateralAsset[] memory collateralAssets,
-        // uint256 amount
         address toAsset,
         uint256 amount,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external override {
-        // for (uint256 i = 0; i < collateralAssets.length; i++) {
-        //     // IERC20(toAsset).approve(address(toContract), type(uint256).max);
-        //     bytes memory mintData = abi.encodeCall(IMToken.mint, (collateralAssets[i].amount));
-        //     bool successMint = ISafe(safe).execTransactionFromModule(
-        //         collateralAssets[i].asset,
-        //         0,
-        //         mintData,
-        //         ISafe.Operation.Call
-        //     );
-        //     console.log("mint done");
-        // }
-        // bytes memory borrowData = abi.encodeCall(IMToken.borrow, (amount));
-        // bool successBorrow = ISafe(safe).execTransactionFromModule(toContract, 0, borrowData, ISafe.Operation.Call);
-        // console.log("borrow done");
+        (address toContract, address collateralContract, uint256 collateralAmount) = abi.decode(
+            extraData,
+            (address, address, uint256)
+        );
+
+        for (uint256 i = 0; i < collateralAssets.length; i++) {
+            // IERC20(toAsset).approve(address(toContract), type(uint256).max);
+            bytes memory mintData = abi.encodeCall(IMToken.mint, (collateralAssets[i].amount));
+            bool successMint = ISafe(onBehalfOf).execTransactionFromModule(
+                collateralAssets[i].asset,
+                0,
+                mintData,
+                ISafe.Operation.Call
+            );
+            console.log("mint done");
+        }
+        bytes memory borrowData = abi.encodeCall(IMToken.borrow, (amount));
+        bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
+            toContract,
+            0,
+            borrowData,
+            ISafe.Operation.Call
+        );
+        console.log("borrow done");
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
@@ -126,10 +143,12 @@ contract MoonwellHandler is IProtocolHandler {
         IERC20(asset).approve(address(this), type(uint256).max);
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
-        // IERC20(toAsset).approve(address(toContract), type(uint256).max);
-        // IMToken(toContract).repayBorrowBehalf(safe, amount);
-        // console.log("repay done");
-        // return true;
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override {
+        (address toContract, address collateralContract, uint256 collateralAmount) = abi.decode(
+            extraData,
+            (address, address, uint256)
+        );
+        IERC20(asset).approve(address(toContract), type(uint256).max);
+        IMToken(toContract).repayBorrowBehalf(onBehalfOf, amount);
     }
 }
