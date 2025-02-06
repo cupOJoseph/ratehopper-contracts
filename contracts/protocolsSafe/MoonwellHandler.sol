@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "../interfaces/IProtocolHandler.sol";
 import "../interfaces/safe/ISafe.sol";
 import "../interfaces/moonwell/IMToken.sol";
+import "../interfaces/moonwell/Comptroller.sol";
 import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import "../Types.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
@@ -12,6 +13,12 @@ import "hardhat/console.sol";
 
 contract MoonwellHandler is IProtocolHandler {
     using GPv2SafeERC20 for IERC20;
+
+    address public immutable comptroller;
+
+    constructor(address _comptroller) {
+        comptroller = _comptroller;
+    }
 
     function getDebtAmount(
         address asset,
@@ -39,8 +46,6 @@ contract MoonwellHandler is IProtocolHandler {
         IERC20(fromAsset).approve(address(fromContract), type(uint256).max);
 
         IMToken(fromContract).repayBorrowBehalf(onBehalfOf, amount);
-
-        console.log("repay done");
 
         uint borrowAmount = amountInMaximum + totalFee;
 
@@ -71,35 +76,18 @@ contract MoonwellHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external override {
-        (address fromContract, address collateralContract, uint256 collateralAmount) = abi.decode(
-            extraData,
-            (address, address, uint256)
-        );
+        (address fromContract, address[] memory mTokens) = abi.decode(extraData, (address, address[]));
         IERC20(fromAsset).approve(address(fromContract), type(uint256).max);
         IMToken(fromContract).repayBorrowBehalf(onBehalfOf, amount);
-        console.log("repay done");
-        // for (uint256 i = 0; i < collateralAssets.length; i++) {
-        //     bytes memory withdrawData = abi.encodeCall(IMToken.redeemUnderlying, (collateralAssets[i].amount));
-        //     bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
-        //         collateralAssets[i].asset,
-        //         0,
-        //         withdrawData,
-        //         ISafe.Operation.Call
-        //     );
-        //     console.log("successWithdraw: ", successWithdraw);
-        // }
 
-        bytes memory withdrawData = abi.encodeCall(IMToken.redeemUnderlying, (collateralAmount));
-        bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
-            collateralContract,
-            0,
-            withdrawData,
-            ISafe.Operation.Call
-        );
-        console.log("successWithdraw: ", successWithdraw);
-
-        console.log("collateralAmount on safe: ", IERC20(collateralAssets[0].asset).balanceOf(onBehalfOf));
-        // console.log("collateralAmount on this: ", IERC20(collateralContract).balanceOf(address(this)));
+        for (uint256 i = 0; i < collateralAssets.length; i++) {
+            bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
+                mTokens[i],
+                0,
+                abi.encodeCall(IMToken.redeemUnderlying, (collateralAssets[i].amount)),
+                ISafe.Operation.Call
+            );
+        }
     }
 
     function switchTo(
@@ -109,38 +97,83 @@ contract MoonwellHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external override {
+        (address toContract, address[] memory mTokens) = abi.decode(extraData, (address, address[]));
+
+        for (uint256 i = 0; i < collateralAssets.length; i++) {
+            bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
+                collateralAssets[i].asset,
+                0,
+                abi.encodeCall(IERC20.approve, (mTokens[i], collateralAssets[i].amount)),
+                ISafe.Operation.Call
+            );
+
+            bool successMint = ISafe(onBehalfOf).execTransactionFromModule(
+                mTokens[i],
+                0,
+                abi.encodeCall(IMToken.mint, (collateralAssets[i].amount)),
+                ISafe.Operation.Call
+            );
+            console.log("mint done");
+
+            address[] memory collateralContracts = new address[](1);
+            collateralContracts[0] = mTokens[i];
+
+            bool successEnterMarkets = ISafe(onBehalfOf).execTransactionFromModule(
+                comptroller,
+                0,
+                abi.encodeCall(IComptroller.enterMarkets, (collateralContracts)),
+                ISafe.Operation.Call
+            );
+        }
+
+        bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
+            toContract,
+            0,
+            abi.encodeCall(IMToken.borrow, (amount)),
+            ISafe.Operation.Call
+        );
+
+        bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
+            toAsset,
+            0,
+            abi.encodeCall(IERC20.transfer, (address(this), amount)),
+            ISafe.Operation.Call
+        );
+    }
+
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
         (address toContract, address collateralContract, uint256 collateralAmount) = abi.decode(
             extraData,
             (address, address, uint256)
         );
 
-        for (uint256 i = 0; i < collateralAssets.length; i++) {
-            // IERC20(toAsset).approve(address(toContract), type(uint256).max);
-            bytes memory mintData = abi.encodeCall(IMToken.mint, (collateralAssets[i].amount));
-            bool successMint = ISafe(onBehalfOf).execTransactionFromModule(
-                collateralAssets[i].asset,
-                0,
-                mintData,
-                ISafe.Operation.Call
-            );
-            console.log("mint done");
-        }
-        bytes memory borrowData = abi.encodeCall(IMToken.borrow, (amount));
-        bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
-            toContract,
+        bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
+            collateralContract,
             0,
-            borrowData,
+            abi.encodeCall(IERC20.approve, (collateralContract, collateralAmount)),
             ISafe.Operation.Call
         );
-        console.log("borrow done");
-    }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
-        IERC20(asset).approve(address(this), type(uint256).max);
+        bool successMint = ISafe(onBehalfOf).execTransactionFromModule(
+            collateralContract,
+            0,
+            abi.encodeCall(IMToken.mint, (collateralAmount)),
+            ISafe.Operation.Call
+        );
     }
 
     function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
-        IERC20(asset).approve(address(this), type(uint256).max);
+        (address toContract, address collateralContract, uint256 collateralAmount) = abi.decode(
+            extraData,
+            (address, address, uint256)
+        );
+
+        bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
+            toContract,
+            0,
+            abi.encodeCall(IMToken.borrow, (amount)),
+            ISafe.Operation.Call
+        );
     }
 
     function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override {

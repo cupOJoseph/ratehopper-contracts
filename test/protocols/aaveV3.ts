@@ -27,19 +27,13 @@ export class AaveV3Helper {
         return response.variableDebtTokenAddress;
     }
 
-    async getCollateralAmount(assetAddress: string): Promise<bigint> {
-        const result = await this.protocolDataProvider.getUserReserveData(
-            assetAddress,
-            this.signer,
-        );
+    async getCollateralAmount(assetAddress: string, userAddress?: string): Promise<bigint> {
+        const result = await this.protocolDataProvider.getUserReserveData(assetAddress, userAddress || this.signer);
         return result.currentATokenBalance;
     }
 
     async getDebtAmount(assetAddress: string, userAddress?: string): Promise<bigint> {
-        const result = await this.protocolDataProvider.getUserReserveData(
-            assetAddress,
-            userAddress || this.signer,
-        );
+        const result = await this.protocolDataProvider.getUserReserveData(assetAddress, userAddress || this.signer);
         return result.currentVariableDebt;
     }
 
@@ -52,10 +46,7 @@ export class AaveV3Helper {
     async approveDelegation(tokenAddress: string, deployedContractAddress: string) {
         const debtTokenAddress = await this.getDebtTokenAddress(tokenAddress);
         const aaveDebtToken = new ethers.Contract(debtTokenAddress, aaveDebtTokenJson, this.signer);
-        const approveDelegationTx = await aaveDebtToken.approveDelegation(
-            deployedContractAddress,
-            MaxUint256,
-        );
+        const approveDelegationTx = await aaveDebtToken.approveDelegation(deployedContractAddress, MaxUint256);
         await approveDelegationTx.wait();
         console.log("approveDelegation:", debtTokenAddress);
     }
@@ -81,9 +72,6 @@ export class AaveV3Helper {
 
         const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.signer);
         const walletBalance = await tokenContract.balanceOf(TEST_ADDRESS);
-        console.log(
-            `borrowed ${amount}, ${tokenAddress} Wallet Balance:`,
-            formatAmount(walletBalance),
-        );
+        console.log(`borrowed ${amount}, ${tokenAddress} Wallet Balance:`, formatAmount(walletBalance));
     }
 }

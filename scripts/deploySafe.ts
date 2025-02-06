@@ -3,23 +3,17 @@ import { createPublicClient, http } from "viem";
 import { ethers } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
-import Safe, {
-    PredictedSafeProps,
-    SafeAccountConfig,
-    SafeDeploymentConfig,
-} from "@safe-global/protocol-kit";
+import Safe, { PredictedSafeProps, SafeAccountConfig, SafeDeploymentConfig } from "@safe-global/protocol-kit";
 import { TEST_ADDRESS } from "../test/constants";
 
 async function main() {
     const safeAccountConfig: SafeAccountConfig = {
         owners: [TEST_ADDRESS],
         threshold: 1,
-        // More optional properties
     };
 
     const predictedSafe: PredictedSafeProps = {
         safeAccountConfig,
-        // More optional properties
     };
 
     const protocolKit = await Safe.init({

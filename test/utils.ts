@@ -17,6 +17,7 @@ import { MORPHO_ADDRESS } from "./protocols/morpho";
 import { AaveV3Helper } from "./protocols/aaveV3";
 import { CompoundHelper } from "./protocols/compound";
 import { MorphoHelper } from "./protocols/morpho";
+import { COMPTROLLER_ADDRESS } from "./protocols/moonwell";
 
 export const protocolHelperMap = new Map<Protocols, any>([
     [Protocols.AAVE_V3, AaveV3Helper],
@@ -99,7 +100,7 @@ export async function deploySafeContractFixture() {
     console.log("AaveV3Handler deployed to:", await aaveV3Handler.getAddress());
 
     const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
-    const moonwellHandler = await MoonwellHandler.deploy({
+    const moonwellHandler = await MoonwellHandler.deploy(COMPTROLLER_ADDRESS, {
         maxFeePerGas: gasPrice * BigInt(5),
     });
     console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());

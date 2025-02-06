@@ -59,22 +59,12 @@ contract AaveV3SafeHandler is IProtocolHandler {
         for (uint256 i = 0; i < collateralAssets.length; i++) {
             DataTypes.ReserveData memory reserveData = aaveV3Pool.getReserveData(collateralAssets[i].asset);
 
-            // IERC20(reserveData.aTokenAddress).safeTransferFrom(safe, address(this), collateralAssets[i].amount);
-
-            bytes memory withdrawData = abi.encodeCall(
-                IPoolV3.withdraw,
-                (collateralAssets[i].asset, collateralAssets[i].amount, address(this))
-            );
             bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
                 aaveV3PoolAddress,
                 0,
-                withdrawData,
+                abi.encodeCall(IPoolV3.withdraw, (collateralAssets[i].asset, collateralAssets[i].amount, onBehalfOf)),
                 ISafe.Operation.Call
             );
-
-            // aaveV3Pool.withdraw(collateralAssets[i].asset, collateralAssets[i].amount, address(this));
-
-            console.log("Aave v3 withdraw done");
         }
     }
 
@@ -86,50 +76,34 @@ contract AaveV3SafeHandler is IProtocolHandler {
         bytes calldata extraData
     ) external override {
         for (uint256 i = 0; i < collateralAssets.length; i++) {
-            bytes memory approveData = abi.encodeCall(
-                IERC20.approve,
-                (address(aaveV3Pool), collateralAssets[i].amount)
-            );
             bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
                 collateralAssets[i].asset,
                 0,
-                approveData,
+                abi.encodeCall(IERC20.approve, (address(aaveV3Pool), collateralAssets[i].amount)),
                 ISafe.Operation.Call
             );
 
-            console.log("approved aave pool");
-
-            bytes memory supplyData = abi.encodeCall(
-                IPoolV3.supply,
-                (collateralAssets[i].asset, collateralAssets[i].amount, onBehalfOf, 0)
-            );
             bool successSupply = ISafe(onBehalfOf).execTransactionFromModule(
                 aaveV3PoolAddress,
                 0,
-                supplyData,
+                abi.encodeCall(IPoolV3.supply, (collateralAssets[i].asset, collateralAssets[i].amount, onBehalfOf, 0)),
                 ISafe.Operation.Call
             );
-
-            console.log("Aave v3 supply done");
         }
 
-        bytes memory borrowData = abi.encodeCall(IPoolV3.borrow, (toAsset, amount, 2, 0, onBehalfOf));
         bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
             aaveV3PoolAddress,
             0,
-            borrowData,
+            abi.encodeCall(IPoolV3.borrow, (toAsset, amount, 2, 0, onBehalfOf)),
             ISafe.Operation.Call
         );
-        console.log("Aave v3 borrow done");
 
-        bytes memory transferData = abi.encodeCall(IERC20.transfer, (address(this), amount));
         bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
             toAsset,
             0,
-            transferData,
+            abi.encodeCall(IERC20.transfer, (address(this), amount)),
             ISafe.Operation.Call
         );
-        console.log("successTransfer: ", successTransfer);
     }
 
     function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override {
