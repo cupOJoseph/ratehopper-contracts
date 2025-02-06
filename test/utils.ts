@@ -105,8 +105,13 @@ export async function deploySafeContractFixture() {
     });
     console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());
 
+    const FluidHandler = await hre.ethers.getContractFactory("FluidSafeHandler");
+    const fluidHandler = await FluidHandler.deploy();
+    console.log("FluidHandler deployed to:", await fluidHandler.getAddress());
+
     await protocolRegistry.setHandler(Protocols.AAVE_V3, aaveV3Handler.getAddress());
     await protocolRegistry.setHandler(Protocols.MOONWELL, moonwellHandler.getAddress());
+    await protocolRegistry.setHandler(Protocols.FLUID, fluidHandler.getAddress());
 
     const SafeModule = await hre.ethers.getContractFactory("SafeModule");
     const safeModule = await SafeModule.deploy(UNISWAP_V3_SWAP_ROUTER_ADDRESS, protocolRegistry.getAddress(), {

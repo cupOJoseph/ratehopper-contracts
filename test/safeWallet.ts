@@ -1,8 +1,8 @@
 import { SafeModule } from "./../typechain-types/contracts/SafeModule";
 import { sepolia, base, hardhat } from "viem/chains";
-import { createPublicClient, http, custom, createWalletClient } from "viem";
+import { createPublicClient, http, custom, createWalletClient, maxInt128 } from "viem";
 import { ethers } from "hardhat";
-import { ZeroAddress } from "ethers";
+import { MaxInt256, ZeroAddress } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
 import Safe, {
@@ -35,21 +35,24 @@ import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { deployContractFixture, deploySafeContractFixture, formatAmount } from "./utils";
 import { mcbETH, mDAI, mUSDC } from "./moonwellDebtSwap";
 import { COMPTROLLER_ADDRESS, MoonwellHelper } from "./protocols/moonwell";
+import { FluidHelper } from "./protocols/fluid";
 const MErc20DelegatorAbi = require("../externalAbi/moonwell/MErc20Delegator.json");
+const FluidVaultAbi = require("../externalAbi/fluid/fluidVaultT1.json");
+
+export const eip1193Provider: Eip1193Provider = {
+    request: async (args: RequestArguments) => {
+        const { method, params } = args;
+        return ethers.provider.send(method, Array.isArray(params) ? params : []);
+    },
+};
 
 describe.only("Safe wallet", function () {
     const safeAddress = "0x2f9054Eb6209bb5B94399115117044E4f150B2De";
+    const FLUID_VAULT_ADDRESS = "0x40d9b8417e6e1dcd358f04e3328bced061018a82";
     const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);
     let safeWallet;
     let safeModuleContract;
     let safeModuleAddress;
-
-    const eip1193Provider: Eip1193Provider = {
-        request: async (args: RequestArguments) => {
-            const { method, params } = args;
-            return ethers.provider.send(method, Array.isArray(params) ? params : []);
-        },
-    };
 
     this.beforeEach(async () => {
         safeWallet = await Safe.init({
@@ -188,6 +191,185 @@ describe.only("Safe wallet", function () {
         console.log("USDC Balance on user:", ethers.formatUnits(userUsdcBalance, 6));
     }
 
+    async function supplyAndBorrowOnFluid() {
+        const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, signer);
+        const tx = await cbETHContract.transfer(safeAddress, ethers.parseEther("0.001"));
+        await tx.wait();
+
+        const balance = await cbETHContract.balanceOf(safeAddress);
+        console.log(`Balance:`, ethers.formatEther(balance), "cbETH");
+
+        const approveTransactionData: MetaTransactionData = {
+            to: cbETH_ADDRESS,
+            value: "0",
+            data: cbETHContract.interface.encodeFunctionData("approve", [FLUID_VAULT_ADDRESS, ethers.parseEther("1")]),
+            operation: OperationType.Call,
+        };
+
+        const fluidVault = new ethers.Contract(FLUID_VAULT_ADDRESS, FluidVaultAbi, signer);
+
+        const supplyTransactionData: MetaTransactionData = {
+            to: FLUID_VAULT_ADDRESS,
+            value: "0",
+            data: fluidVault.interface.encodeFunctionData("operate", [
+                0,
+                ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
+                0,
+                safeAddress,
+            ]),
+            operation: OperationType.Call,
+        };
+
+        const safeTransaction = await safeWallet.createTransaction({
+            transactions: [approveTransactionData, supplyTransactionData],
+        });
+
+        const safeTxHash = await safeWallet.executeTransaction(safeTransaction);
+        console.log("Safe transaction hash:", safeTxHash);
+
+        const fluidHelper = new FluidHelper(signer);
+        const nftId = await fluidHelper.getNftId(FLUID_VAULT_ADDRESS, safeAddress);
+
+        const borrowTransactionData: MetaTransactionData = {
+            to: FLUID_VAULT_ADDRESS,
+            value: "0",
+            data: fluidVault.interface.encodeFunctionData("operate", [
+                nftId,
+                0,
+                ethers.parseUnits("1", 6),
+                safeAddress,
+            ]),
+            operation: OperationType.Call,
+        };
+
+        const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
+
+        // const transferTransactionData: MetaTransactionData = {
+        //     to: USDC_ADDRESS,
+        //     value: "0",
+        //     data: usdcContract.interface.encodeFunctionData("transfer", [TEST_ADDRESS, ethers.parseUnits("1", 6)]),
+        //     operation: OperationType.Call,
+        // };
+
+        const safeTransaction2 = await safeWallet.createTransaction({
+            transactions: [borrowTransactionData],
+        });
+
+        const safeTxHash2 = await safeWallet.executeTransaction(safeTransaction2);
+        console.log("Safe transaction hash:", safeTxHash2);
+
+        // const approveTransactionData2: MetaTransactionData = {
+        //     to: USDC_ADDRESS,
+        //     value: "0",
+        //     data: usdcContract.interface.encodeFunctionData("approve", [
+        //         FLUID_VAULT_ADDRESS,
+        //         ethers.parseUnits("10", 6),
+        //     ]),
+        //     operation: OperationType.Call,
+        // };
+
+        // const beforeFluidDebt = await fluidHelper.getDebtAmount(FLUID_VAULT_ADDRESS, safeAddress);
+
+        // const repayTransactionData: MetaTransactionData = {
+        //     to: FLUID_VAULT_ADDRESS,
+        //     value: "0",
+        //     // data: fluidVault.interface.encodeFunctionData("operate", [nftId, 0, -MaxInt256, safeAddress]),
+        //     data: fluidVault.interface.encodeFunctionData("operate", [
+        //         nftId,
+        //         0,
+        //         // -ethers.parseUnits("0.1", 6),
+        //         -1000004,
+        //         safeAddress,
+        //     ]),
+        //     operation: OperationType.Call,
+        // };
+
+        // const safeTransaction3 = await safeWallet.createTransaction({
+        //     transactions: [approveTransactionData2, repayTransactionData],
+        // });
+
+        // const safeTxHash3 = await safeWallet.executeTransaction(safeTransaction3);
+        // console.log("Safe transaction hash3:", safeTxHash3);
+
+        const collateral = await fluidHelper.getCollateralAmount(FLUID_VAULT_ADDRESS, safeAddress);
+
+        const debt = await fluidHelper.getDebtAmount(FLUID_VAULT_ADDRESS, safeAddress);
+    }
+
+    it("Should execute debt swap from Fluid to Moonwell", async function () {
+        await supplyAndBorrowOnFluid();
+
+        const fluidHelper = new FluidHelper(signer);
+        const moonwellHelper = new MoonwellHelper(signer);
+
+        const beforeMoonwellDebt = await moonwellHelper.getDebtAmount(mUSDC, safeAddress);
+        const beforeFluidDebt = await fluidHelper.getDebtAmount(FLUID_VAULT_ADDRESS, safeAddress);
+
+        const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
+
+        const nftId = await fluidHelper.getNftId(FLUID_VAULT_ADDRESS, safeAddress);
+
+        await moduleContract.executeDebtSwap(
+            USDC_hyUSD_POOL,
+            Protocols.FLUID,
+            Protocols.MOONWELL,
+            USDC_ADDRESS,
+            USDC_ADDRESS,
+            // beforeFluidDebt,
+            MaxUint256,
+            100,
+            [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+            ethers.AbiCoder.defaultAbiCoder().encode(["address", "uint256"], [FLUID_VAULT_ADDRESS, nftId]),
+            ethers.AbiCoder.defaultAbiCoder().encode(["address", "address[]"], [mUSDC, [mcbETH]]),
+            {
+                gasLimit: "2000000",
+            },
+        );
+
+        const afterMoonwellDebt = await moonwellHelper.getDebtAmount(mUSDC, safeAddress);
+        const afterFluidDebt = await fluidHelper.getDebtAmount(FLUID_VAULT_ADDRESS, safeAddress);
+
+        console.log(`Fluid Debt Amount:`, formatAmount(beforeFluidDebt), " -> ", formatAmount(afterFluidDebt));
+        console.log(`Moonwell Debt Amount:`, formatAmount(beforeMoonwellDebt), " -> ", formatAmount(afterMoonwellDebt));
+    });
+
+    it.only("Should execute debt swap from Moonwell to Fluid", async function () {
+        await supplyAndBorrowOnMoonwell();
+
+        const fluidHelper = new FluidHelper(signer);
+        const moonwellHelper = new MoonwellHelper(signer);
+
+        const beforeMoonwellDebt = await moonwellHelper.getDebtAmount(mUSDC, safeAddress);
+        const beforeFluidDebt = await fluidHelper.getDebtAmount(FLUID_VAULT_ADDRESS, safeAddress);
+
+        const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
+
+        // const nftId = await fluidHelper.getNftId(FLUID_VAULT_ADDRESS, safeAddress);
+
+        await moduleContract.executeDebtSwap(
+            USDC_hyUSD_POOL,
+            Protocols.MOONWELL,
+            Protocols.FLUID,
+            USDC_ADDRESS,
+            USDC_ADDRESS,
+            // beforeFluidDebt,
+            MaxUint256,
+            100,
+            [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+            ethers.AbiCoder.defaultAbiCoder().encode(["address", "address[]"], [mUSDC, [mcbETH]]),
+            ethers.AbiCoder.defaultAbiCoder().encode(["address", "uint256"], [FLUID_VAULT_ADDRESS, 0]),
+            {
+                gasLimit: "2000000",
+            },
+        );
+
+        const afterMoonwellDebt = await moonwellHelper.getDebtAmount(mUSDC, safeAddress);
+        const afterFluidDebt = await fluidHelper.getDebtAmount(FLUID_VAULT_ADDRESS, safeAddress);
+
+        console.log(`Fluid Debt Amount:`, formatAmount(beforeFluidDebt), " -> ", formatAmount(afterFluidDebt));
+        console.log(`Moonwell Debt Amount:`, formatAmount(beforeMoonwellDebt), " -> ", formatAmount(afterMoonwellDebt));
+    });
+
     it.skip("Should execute debt swap", async function () {
         const aaveV3Helper = new AaveV3Helper(signer);
 
@@ -236,8 +418,8 @@ describe.only("Safe wallet", function () {
             MaxUint256,
             100,
             [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
-            ethers.AbiCoder.defaultAbiCoder().encode(["address", "address", "uint256"], [mUSDC, ZeroAddress, 0]),
-            ethers.AbiCoder.defaultAbiCoder().encode(["address", "address", "uint256"], [mDAI, ZeroAddress, 0]),
+            ethers.AbiCoder.defaultAbiCoder().encode(["address", "address[]"], [mUSDC, [ZeroAddress]]),
+            ethers.AbiCoder.defaultAbiCoder().encode(["address", "address[]"], [mDAI, [ZeroAddress]]),
             {
                 gasLimit: "5000000",
             },

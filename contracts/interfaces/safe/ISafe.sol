@@ -39,11 +39,14 @@ interface ISafe {
         Operation operation
     ) external returns (bool success);
 
-    function checkSignatures(
-        bytes32 dataHash,
+    function execTransactionFromModuleReturnData(
+        address to,
+        uint256 value,
         bytes memory data,
-        bytes memory signatures
-    ) external view;
+        Operation operation
+    ) external returns (bool success, bytes memory returnData);
+
+    function checkSignatures(bytes32 dataHash, bytes memory data, bytes memory signatures) external view;
 
     function checkNSignatures(
         address executor,

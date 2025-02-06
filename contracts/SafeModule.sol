@@ -205,12 +205,14 @@ contract SafeModule {
         if (remainingBalance > 0) {
             address handler = protocolRegistry.getHandler(decoded.toProtocol);
 
-            handler.delegatecall(
+            (bool success, bytes memory returnData) = handler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.repay,
                     (decoded.toAsset, remainingBalance, address(decoded.safe), decoded.toExtraData)
                 )
             );
+
+            require(success);
         }
 
         uint256 remainingBalanceAfter = toToken.balanceOf(address(this));
