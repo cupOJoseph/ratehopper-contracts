@@ -10,25 +10,33 @@ import {DataTypes} from "../interfaces/aaveV3/DataTypes.sol";
 import "../interfaces/fluid/IFluidVault.sol";
 import "../interfaces/fluid/IFluidVaultResolver.sol";
 import "../interfaces/IProtocolHandler.sol";
+import {Structs} from "../dependencies/fluid/structs.sol";
 
 import "hardhat/console.sol";
 
 contract FluidSafeHandler is IProtocolHandler {
     using GPv2SafeERC20 for IERC20;
 
-    address public constant FLUID_VAULT_RESOLVER = 0x79B3102173EB84E6BCa182C7440AfCa5A41aBcF8;
+    address public immutable FLUID_VAULT_RESOLVER;
+
+    constructor(address _fluidVaultResolver) {
+        FLUID_VAULT_RESOLVER = _fluidVaultResolver;
+    }
 
     function getDebtAmount(
         address asset,
         address onBehalfOf,
         bytes calldata fromExtraData
-    ) external view returns (uint256) {
+    ) public view returns (uint256) {
+        (address vaultAddress, uint256 nftId) = abi.decode(fromExtraData, (address, uint256));
+
         IFluidVaultResolver resolver = IFluidVaultResolver(FLUID_VAULT_RESOLVER);
-        // TODO fis this
-        (address[][] memory vaults, uint256[][] memory positions) = resolver.positionsByUser(onBehalfOf);
-        for (uint256 i = 0; i < vaults[1].length; i++) {
-            if (vaults[1][i] == onBehalfOf) {
-                uint256 debtAmount = positions[i][10];
+
+        (Structs.UserPosition[] memory userPositions_, Structs.VaultEntireData[] memory vaultsData_) = resolver
+            .positionsByUser(onBehalfOf);
+        for (uint256 i = 0; i < vaultsData_.length; i++) {
+            if (vaultsData_[i].vault == vaultAddress) {
+                uint256 debtAmount = userPositions_[i].borrow;
                 return debtAmount;
             }
         }
@@ -59,10 +67,21 @@ contract FluidSafeHandler is IProtocolHandler {
         (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
         IERC20(fromAsset).approve(address(vaultAddress), type(uint256).max);
+
+        IERC20(fromAsset).transfer(onBehalfOf, amount);
+
+        bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
+            fromAsset,
+            0,
+            abi.encodeCall(IERC20.approve, (address(vaultAddress), type(uint256).max)),
+            ISafe.Operation.Call
+        );
+        console.log("successApprove:", successApprove);
+
         bool successRepay = ISafe(onBehalfOf).execTransactionFromModule(
             vaultAddress,
             0,
-            abi.encodeCall(IFluidVault.operate, (nftId, 0, -int256(amount), onBehalfOf)),
+            abi.encodeCall(IFluidVault.operate, (nftId, 0, type(int).min, onBehalfOf)),
             ISafe.Operation.Call
         );
         console.log("successRepay:", successRepay);
@@ -70,7 +89,7 @@ contract FluidSafeHandler is IProtocolHandler {
         bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
             vaultAddress,
             0,
-            abi.encodeCall(IFluidVault.operate, (nftId, -int256(collateralAssets[0].amount), 0, address(this))),
+            abi.encodeCall(IFluidVault.operate, (nftId, type(int).min, 0, onBehalfOf)),
             ISafe.Operation.Call
         );
         console.log("successWithdraw:", successWithdraw);
@@ -114,7 +133,8 @@ contract FluidSafeHandler is IProtocolHandler {
     }
 
     function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override {
-        (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
+        // (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
+        (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
 
         IERC20(asset).transfer(onBehalfOf, amount);
 
@@ -126,12 +146,22 @@ contract FluidSafeHandler is IProtocolHandler {
         );
         console.log("successApprove:", successApprove);
 
+        IFluidVaultResolver resolver = IFluidVaultResolver(FLUID_VAULT_RESOLVER);
+
+        // get nftId
+        uint256 nftId = 0;
+        (Structs.UserPosition[] memory userPositions_, Structs.VaultEntireData[] memory vaultsData_) = resolver
+            .positionsByUser(onBehalfOf);
+        for (uint256 i = 0; i < vaultsData_.length; i++) {
+            if (vaultsData_[i].vault == vaultAddress) {
+                nftId = userPositions_[i].nftId;
+            }
+        }
+
         bool successRepay = ISafe(onBehalfOf).execTransactionFromModule(
             vaultAddress,
             0,
-            // TODO get nftId dynamicly
             abi.encodeCall(IFluidVault.operate, (nftId, 0, -int256(amount), onBehalfOf)),
-            // abi.encodeCall(IFluidVault.operate, (4958, 0, -int256(amount), onBehalfOf)),
             ISafe.Operation.Call
         );
 

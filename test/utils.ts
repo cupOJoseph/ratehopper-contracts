@@ -18,6 +18,7 @@ import { AaveV3Helper } from "./protocols/aaveV3";
 import { CompoundHelper } from "./protocols/compound";
 import { MorphoHelper } from "./protocols/morpho";
 import { COMPTROLLER_ADDRESS } from "./protocols/moonwell";
+import { FLUID_VAULT_RESOLVER } from "./protocols/fluid";
 
 export const protocolHelperMap = new Map<Protocols, any>([
     [Protocols.AAVE_V3, AaveV3Helper],
@@ -106,7 +107,7 @@ export async function deploySafeContractFixture() {
     console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());
 
     const FluidHandler = await hre.ethers.getContractFactory("FluidSafeHandler");
-    const fluidHandler = await FluidHandler.deploy();
+    const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER);
     console.log("FluidHandler deployed to:", await fluidHandler.getAddress());
 
     await protocolRegistry.setHandler(Protocols.AAVE_V3, aaveV3Handler.getAddress());

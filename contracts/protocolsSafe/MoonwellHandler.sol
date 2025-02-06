@@ -100,6 +100,8 @@ contract MoonwellHandler is IProtocolHandler {
         (address toContract, address[] memory mTokens) = abi.decode(extraData, (address, address[]));
 
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(onBehalfOf);
+
             bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
                 collateralAssets[i].asset,
                 0,
@@ -110,10 +112,11 @@ contract MoonwellHandler is IProtocolHandler {
             bool successMint = ISafe(onBehalfOf).execTransactionFromModule(
                 mTokens[i],
                 0,
-                abi.encodeCall(IMToken.mint, (collateralAssets[i].amount)),
+                // abi.encodeCall(IMToken.mint, (collateralAssets[i].amount)),
+                abi.encodeCall(IMToken.mint, (currentBalance)),
                 ISafe.Operation.Call
             );
-            console.log("mint done");
+            console.log("successMint:", successMint);
 
             address[] memory collateralContracts = new address[](1);
             collateralContracts[0] = mTokens[i];
@@ -132,6 +135,8 @@ contract MoonwellHandler is IProtocolHandler {
             abi.encodeCall(IMToken.borrow, (amount)),
             ISafe.Operation.Call
         );
+
+        console.log("successBorrow:", successBorrow);
 
         bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
             toAsset,

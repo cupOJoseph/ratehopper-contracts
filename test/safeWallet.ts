@@ -196,8 +196,8 @@ describe.only("Safe wallet", function () {
         const tx = await cbETHContract.transfer(safeAddress, ethers.parseEther("0.001"));
         await tx.wait();
 
-        const balance = await cbETHContract.balanceOf(safeAddress);
-        console.log(`Balance:`, ethers.formatEther(balance), "cbETH");
+        // const balance = await cbETHContract.balanceOf(safeAddress);
+        // console.log(`Balance:`, ethers.formatEther(balance), "cbETH");
 
         const approveTransactionData: MetaTransactionData = {
             to: cbETH_ADDRESS,
@@ -290,10 +290,6 @@ describe.only("Safe wallet", function () {
 
         // const safeTxHash3 = await safeWallet.executeTransaction(safeTransaction3);
         // console.log("Safe transaction hash3:", safeTxHash3);
-
-        const collateral = await fluidHelper.getCollateralAmount(FLUID_VAULT_ADDRESS, safeAddress);
-
-        const debt = await fluidHelper.getDebtAmount(FLUID_VAULT_ADDRESS, safeAddress);
     }
 
     it("Should execute debt swap from Fluid to Moonwell", async function () {
@@ -344,8 +340,6 @@ describe.only("Safe wallet", function () {
 
         const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
 
-        // const nftId = await fluidHelper.getNftId(FLUID_VAULT_ADDRESS, safeAddress);
-
         await moduleContract.executeDebtSwap(
             USDC_hyUSD_POOL,
             Protocols.MOONWELL,
@@ -370,7 +364,7 @@ describe.only("Safe wallet", function () {
         console.log(`Moonwell Debt Amount:`, formatAmount(beforeMoonwellDebt), " -> ", formatAmount(afterMoonwellDebt));
     });
 
-    it.skip("Should execute debt swap", async function () {
+    it.skip("Should execute debt swap on Aave", async function () {
         const aaveV3Helper = new AaveV3Helper(signer);
 
         // const debtAmount = await aaveV3Helper.getDebtAmount(mUSDC, safeAddress);
