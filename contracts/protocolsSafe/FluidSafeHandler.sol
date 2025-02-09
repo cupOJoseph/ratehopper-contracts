@@ -66,8 +66,6 @@ contract FluidSafeHandler is IProtocolHandler {
     ) external override {
         (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
-        IERC20(fromAsset).approve(address(vaultAddress), type(uint256).max);
-
         IERC20(fromAsset).transfer(onBehalfOf, amount);
 
         bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
@@ -78,9 +76,16 @@ contract FluidSafeHandler is IProtocolHandler {
         );
         console.log("successApprove:", successApprove);
 
+        // int256 debtAmount = type(int256).min;
+        // uint256 currentDebtAmount = getDebtAmount(fromAsset, onBehalfOf, extraData);
+        // if (amount == currentDebtAmount) {
+        //     debtAmount = -int256(amount);
+        // }
+
         bool successRepay = ISafe(onBehalfOf).execTransactionFromModule(
             vaultAddress,
             0,
+            // abi.encodeCall(IFluidVault.operate, (nftId, 0, debtAmount, onBehalfOf)),
             abi.encodeCall(IFluidVault.operate, (nftId, 0, type(int).min, onBehalfOf)),
             ISafe.Operation.Call
         );

@@ -10,7 +10,8 @@
         "compile": "npx hardhat compile",
         "size": "npx hardhat size-contracts",
         "coverage": "npx hardhat coverage",
-        "clean": "npx hardhat clean"
+        "clean": "npx hardhat clean",
+        "run-script": "ts-node scripts/paraswap.ts"
     },
     "author": "",
     "license": "ISC",
@@ -20,6 +21,7 @@
         "@morpho-org/bundler-sdk-ethers": "^1.0.3",
         "@morpho-org/morpho-blue-bundlers": "^1.1.2",
         "@openzeppelin/contracts": "^4.9.3",
+        "@paraswap/sdk": "^7.2.3",
         "@safe-global/api-kit": "^2.5.7",
         "@safe-global/protocol-kit": "^5.2.0",
         "@safe-global/types-kit": "^1.0.1",
