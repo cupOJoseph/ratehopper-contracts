@@ -162,14 +162,25 @@ describe.only("Protocol Switch Paraswap", function () {
         // suppose flashloan fee is 0.01%, must be fetched dynamically
         const debtAmountPlusFee = beforeFromProtocolDebt + (beforeFromProtocolDebt * 2n) / 10000n;
 
-        const paraswapData =
-            fromTokenAddress !== toTokenAddress
-                ? await getParaswapData(fromTokenAddress, toTokenAddress, deployedContractAddress, debtAmountPlusFee)
-                : {
-                      router: zeroAddress,
-                      tokenTransferProxy: zeroAddress,
-                      swapData: "0x",
-                  };
+        let srcAmount = debtAmountPlusFee;
+
+        let paraswapData = {
+            router: zeroAddress,
+            tokenTransferProxy: zeroAddress,
+            swapData: "0x",
+        };
+
+        if (fromTokenAddress !== toTokenAddress) {
+            [srcAmount, paraswapData] = await getParaswapData(
+                fromTokenAddress,
+                toTokenAddress,
+                deployedContractAddress,
+                debtAmountPlusFee,
+            );
+        }
+
+        // add 0.3% slippage
+        const amountPlusSlippage = (BigInt(srcAmount) * 1003n) / 1000n;
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
@@ -178,7 +189,7 @@ describe.only("Protocol Switch Paraswap", function () {
             fromTokenAddress,
             toTokenAddress,
             MaxUint256,
-            100,
+            amountPlusSlippage,
             collateralArray,
             fromExtraData,
             toExtraData,
@@ -283,7 +294,7 @@ describe.only("Protocol Switch Paraswap", function () {
         );
     });
 
-    it.only("should switch USDC debt on Morpho to USDbC on Aave", async function () {
+    it("should switch USDC debt on Morpho to USDbC on Aave", async function () {
         await morphoHelper.supply(cbETH_ADDRESS, morphoMarket1Id);
         await morphoHelper.borrow(morphoMarket1Id);
 

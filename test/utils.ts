@@ -168,7 +168,7 @@ export async function getParaswapData(fromAsset: string, toAsset: string, contra
         side: "BUY",
         network: "8453",
         // should be passed by user dynamically
-        slippage: "100",
+        slippage: "30",
         userAddress: contractAddress,
     };
 
@@ -178,11 +178,14 @@ export async function getParaswapData(fromAsset: string, toAsset: string, contra
             throw new Error("Invalid response from ParaSwap API");
         }
 
-        return {
-            router: response.data.txParams.to,
-            tokenTransferProxy: response.data.priceRoute.tokenTransferProxy,
-            swapData: response.data.txParams.data,
-        };
+        return [
+            response.data.priceRoute.srcAmount,
+            {
+                router: response.data.txParams.to,
+                tokenTransferProxy: response.data.priceRoute.tokenTransferProxy,
+                swapData: response.data.txParams.data,
+            },
+        ];
     } catch (error) {
         console.error("Error fetching data from ParaSwap API:", error);
         throw new Error("Failed to fetch ParaSwap data");

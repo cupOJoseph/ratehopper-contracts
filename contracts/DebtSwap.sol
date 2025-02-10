@@ -34,7 +34,7 @@ contract DebtSwap is Ownable {
         address fromAsset;
         address toAsset;
         uint256 amount;
-        uint256 allowedSlippage;
+        uint256 srcAmount;
         CollateralAsset[] collateralAssets;
         address onBehalfOf;
         bytes fromExtraData;
@@ -73,7 +73,7 @@ contract DebtSwap is Ownable {
         address _fromDebtAsset,
         address _toDebtAsset,
         uint256 _amount,
-        uint16 _allowedSlippage,
+        uint256 _srcAmount,
         CollateralAsset[] calldata _collateralAssets,
         bytes calldata _fromExtraData,
         bytes calldata _toExtraData,
@@ -110,7 +110,7 @@ contract DebtSwap is Ownable {
                 fromAsset: _fromDebtAsset,
                 toAsset: _toDebtAsset,
                 amount: debtAmount,
-                allowedSlippage: _allowedSlippage,
+                srcAmount: _srcAmount,
                 onBehalfOf: msg.sender,
                 collateralAssets: _collateralAssets,
                 fromExtraData: _fromExtraData,
@@ -135,7 +135,8 @@ contract DebtSwap is Ownable {
         uint8 toDecimals = IERC20(decoded.toAsset).decimals();
         uint8 decimalDiff = fromDecimals > toDecimals ? fromDecimals - toDecimals : toDecimals - fromDecimals;
 
-        uint256 amountInMax = (decoded.amount * (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
+        // uint256 amountInMax = (decoded.amount * (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
+        uint256 amountInMax = decoded.srcAmount == 0 ? decoded.amount : decoded.srcAmount;
 
         if (decimalDiff > 0) {
             amountInMax = amountInMax * 10 ** decimalDiff;
