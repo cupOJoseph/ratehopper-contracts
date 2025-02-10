@@ -19,6 +19,7 @@ import {
     cbETH_ADDRESS,
     WETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
+    ETH_USDC_POOL,
 } from "./constants";
 
 import { AaveV3Helper } from "./protocols/aaveV3";

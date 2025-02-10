@@ -156,7 +156,6 @@ export async function wrapETH(amountIn: string, signer: HardhatEthersSigner) {
 }
 
 export async function getParaswapData(fromAsset: string, toAsset: string, contractAddress: string, amount: bigint) {
-    console.log("amount:", amount);
     const url = "https://api.paraswap.io/swap";
     const params = {
         srcToken: toAsset,

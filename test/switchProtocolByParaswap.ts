@@ -27,6 +27,7 @@ import {
     cbETH_ADDRESS,
     WETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
+    ETH_USDC_POOL,
 } from "./constants";
 
 import { AaveV3Helper } from "./protocols/aaveV3";
@@ -162,7 +163,9 @@ describe.only("Protocol Switch Paraswap", function () {
         // suppose flashloan fee is 0.01%, must be fetched dynamically
         const debtAmountPlusFee = beforeFromProtocolDebt + (beforeFromProtocolDebt * 2n) / 10000n;
 
-        let srcAmount = debtAmountPlusFee;
+        const debtAmountPlusBuffer = (BigInt(debtAmountPlusFee) * 100001n) / 100000n;
+
+        let srcAmount = debtAmountPlusBuffer;
 
         let paraswapData = {
             router: zeroAddress,
@@ -175,7 +178,7 @@ describe.only("Protocol Switch Paraswap", function () {
                 fromTokenAddress,
                 toTokenAddress,
                 deployedContractAddress,
-                debtAmountPlusFee,
+                debtAmountPlusBuffer,
             );
         }
 
@@ -247,6 +250,14 @@ describe.only("Protocol Switch Paraswap", function () {
         await aaveV3Helper.borrow(USDbC_ADDRESS);
 
         await executeDebtSwap(ETH_USDbC_POOL, USDbC_ADDRESS, USDC_ADDRESS, Protocols.AAVE_V3, Protocols.COMPOUND);
+    });
+
+    // TODO: pass test
+    it("should switch WETH debt on Aave to Compound", async function () {
+        await aaveV3Helper.supply(cbETH_ADDRESS);
+        await aaveV3Helper.borrow(WETH_ADDRESS, ethers.parseEther("0.0005"));
+
+        await executeDebtSwap(ETH_USDC_POOL, WETH_ADDRESS, WETH_ADDRESS, Protocols.AAVE_V3, Protocols.COMPOUND);
     });
 
     it("should switch USDC debt on Aave to USDC on Morpho", async function () {

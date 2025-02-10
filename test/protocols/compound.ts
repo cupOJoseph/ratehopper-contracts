@@ -9,32 +9,28 @@ import {
     TEST_ADDRESS,
     USDbC_ADDRESS,
     USDC_ADDRESS,
+    WETH_ADDRESS,
 } from "../constants";
 
 export const USDC_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
 export const USDbC_COMET_ADDRESS = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
+export const WETH_COMET_ADDRESS = "0x46e6b214b524310239732D51387075E0e70970bf";
 
 export const cometAddressMap = new Map<string, string>([
     [USDC_ADDRESS, USDC_COMET_ADDRESS],
     [USDbC_ADDRESS, USDbC_COMET_ADDRESS],
+    [WETH_ADDRESS, WETH_COMET_ADDRESS],
 ]);
 
 export class CompoundHelper {
     constructor(private signer: HardhatEthersSigner) {}
 
     async getDebtAmount(tokenAddress: string): Promise<bigint> {
-        const comet = new ethers.Contract(
-            cometAddressMap.get(tokenAddress)!,
-            cometAbi,
-            this.signer,
-        );
+        const comet = new ethers.Contract(cometAddressMap.get(tokenAddress)!, cometAbi, this.signer);
         return await comet.borrowBalanceOf(TEST_ADDRESS);
     }
 
-    async getCollateralAmount(
-        cometAddress: string,
-        collateralTokenAddress: string,
-    ): Promise<bigint> {
+    async getCollateralAmount(cometAddress: string, collateralTokenAddress: string): Promise<bigint> {
         const comet = new ethers.Contract(cometAddress, cometAbi, this.signer);
         const response = await comet.userCollateral(TEST_ADDRESS, collateralTokenAddress);
         return response.balance;
@@ -52,11 +48,7 @@ export class CompoundHelper {
     }
 
     async borrow(tokenAddress: string) {
-        const comet = new ethers.Contract(
-            cometAddressMap.get(tokenAddress)!,
-            cometAbi,
-            this.signer,
-        );
+        const comet = new ethers.Contract(cometAddressMap.get(tokenAddress)!, cometAbi, this.signer);
 
         const borrowAmount = ethers.parseUnits("1", 6);
         const tx = await comet.withdraw(tokenAddress, borrowAmount);
@@ -66,11 +58,7 @@ export class CompoundHelper {
     }
 
     async allow(tokenAddress: string, targetAddress: string) {
-        const comet = new ethers.Contract(
-            cometAddressMap.get(tokenAddress)!,
-            cometAbi,
-            this.signer,
-        );
+        const comet = new ethers.Contract(cometAddressMap.get(tokenAddress)!, cometAbi, this.signer);
         const tx = await comet.allow(targetAddress, true);
         await tx.wait();
         console.log(`allow ${tokenAddress} to ${targetAddress}`);

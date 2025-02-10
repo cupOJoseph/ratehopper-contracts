@@ -64,8 +64,8 @@ export class AaveV3Helper {
         console.log(`${tokenAddress} Wallet Balance:`, ethers.formatEther(walletBalance));
     }
 
-    async borrow(tokenAddress: string) {
-        const amount = ethers.parseUnits("1", 6);
+    async borrow(tokenAddress: string, borrowAmount?: bigint) {
+        const amount = borrowAmount || ethers.parseUnits("1", 6);
 
         const borrowTx = await this.pool.borrow(tokenAddress, amount, 2, 0, TEST_ADDRESS);
         await borrowTx.wait();
