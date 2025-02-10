@@ -8,7 +8,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { approve, deployContractFixture, formatAmount, getAmountInMax, wrapETH } from "./utils";
-import { Contract, MaxUint256 } from "ethers";
+import { Contract, MaxUint256, ZeroAddress } from "ethers";
 import {
     USDC_ADDRESS,
     USDbC_ADDRESS,
@@ -37,11 +37,7 @@ describe("Aave DebtSwap", function () {
         const { debtSwap } = await loadFixture(deployContractFixture);
         deployedContractAddress = await debtSwap.getAddress();
 
-        myContract = await ethers.getContractAt(
-            "DebtSwap",
-            deployedContractAddress,
-            impersonatedSigner,
-        );
+        myContract = await ethers.getContractAt("DebtSwap", deployedContractAddress, impersonatedSigner);
 
         aaveV3Pool = new ethers.Contract(AAVE_V3_POOL_ADDRESS, aaveV3PoolJson, impersonatedSigner);
     });
@@ -59,11 +55,7 @@ describe("Aave DebtSwap", function () {
         const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
         const usdcBalance = await usdcContract.balanceOf(TEST_ADDRESS);
 
-        const collateralToken = new ethers.Contract(
-            collateralTokenAddress,
-            ERC20_ABI,
-            impersonatedSigner,
-        );
+        const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, impersonatedSigner);
         const collateralBalance = await collateralToken.balanceOf(TEST_ADDRESS);
 
         await aaveV3Helper.approveDelegation(toTokenAddress, deployedContractAddress);
@@ -84,6 +76,11 @@ describe("Aave DebtSwap", function () {
             [{ asset: collateralTokenAddress, amount: collateralBalance }],
             "0x",
             "0x",
+            {
+                router: ZeroAddress,
+                tokenTransferProxy: ZeroAddress,
+                swapData: "0x",
+            },
         );
         await tx.wait();
 
@@ -134,13 +131,7 @@ describe("Aave DebtSwap", function () {
             await aaveV3Helper.supply(cbETH_ADDRESS);
             await aaveV3Helper.borrow(USDC_ADDRESS);
 
-            await executeDebtSwap(
-                USDC_ADDRESS,
-                USDbC_ADDRESS,
-                USDC_hyUSD_POOL,
-                cbETH_ADDRESS,
-                true,
-            );
+            await executeDebtSwap(USDC_ADDRESS, USDbC_ADDRESS, USDC_hyUSD_POOL, cbETH_ADDRESS, true);
         });
 
         it("should switch from USDbC to USDC", async function () {

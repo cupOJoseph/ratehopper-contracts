@@ -19,6 +19,7 @@ import { CompoundHelper } from "./protocols/compound";
 import { MorphoHelper } from "./protocols/morpho";
 import { COMPTROLLER_ADDRESS } from "./protocols/moonwell";
 import { FLUID_VAULT_RESOLVER } from "./protocols/fluid";
+import axios from "axios";
 
 export const protocolHelperMap = new Map<Protocols, any>([
     [Protocols.AAVE_V3, AaveV3Helper],
@@ -152,4 +153,38 @@ export async function wrapETH(amountIn: string, signer: HardhatEthersSigner) {
     const tx = await wethContract.deposit({ value: amount });
     await tx.wait();
     console.log("Wrapped ETH to WETH:", amount);
+}
+
+export async function getParaswapData(fromAsset: string, toAsset: string, contractAddress: string, amount: bigint) {
+    console.log("amount:", amount);
+    const url = "https://api.paraswap.io/swap";
+    const params = {
+        srcToken: toAsset,
+        srcDecimals: 6,
+        destToken: fromAsset,
+        destDecimals: 6,
+        amount,
+        // side must be BUY to use exactAmountOutSwap
+        side: "BUY",
+        network: "8453",
+        // should be passed by user dynamically
+        slippage: "100",
+        userAddress: contractAddress,
+    };
+
+    try {
+        const response = await axios.get(url, { params });
+        if (!response?.data?.txParams || !response?.data?.priceRoute) {
+            throw new Error("Invalid response from ParaSwap API");
+        }
+
+        return {
+            router: response.data.txParams.to,
+            tokenTransferProxy: response.data.priceRoute.tokenTransferProxy,
+            swapData: response.data.txParams.data,
+        };
+    } catch (error) {
+        console.error("Error fetching data from ParaSwap API:", error);
+        throw new Error("Failed to fetch ParaSwap data");
+    }
 }

@@ -7,7 +7,7 @@ import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { approve, deployContractFixture, formatAmount, getAmountInMax, wrapETH } from "./utils";
+import { approve, deployContractFixture, formatAmount, getAmountInMax, getParaswapData, wrapETH } from "./utils";
 import { Contract, MaxUint256 } from "ethers";
 import {
     USDC_ADDRESS,
@@ -24,8 +24,9 @@ import {
 import { AaveV3Helper } from "./protocols/aaveV3";
 import { constructSimpleSDK, SwapSide } from "@paraswap/sdk";
 import axios from "axios";
+import { cometAddressMap, CompoundHelper } from "./protocols/compound";
 
-describe.only("ParaSwap", function () {
+describe("ParaSwap", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
     let deployedContractAddress: string;
@@ -40,87 +41,50 @@ describe.only("ParaSwap", function () {
     });
 
     it("should execute token swap", async function () {
-        const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
-        const beforeBalance = await usdcContract.balanceOf(TEST_ADDRESS);
+        const aaveV3Helper = new AaveV3Helper(impersonatedSigner);
+        await aaveV3Helper.supply(cbETH_ADDRESS);
+        await aaveV3Helper.borrow(USDC_ADDRESS);
 
-        const provider = ethers.provider;
-        const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, provider);
-        const senderAddress = signer.address;
+        const collateralToken = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, impersonatedSigner);
+        const collateralBalance = await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS);
 
-        // const providerOptionsEtherV6 = {
-        //     ethersV6ProviderOrSigner: signer,
-        //     EthersV6Contract: ethers.Contract,
-        //     account: senderAddress,
-        // };
+        const compoundHelper = new CompoundHelper(impersonatedSigner);
+        await compoundHelper.allow(USDbC_ADDRESS, deployedContractAddress);
 
-        // const paraSwap = constructSimpleSDK({ chainId: 8453, axios }, providerOptionsEtherV6);
+        const toCometAddress = cometAddressMap.get(USDbC_ADDRESS)!;
+        const toExtraData = compoundHelper.encodeExtraData(toCometAddress);
 
-        const amount = ethers.parseUnits("0.1", 6).toString();
+        const aTokenAddress = await aaveV3Helper.getATokenAddress(cbETH_ADDRESS);
+        await approve(aTokenAddress, deployedContractAddress, impersonatedSigner);
 
-        // const quote = await paraSwap.quote.getQuote({
-        //     srcToken: USDC_ADDRESS,
-        //     destToken: USDbC_ADDRESS,
-        //     amount,
-        //     // userAddress: deployedContractAddress,
-        //     srcDecimals: 6,
-        //     destDecimals: 6,
-        //     mode: "market",
-        //     side: SwapSide.BUY,
-        // });
+        // suppose flashloan fee is 0.01%, must be fetched dynamically
+        const debtAmountPlusFee = 1 + 1 * 0.0001;
+        const amount = ethers.parseUnits(debtAmountPlusFee.toString(), 6).toString();
 
-        // console.log("quote:", quote);
-
-        // const txHash = await paraSwap.swap.approveToken(quote.market.srcAmount, USDC_ADDRESS);
-
-        // await provider.waitForTransaction(txHash);
-        // console.log("txHash:", txHash);
-
-        const url = "https://api.paraswap.io/swap";
-        const params = {
-            srcToken: "USDC",
-            destToken: "USDbC",
+        const { router, tokenTransferProxy, swapData } = await getParaswapData(
+            USDC_ADDRESS,
+            USDbC_ADDRESS,
+            deployedContractAddress,
             amount,
-            side: "BUY",
-            network: "8453",
-            slippage: "1000",
-            userAddress: deployedContractAddress,
-        };
-        const response = await axios.get(url, { params });
-
-        const afterBalance = await usdcContract.balanceOf(TEST_ADDRESS);
-        console.log("beforeBalance:", beforeBalance);
-        console.log("afterBalance:", afterBalance);
-
-        const contractBalance = await usdcContract.balanceOf(deployedContractAddress);
-        console.log("contractBalance:", contractBalance);
-
-        // const txParams = await paraSwap.swap.buildTx({
-        //     srcToken: USDC_ADDRESS,
-        //     srcDecimals: 6,
-        //     destToken: USDbC_ADDRESS,
-        //     destDecimals: 6,
-        //     srcAmount: quote.market.srcAmount,
-        //     destAmount: quote.market.destAmount,
-        //     priceRoute: quote.market,
-        //     userAddress: senderAddress,
-        //     txOrigin: deployedContractAddress,
-        // });
-
-        const tx = await usdcContract.transfer(deployedContractAddress, ethers.parseUnits("3", 6));
-        await tx.wait();
-
-        await myContract.swapByParaswap(
-            response.data.priceRoute.tokenTransferProxy,
-            response.data.txParams.to,
-            response.data.txParams.data,
         );
 
-        const usdbcContract = new ethers.Contract(USDbC_ADDRESS, ERC20_ABI, impersonatedSigner);
-
-        const afterContractBalance = await usdcContract.balanceOf(deployedContractAddress);
-        console.log("source token Contract Balance:", afterContractBalance);
-
-        const outputContractBalance = await usdbcContract.balanceOf(deployedContractAddress);
-        console.log("output token Contract Balance:", outputContractBalance);
+        const tx = await myContract.executeDebtSwap(
+            USDC_hyUSD_POOL,
+            Protocols.AAVE_V3,
+            Protocols.COMPOUND,
+            USDC_ADDRESS,
+            USDbC_ADDRESS,
+            MaxUint256,
+            100,
+            [{ asset: cbETH_ADDRESS, amount: collateralBalance }],
+            "0x",
+            toExtraData,
+            {
+                router,
+                tokenTransferProxy,
+                swapData,
+            },
+        );
+        await tx.wait();
     });
 });

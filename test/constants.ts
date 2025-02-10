@@ -1,6 +1,6 @@
 export const WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
 export const USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // Circle
-export const USDbC_ADDRESS = "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca"; // Coinbase
+export const USDbC_ADDRESS = "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA"; // Coinbase
 export const cbETH_ADDRESS = "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22";
 export const cbBTC_ADDRESS = "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf";
 export const eUSD_ADDRESS = "0xCfA3Ef56d303AE4fAabA0592388F19d7C3399FB4";

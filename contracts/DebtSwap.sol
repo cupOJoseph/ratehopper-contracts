@@ -39,6 +39,13 @@ contract DebtSwap is Ownable {
         address onBehalfOf;
         bytes fromExtraData;
         bytes toExtraData;
+        ParaswapParams paraswapParams;
+    }
+
+    struct ParaswapParams {
+        address router;
+        address tokenTransferProxy;
+        bytes swapData;
     }
 
     event DebtSwapped(
@@ -59,16 +66,6 @@ contract DebtSwap is Ownable {
         protocolRegistry = ProtocolRegistry(_registry);
     }
 
-    function swapByParaswap(address tokenTransferProxy, address target, bytes calldata _txParams) public {
-        // address paraswap = address(0x6A000F20005980200259B80c5102003040001068);
-        IERC20(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913).approve(target, type(uint256).max);
-        IERC20(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913).approve(tokenTransferProxy, type(uint256).max);
-
-        (bool success, bytes memory returnData) = target.call(_txParams);
-        console.log("success:", success);
-        console.logBytes(returnData);
-    }
-
     function executeDebtSwap(
         address _flashloanPool,
         Protocol _fromProtocol,
@@ -79,7 +76,8 @@ contract DebtSwap is Ownable {
         uint16 _allowedSlippage,
         CollateralAsset[] calldata _collateralAssets,
         bytes calldata _fromExtraData,
-        bytes calldata _toExtraData
+        bytes calldata _toExtraData,
+        ParaswapParams calldata _paraswapParams
     ) public {
         require(_fromDebtAsset != address(0), "Invalid from asset address");
         require(_toDebtAsset != address(0), "Invalid to asset address");
@@ -116,7 +114,8 @@ contract DebtSwap is Ownable {
                 onBehalfOf: msg.sender,
                 collateralAssets: _collateralAssets,
                 fromExtraData: _fromExtraData,
-                toExtraData: _toExtraData
+                toExtraData: _toExtraData,
+                paraswapParams: _paraswapParams
             })
         );
 
@@ -193,7 +192,13 @@ contract DebtSwap is Ownable {
         }
 
         if (decoded.fromAsset != decoded.toAsset) {
-            swapToken(address(decoded.toAsset), address(decoded.fromAsset), decoded.amount + totalFee, amountInMax);
+            // swapToken(address(decoded.toAsset), address(decoded.fromAsset), decoded.amount + totalFee, amountInMax);
+            swapByParaswap(
+                decoded.toAsset,
+                decoded.paraswapParams.tokenTransferProxy,
+                decoded.paraswapParams.router,
+                decoded.paraswapParams.swapData
+            );
         }
 
         // repay flashloan
@@ -229,21 +234,29 @@ contract DebtSwap is Ownable {
         );
     }
 
-    function swapToken(address inputToken, address outputToken, uint256 amountOut, uint256 amountInMaximum) internal {
-        IERC20(inputToken).approve(address(swapRouter), type(uint256).max);
+    // function swapToken(address inputToken, address outputToken, uint256 amountOut, uint256 amountInMaximum) internal {
+    //     IERC20(inputToken).approve(address(swapRouter), type(uint256).max);
 
-        IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter.ExactOutputSingleParams({
-            tokenIn: inputToken,
-            tokenOut: outputToken,
-            fee: 100,
-            recipient: address(this),
-            amountOut: amountOut,
-            amountInMaximum: amountInMaximum,
-            sqrtPriceLimitX96: 0
-        });
+    //     IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter.ExactOutputSingleParams({
+    //         tokenIn: inputToken,
+    //         tokenOut: outputToken,
+    //         fee: 100,
+    //         recipient: address(this),
+    //         amountOut: amountOut,
+    //         amountInMaximum: amountInMaximum,
+    //         sqrtPriceLimitX96: 0
+    //     });
 
-        uint256 amountIn = swapRouter.exactOutputSingle(params);
+    //     uint256 amountIn = swapRouter.exactOutputSingle(params);
 
-        console.log("swap from ", inputToken, " to ", outputToken);
+    //     console.log("swap from ", inputToken, " to ", outputToken);
+    // }
+
+    function swapByParaswap(address asset, address tokenTransferProxy, address router, bytes memory _txParams) public {
+        IERC20(asset).approve(tokenTransferProxy, type(uint256).max);
+
+        (bool success, bytes memory returnData) = router.call(_txParams);
+        console.log("success:", success);
+        console.logBytes(returnData);
     }
 }

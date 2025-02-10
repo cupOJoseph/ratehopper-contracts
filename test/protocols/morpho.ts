@@ -88,6 +88,7 @@ export class MorphoHelper {
         const result1 = borrowShares * totalBorrowAssets;
         const result2 = totalBorrowShares - BigInt(1);
         const debtAmount = result1 / result2;
+        console.log("morphoDebtAmount:", debtAmount);
         return debtAmount;
     }
 
@@ -141,21 +142,10 @@ export class MorphoHelper {
 
         const marketParam = marketParamsMap.get(marketId)!;
 
-        const supplyAction = BundlerAction.morphoSupplyCollateral(
-            marketParam,
-            amount,
-            TEST_ADDRESS,
-            [],
-        );
+        const supplyAction = BundlerAction.morphoSupplyCollateral(marketParam, amount, TEST_ADDRESS, []);
 
         const borrowAmount = ethers.parseUnits("1", 6);
-        const borrowAction = BundlerAction.morphoBorrow(
-            marketParam,
-            borrowAmount,
-            0n,
-            0n,
-            TEST_ADDRESS,
-        );
+        const borrowAction = BundlerAction.morphoBorrow(marketParam, borrowAmount, 0n, 0n, TEST_ADDRESS);
 
         const bundler = new Contract(bundlerAddress, chainAgnosticBundlerV2Abi, this.signer);
         await bundler.multicall([erc20TransferAction, supplyAction]);
