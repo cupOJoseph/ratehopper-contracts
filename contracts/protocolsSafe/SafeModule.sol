@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.27;
 
-import {IERC20} from "./dependencies/IERC20.sol";
-import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
+import {IERC20} from "../dependencies/IERC20.sol";
+import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import {IFlashLoanSimpleReceiver} from "@aave/core-v3/contracts/flashloan/interfaces/IFlashLoanSimpleReceiver.sol";
-import {IPoolV3} from "./interfaces/aaveV3/IPoolV3.sol";
+import {IPoolV3} from "../interfaces/aaveV3/IPoolV3.sol";
 
-import {IDebtToken} from "./interfaces/aaveV3/IDebtToken.sol";
-import {IAaveProtocolDataProvider} from "./interfaces/aaveV3/IAaveProtocolDataProvider.sol";
+import {IDebtToken} from "../interfaces/aaveV3/IDebtToken.sol";
+import {IAaveProtocolDataProvider} from "../interfaces/aaveV3/IAaveProtocolDataProvider.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IMToken} from "./interfaces/moonwell/IMToken.sol";
-import {ISwapRouter02} from "./interfaces/uniswapV3/ISwapRouter02.sol";
-import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
-import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
-import {ProtocolRegistry} from "./ProtocolRegistry.sol";
+import {IMToken} from "../interfaces/moonwell/IMToken.sol";
+import {ISwapRouter02} from "../interfaces/uniswapV3/ISwapRouter02.sol";
+import {IV3SwapRouter} from "../interfaces/uniswapV3/IV3SwapRouter.sol";
+import {PoolAddress} from "../dependencies/uniswapV3/PoolAddress.sol";
+import {ProtocolRegistry} from "../ProtocolRegistry.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./Types.sol";
-import "./interfaces/safe/ISafe.sol";
-import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
+import "../Types.sol";
+import "../interfaces/safe/ISafe.sol";
+import {IProtocolHandler} from "../interfaces/IProtocolHandler.sol";
 
 import "hardhat/console.sol";
 

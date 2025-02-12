@@ -7,7 +7,7 @@ import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { DebtSwap } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { approve, deployContractFixture, formatAmount, getAmountInMax, wrapETH } from "./utils";
+import { approve, deployContractFixture, formatAmount, getAmountInMax, getParaswapData, wrapETH } from "./utils";
 import { Contract, MaxUint256, ZeroAddress } from "ethers";
 import {
     USDC_ADDRESS,
@@ -23,7 +23,7 @@ import {
 } from "./constants";
 import { AaveV3Helper } from "./protocols/aaveV3";
 
-describe("Aave DebtSwap", function () {
+describe.only("Aave DebtSwap", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
     let aaveV3Pool: Contract;
@@ -60,10 +60,28 @@ describe("Aave DebtSwap", function () {
 
         await aaveV3Helper.approveDelegation(toTokenAddress, deployedContractAddress);
 
+        const debtAmount = useMaxAmount ? MaxUint256 : beforeFromTokenDebt;
+
+        let srcAmount = BigInt(0);
+        let paraswapData = {
+            router: ZeroAddress,
+            tokenTransferProxy: ZeroAddress,
+            swapData: "0x",
+        };
+
+        if (fromTokenAddress !== toTokenAddress) {
+            [srcAmount, paraswapData] = await getParaswapData(
+                fromTokenAddress,
+                toTokenAddress,
+                deployedContractAddress,
+                beforeFromTokenDebt,
+            );
+        }
+
         await time.increaseTo((await time.latest()) + 60);
 
-        const debtAmount = useMaxAmount ? MaxUint256 : beforeFromTokenDebt;
-        // const debtAmountInMax = useMaxAmount ? MaxUint256 : getAmountInMax(beforeFromTokenDebt);
+        // add 0.3% slippage(must be set by user)
+        const amountPlusSlippage = (BigInt(srcAmount) * 1003n) / 1000n;
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
@@ -72,15 +90,11 @@ describe("Aave DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             debtAmount,
-            10,
+            amountPlusSlippage,
             [{ asset: collateralTokenAddress, amount: collateralBalance }],
             "0x",
             "0x",
-            {
-                router: ZeroAddress,
-                tokenTransferProxy: ZeroAddress,
-                swapData: "0x",
-            },
+            paraswapData,
         );
         await tx.wait();
 

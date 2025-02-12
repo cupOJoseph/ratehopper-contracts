@@ -8,7 +8,15 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { aave, DebtSwap } from "../typechain-types";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
 
-import { approve, deployContractFixture, formatAmount, getAmountInMax, protocolHelperMap, wrapETH } from "./utils";
+import {
+    approve,
+    deployContractFixture,
+    formatAmount,
+    getAmountInMax,
+    getParaswapData,
+    protocolHelperMap,
+    wrapETH,
+} from "./utils";
 import {
     USDC_ADDRESS,
     USDbC_ADDRESS,
@@ -28,7 +36,7 @@ import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id, morphoMarket4Id } from "
 import { MaxUint256 } from "ethers";
 import { zeroAddress } from "viem";
 
-describe("Protocol Switch", function () {
+describe("Protocol Switch(Paraswap)", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
 
@@ -65,10 +73,10 @@ describe("Protocol Switch", function () {
         const toHelper = new ToHelper(impersonatedSigner);
 
         const fromDebtAmountParameter = fromProtocol === Protocols.MORPHO ? fromMarketId! : fromTokenAddress;
-        const beforeFromProtocolDebt = await fromHelper.getDebtAmount(fromDebtAmountParameter);
+        const beforeFromProtocolDebt: bigint = await fromHelper.getDebtAmount(fromDebtAmountParameter);
 
         const toDebtAmountParameter = toProtocol === Protocols.MORPHO ? toMarketId! : toTokenAddress;
-        const beforeToProtocolDebt = await toHelper.getDebtAmount(toDebtAmountParameter);
+        const beforeToProtocolDebt: bigint = await toHelper.getDebtAmount(toDebtAmountParameter);
 
         const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
         const usdcBalance = await usdcContract.balanceOf(TEST_ADDRESS);
@@ -152,6 +160,29 @@ describe("Protocol Switch", function () {
               ]
             : [{ asset: cbETH_ADDRESS, amount: collateralAmount }];
 
+        let srcAmount = BigInt(0);
+
+        let paraswapData = {
+            router: zeroAddress,
+            tokenTransferProxy: zeroAddress,
+            swapData: "0x",
+        };
+
+        if (fromTokenAddress !== toTokenAddress) {
+            [srcAmount, paraswapData] = await getParaswapData(
+                fromTokenAddress,
+                toTokenAddress,
+                deployedContractAddress,
+                beforeFromProtocolDebt,
+            );
+        }
+
+        // add 0.3% slippage(must be set by user)
+        const amountPlusSlippage = (BigInt(srcAmount) * 1003n) / 1000n;
+
+        // simulate waiting for user's confirmation
+        await time.increaseTo((await time.latest()) + 60);
+
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
             fromProtocol,
@@ -159,15 +190,11 @@ describe("Protocol Switch", function () {
             fromTokenAddress,
             toTokenAddress,
             MaxUint256,
-            10,
+            amountPlusSlippage,
             collateralArray,
             fromExtraData,
             toExtraData,
-            {
-                router: zeroAddress,
-                tokenTransferProxy: zeroAddress,
-                swapData: "0x",
-            },
+            paraswapData,
         );
         await tx.wait();
 
@@ -176,6 +203,14 @@ describe("Protocol Switch", function () {
 
         const usdcBalanceAfter = await usdcContract.balanceOf(TEST_ADDRESS);
         const cbethBalanceAfter = await cbethContract.balanceOf(TEST_ADDRESS);
+
+        const toToken = new ethers.Contract(toTokenAddress, ERC20_ABI, impersonatedSigner);
+        const remainingBalance = await toToken.balanceOf(deployedContractAddress);
+        expect(remainingBalance).to.be.equal(0n);
+
+        const fromToken = new ethers.Contract(fromTokenAddress, ERC20_ABI, impersonatedSigner);
+        const fromRemainingBalance = await fromToken.balanceOf(deployedContractAddress);
+        console.log("fromRemainingBalance: ", fromRemainingBalance);
 
         console.log(
             `Before Protocol ${Protocols[fromProtocol]}, asset: ${fromTokenAddress} Debt Amount:`,
@@ -221,6 +256,13 @@ describe("Protocol Switch", function () {
         await aaveV3Helper.borrow(USDbC_ADDRESS);
 
         await executeDebtSwap(ETH_USDbC_POOL, USDbC_ADDRESS, USDC_ADDRESS, Protocols.AAVE_V3, Protocols.COMPOUND);
+    });
+
+    it("should switch WETH debt on Aave to Compound", async function () {
+        await aaveV3Helper.supply(cbETH_ADDRESS);
+        await aaveV3Helper.borrow(WETH_ADDRESS, ethers.parseEther("0.0005"));
+
+        await executeDebtSwap(ETH_USDC_POOL, WETH_ADDRESS, WETH_ADDRESS, Protocols.AAVE_V3, Protocols.COMPOUND);
     });
 
     it("should switch USDC debt on Aave to USDC on Morpho", async function () {
