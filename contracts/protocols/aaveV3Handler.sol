@@ -40,7 +40,6 @@ contract AaveV3Handler is IProtocolHandler {
         bytes calldata fromExtraData,
         bytes calldata toExtraData
     ) external override {
-        console.log("sender:", msg.sender);
         repay(address(fromAsset), amount, onBehalfOf, fromExtraData);
         aaveV3Pool.borrow(address(toAsset), amountInMax + totalFee, 2, 0, onBehalfOf);
     }

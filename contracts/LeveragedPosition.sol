@@ -71,22 +71,14 @@ contract LeveragedPosition is Ownable {
         uint16 _swapFee,
         bytes calldata _extraData
     ) public {
-        require(
-            _collateralAsset != address(0),
-            "Invalid collateral asset address"
-        );
+        require(_collateralAsset != address(0), "Invalid collateral asset address");
         require(_debtAsset != address(0), "Invalid debt asset address");
 
-        IERC20(_collateralAsset).transferFrom(
-            msg.sender,
-            address(this),
-            _principleCollateralAmount
-        );
+        IERC20(_collateralAsset).transferFrom(msg.sender, address(this), _principleCollateralAmount);
 
         IUniswapV3Pool pool = IUniswapV3Pool(_flashloanPool);
 
-        uint256 flashloanBorrowAmount = _targetCollateralAmount -
-            _principleCollateralAmount;
+        uint256 flashloanBorrowAmount = _targetCollateralAmount - _principleCollateralAmount;
 
         address token0;
         try pool.token0() returns (address result) {
@@ -95,12 +87,8 @@ contract LeveragedPosition is Ownable {
             revert("Invalid flashloan pool address");
         }
 
-        uint256 amount0 = _collateralAsset == token0
-            ? flashloanBorrowAmount
-            : 0;
-        uint256 amount1 = _collateralAsset == token0
-            ? 0
-            : flashloanBorrowAmount;
+        uint256 amount0 = _collateralAsset == token0 ? flashloanBorrowAmount : 0;
+        uint256 amount1 = _collateralAsset == token0 ? 0 : flashloanBorrowAmount;
 
         bytes memory data = abi.encode(
             FlashCallbackData({
@@ -121,17 +109,9 @@ contract LeveragedPosition is Ownable {
         pool.flash(address(this), amount0, amount1, data);
     }
 
-    function uniswapV3FlashCallback(
-        uint256 fee0,
-        uint256 fee1,
-        bytes calldata data
-    ) external {
-        FlashCallbackData memory decoded = abi.decode(
-            data,
-            (FlashCallbackData)
-        );
-        uint256 flashloanBorrowAmount = decoded.targetCollateralAmount -
-            decoded.principleCollateralAmount;
+    function uniswapV3FlashCallback(uint256 fee0, uint256 fee1, bytes calldata data) external {
+        FlashCallbackData memory decoded = abi.decode(data, (FlashCallbackData));
+        uint256 flashloanBorrowAmount = decoded.targetCollateralAmount - decoded.principleCollateralAmount;
 
         // implement the same logic as CallbackValidation.verifyCallback()
         require(msg.sender == address(decoded.flashloanPool));
@@ -139,32 +119,21 @@ contract LeveragedPosition is Ownable {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
-        uint256 amountInMax = (decoded.debtAmount *
-            (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
+        uint256 amountInMax = (decoded.debtAmount * (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
 
         address handler = protocolRegistry.getHandler(decoded.protocol);
 
         handler.delegatecall(
             abi.encodeCall(
                 IProtocolHandler.supply,
-                (
-                    decoded.collateralAsset,
-                    decoded.targetCollateralAmount,
-                    decoded.onBehalfOf,
-                    decoded.extraData
-                )
+                (decoded.collateralAsset, decoded.targetCollateralAmount, decoded.onBehalfOf, decoded.extraData)
             )
         );
 
         handler.delegatecall(
             abi.encodeCall(
                 IProtocolHandler.borrow,
-                (
-                    decoded.debtAsset,
-                    amountInMax,
-                    decoded.onBehalfOf,
-                    decoded.extraData
-                )
+                (decoded.debtAsset, amountInMax, decoded.onBehalfOf, decoded.extraData)
             )
         );
 
@@ -178,32 +147,22 @@ contract LeveragedPosition is Ownable {
 
         IERC20 token = IERC20(decoded.collateralAsset);
 
-        token.transfer(
-            address(decoded.flashloanPool),
-            flashloanBorrowAmount + totalFee
-        );
+        token.transfer(address(decoded.flashloanPool), flashloanBorrowAmount + totalFee);
 
         // repay remaining amount
         IERC20 debtToken = IERC20(decoded.debtAsset);
         uint256 remainingBalance = debtToken.balanceOf(address(this));
-        console.log("remainingBalance:", remainingBalance);
 
         if (remainingBalance > 0) {
             handler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.repay,
-                    (
-                        decoded.debtAsset,
-                        remainingBalance,
-                        decoded.onBehalfOf,
-                        decoded.extraData
-                    )
+                    (decoded.debtAsset, remainingBalance, decoded.onBehalfOf, decoded.extraData)
                 )
             );
         }
 
         uint256 remainingBalanceAfter = debtToken.balanceOf(address(this));
-        console.log("remainingBalanceAfter:", remainingBalanceAfter);
 
         emit LeveragedPositionCreated(
             decoded.onBehalfOf,
@@ -224,19 +183,16 @@ contract LeveragedPosition is Ownable {
     ) internal {
         IERC20(inputToken).approve(address(swapRouter), amountInMaximum);
 
-        IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter
-            .ExactOutputSingleParams({
-                tokenIn: inputToken,
-                tokenOut: outputToken,
-                fee: swapFee,
-                recipient: address(this),
-                amountOut: amountOut,
-                amountInMaximum: amountInMaximum,
-                sqrtPriceLimitX96: 0
-            });
+        IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter.ExactOutputSingleParams({
+            tokenIn: inputToken,
+            tokenOut: outputToken,
+            fee: swapFee,
+            recipient: address(this),
+            amountOut: amountOut,
+            amountInMaximum: amountInMaximum,
+            sqrtPriceLimitX96: 0
+        });
 
         uint256 amountIn = swapRouter.exactOutputSingle(params);
-
-        console.log("swap from ", inputToken, " to ", outputToken);
     }
 }

@@ -89,7 +89,6 @@ contract DebtSwap is Ownable {
             address handler = protocolRegistry.getHandler(_fromProtocol);
 
             debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, msg.sender, _fromExtraData);
-            console.log("on-chain debtAmount:", debtAmount);
         }
 
         address token0;
@@ -135,13 +134,11 @@ contract DebtSwap is Ownable {
         uint8 toDecimals = IERC20(decoded.toAsset).decimals();
         uint8 decimalDiff = fromDecimals > toDecimals ? fromDecimals - toDecimals : toDecimals - fromDecimals;
 
-        // uint256 amountInMax = (decoded.amount * (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
         uint256 amountInMax = decoded.srcAmount == 0 ? decoded.amount : decoded.srcAmount;
 
         if (decimalDiff > 0) {
             amountInMax = amountInMax * 10 ** decimalDiff;
         }
-        console.log("amountInMax:", amountInMax);
 
         if (decoded.fromProtocol == decoded.toProtocol) {
             address handler = protocolRegistry.getHandler(decoded.fromProtocol);
@@ -193,7 +190,6 @@ contract DebtSwap is Ownable {
         }
 
         if (decoded.fromAsset != decoded.toAsset) {
-            // swapToken(address(decoded.toAsset), address(decoded.fromAsset), decoded.amount + totalFee, amountInMax);
             swapByParaswap(
                 decoded.toAsset,
                 decoded.paraswapParams.tokenTransferProxy,
@@ -209,7 +205,6 @@ contract DebtSwap is Ownable {
         // repay remaining amount
         IERC20 toToken = IERC20(decoded.toAsset);
         uint256 remainingBalance = toToken.balanceOf(address(this));
-        console.log("remainingBalance:", remainingBalance);
 
         if (remainingBalance > 0) {
             address handler = protocolRegistry.getHandler(decoded.toProtocol);
@@ -223,7 +218,6 @@ contract DebtSwap is Ownable {
         }
 
         uint256 remainingBalanceAfter = toToken.balanceOf(address(this));
-        console.log("remainingBalanceAfter:", remainingBalanceAfter);
 
         emit DebtSwapped(
             decoded.onBehalfOf,
@@ -235,29 +229,11 @@ contract DebtSwap is Ownable {
         );
     }
 
-    // function swapToken(address inputToken, address outputToken, uint256 amountOut, uint256 amountInMaximum) internal {
-    //     IERC20(inputToken).approve(address(swapRouter), type(uint256).max);
-
-    //     IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter.ExactOutputSingleParams({
-    //         tokenIn: inputToken,
-    //         tokenOut: outputToken,
-    //         fee: 100,
-    //         recipient: address(this),
-    //         amountOut: amountOut,
-    //         amountInMaximum: amountInMaximum,
-    //         sqrtPriceLimitX96: 0
-    //     });
-
-    //     uint256 amountIn = swapRouter.exactOutputSingle(params);
-
-    //     console.log("swap from ", inputToken, " to ", outputToken);
-    // }
-
     function swapByParaswap(address asset, address tokenTransferProxy, address router, bytes memory _txParams) public {
         IERC20(asset).approve(tokenTransferProxy, type(uint256).max);
 
         (bool success, bytes memory returnData) = router.call(_txParams);
-        console.log("success:", success);
-        console.logBytes(returnData);
+
+        require(success, "Token swap failed");
     }
 }
