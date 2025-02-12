@@ -63,23 +63,17 @@ export async function deployContractFixture() {
     await protocolRegistry.setHandler(Protocols.MORPHO, morphoHandler.getAddress());
 
     const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
-    const debtSwap = await DebtSwap.deploy(UNISWAP_V3_FACTORY_ADRESS, UNISWAP_V3_SWAP_ROUTER_ADDRESS, {
+    const debtSwap = await DebtSwap.deploy(protocolRegistry.getAddress(), {
         maxFeePerGas: gasPrice * BigInt(5),
     });
     console.log("DebtSwap deployed to:", await debtSwap.getAddress());
-    await debtSwap.setRegistry(protocolRegistry.getAddress());
 
     const LeveragedPosition = await hre.ethers.getContractFactory("LeveragedPosition");
-    const leveragedPosition = await LeveragedPosition.deploy(
-        UNISWAP_V3_FACTORY_ADRESS,
-        UNISWAP_V3_SWAP_ROUTER_ADDRESS,
-        {
-            maxFeePerGas: gasPrice * BigInt(5),
-        },
-    );
+    const leveragedPosition = await LeveragedPosition.deploy(protocolRegistry.getAddress(), {
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
 
     console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
-    await leveragedPosition.setRegistry(protocolRegistry.getAddress());
 
     return {
         debtSwap,

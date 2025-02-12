@@ -28,6 +28,7 @@ import {
     WETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
     ETH_USDC_POOL,
+    TEST_FEE_BENEFICIARY_ADDRESS,
 } from "./constants";
 
 import { AaveV3Helper } from "./protocols/aaveV3";
@@ -36,7 +37,7 @@ import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id, morphoMarket4Id } from "
 import { MaxUint256 } from "ethers";
 import { zeroAddress } from "viem";
 
-describe("Protocol Switch(Paraswap)", function () {
+describe("Protocol Switch", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
 
@@ -182,6 +183,15 @@ describe("Protocol Switch(Paraswap)", function () {
 
         // simulate waiting for user's confirmation
         await time.increaseTo((await time.latest()) + 60);
+
+        // set protocol fee
+        const signers = await ethers.getSigners();
+        const contractByOwner = await ethers.getContractAt("DebtSwap", deployedContractAddress, signers[0]);
+        const setTx = await contractByOwner.setProtocolFee(10);
+        await setTx.wait();
+
+        const setFeeBeneficiaryTx = await contractByOwner.setFeeBeneficiary(TEST_FEE_BENEFICIARY_ADDRESS);
+        await setFeeBeneficiaryTx.wait();
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,

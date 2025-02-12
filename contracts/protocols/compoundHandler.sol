@@ -20,27 +20,14 @@ contract CompoundHandler is IProtocolHandler {
         address fromAsset,
         address toAsset,
         uint256 amount,
-        uint256 amountInMaximum,
-        uint256 totalFee,
+        uint256 amountTotal,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
     ) external override {
-        switchFrom(
-            fromAsset,
-            amount,
-            onBehalfOf,
-            collateralAssets,
-            fromExtraData
-        );
-        switchTo(
-            toAsset,
-            amountInMaximum + totalFee,
-            onBehalfOf,
-            collateralAssets,
-            toExtraData
-        );
+        switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
+        switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
 
     function switchFrom(
@@ -59,12 +46,7 @@ contract CompoundHandler is IProtocolHandler {
 
         // withdraw collateral
         for (uint256 i = 0; i < collateralAssets.length; i++) {
-            fromComet.withdrawFrom(
-                onBehalfOf,
-                address(this),
-                collateralAssets[i].asset,
-                collateralAssets[i].amount
-            );
+            fromComet.withdrawFrom(onBehalfOf, address(this), collateralAssets[i].asset, collateralAssets[i].amount);
         }
     }
 
@@ -79,53 +61,31 @@ contract CompoundHandler is IProtocolHandler {
 
         IComet toComet = IComet(cContract);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
-            IERC20(collateralAssets[i].asset).approve(
-                address(cContract),
-                collateralAssets[i].amount
-            );
+            IERC20(collateralAssets[i].asset).approve(address(cContract), collateralAssets[i].amount);
 
             // supply collateral
-            toComet.supplyTo(
-                onBehalfOf,
-                collateralAssets[i].asset,
-                collateralAssets[i].amount
-            );
+            toComet.supplyTo(onBehalfOf, collateralAssets[i].asset, collateralAssets[i].amount);
         }
 
         // borrow
         toComet.withdrawFrom(onBehalfOf, address(this), toAsset, amount);
     }
 
-    function supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        bytes calldata extraData
-    ) external override {
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
         address cContract = abi.decode(extraData, (address));
         IERC20(asset).approve(address(cContract), amount);
         // supply collateral
         IComet(cContract).supplyTo(onBehalfOf, asset, amount);
     }
 
-    function borrow(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        bytes calldata extraData
-    ) external override {
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
         address cContract = abi.decode(extraData, (address));
 
         IComet comet = IComet(cContract);
         comet.withdrawFrom(onBehalfOf, address(this), asset, amount);
     }
 
-    function repay(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        bytes calldata extraData
-    ) external override {
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
         address cContract = abi.decode(extraData, (address));
 
         IERC20(asset).approve(address(cContract), amount);

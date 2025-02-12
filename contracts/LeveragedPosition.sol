@@ -39,6 +39,7 @@ contract LeveragedPosition is Ownable {
         address onBehalfOf;
         uint16 swapFee;
         bytes extraData;
+        ParaswapParams paraswapParams;
     }
 
     event LeveragedPositionCreated(
@@ -50,12 +51,7 @@ contract LeveragedPosition is Ownable {
         address debtAsset
     );
 
-    constructor(address uniswap_v3_factory, address uniswap_v3_swap_router) {
-        uniswapV3Factory = uniswap_v3_factory;
-        swapRouter = ISwapRouter02(uniswap_v3_swap_router);
-    }
-
-    function setRegistry(address _registry) public onlyOwner {
+    constructor(address _registry) {
         protocolRegistry = ProtocolRegistry(_registry);
     }
 
@@ -69,7 +65,8 @@ contract LeveragedPosition is Ownable {
         uint256 _debtAmount,
         uint16 _allowedSlippage,
         uint16 _swapFee,
-        bytes calldata _extraData
+        bytes calldata _extraData,
+        ParaswapParams calldata _paraswapParams
     ) public {
         require(_collateralAsset != address(0), "Invalid collateral asset address");
         require(_debtAsset != address(0), "Invalid debt asset address");
@@ -102,7 +99,8 @@ contract LeveragedPosition is Ownable {
                 allowedSlippage: _allowedSlippage,
                 swapFee: _swapFee,
                 onBehalfOf: msg.sender,
-                extraData: _extraData
+                extraData: _extraData,
+                paraswapParams: _paraswapParams
             })
         );
 
@@ -137,12 +135,19 @@ contract LeveragedPosition is Ownable {
             )
         );
 
-        swapToken(
-            address(decoded.debtAsset),
-            address(decoded.collateralAsset),
-            flashloanBorrowAmount + totalFee,
-            amountInMax,
-            decoded.swapFee
+        // swapToken(
+        //     address(decoded.debtAsset),
+        //     address(decoded.collateralAsset),
+        //     flashloanBorrowAmount + totalFee,
+        //     amountInMax,
+        //     decoded.swapFee
+        // );
+
+        swapByParaswap(
+            decoded.collateralAsset,
+            decoded.paraswapParams.tokenTransferProxy,
+            decoded.paraswapParams.router,
+            decoded.paraswapParams.swapData
         );
 
         IERC20 token = IERC20(decoded.collateralAsset);
@@ -174,25 +179,11 @@ contract LeveragedPosition is Ownable {
         );
     }
 
-    function swapToken(
-        address inputToken,
-        address outputToken,
-        uint256 amountOut,
-        uint256 amountInMaximum,
-        uint16 swapFee
-    ) internal {
-        IERC20(inputToken).approve(address(swapRouter), amountInMaximum);
+    function swapByParaswap(address asset, address tokenTransferProxy, address router, bytes memory _txParams) public {
+        IERC20(asset).approve(tokenTransferProxy, type(uint256).max);
 
-        IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter.ExactOutputSingleParams({
-            tokenIn: inputToken,
-            tokenOut: outputToken,
-            fee: swapFee,
-            recipient: address(this),
-            amountOut: amountOut,
-            amountInMaximum: amountInMaximum,
-            sqrtPriceLimitX96: 0
-        });
+        (bool success, bytes memory returnData) = router.call(_txParams);
 
-        uint256 amountIn = swapRouter.exactOutputSingle(params);
+        require(success, "Token swap failed");
     }
 }

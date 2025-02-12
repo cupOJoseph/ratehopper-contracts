@@ -24,10 +24,7 @@ contract MorphoHandler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata fromExtraData
     ) public view returns (uint256) {
-        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(
-            fromExtraData,
-            (MarketParams, uint256)
-        );
+        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(fromExtraData, (MarketParams, uint256));
 
         Id marketId = marketParams.id();
 
@@ -46,27 +43,14 @@ contract MorphoHandler is IProtocolHandler {
         address fromAsset,
         address toAsset,
         uint256 amount,
-        uint256 amountInMaximum,
-        uint256 totalFee,
+        uint256 amountTotal,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
     ) external override {
-        switchFrom(
-            fromAsset,
-            amount,
-            onBehalfOf,
-            collateralAssets,
-            fromExtraData
-        );
-        switchTo(
-            toAsset,
-            amountInMaximum + totalFee,
-            onBehalfOf,
-            collateralAssets,
-            toExtraData
-        );
+        switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
+        switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
 
     function switchFrom(
@@ -76,21 +60,13 @@ contract MorphoHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) public override {
-        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(
-            extraData,
-            (MarketParams, uint256)
-        );
+        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(extraData, (MarketParams, uint256));
 
         IERC20(fromAsset).approve(address(morpho), type(uint256).max);
 
         morpho.repay(marketParams, 0, borrowShares, onBehalfOf, "");
 
-        morpho.withdrawCollateral(
-            marketParams,
-            collateralAssets[0].amount,
-            onBehalfOf,
-            address(this)
-        );
+        morpho.withdrawCollateral(marketParams, collateralAssets[0].amount, onBehalfOf, address(this));
     }
 
     function switchTo(
@@ -100,64 +76,29 @@ contract MorphoHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) public override {
-        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(
-            extraData,
-            (MarketParams, uint256)
-        );
+        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(extraData, (MarketParams, uint256));
 
-        IERC20(marketParams.collateralToken).approve(
-            address(morpho),
-            collateralAssets[0].amount
-        );
-        morpho.supplyCollateral(
-            marketParams,
-            collateralAssets[0].amount,
-            onBehalfOf,
-            ""
-        );
+        IERC20(marketParams.collateralToken).approve(address(morpho), collateralAssets[0].amount);
+        morpho.supplyCollateral(marketParams, collateralAssets[0].amount, onBehalfOf, "");
 
         morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
     }
 
-    function supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        bytes calldata extraData
-    ) external override {
-        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(
-            extraData,
-            (MarketParams, uint256)
-        );
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
+        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(extraData, (MarketParams, uint256));
 
         IERC20(asset).approve(address(morpho), amount);
         morpho.supplyCollateral(marketParams, amount, onBehalfOf, "");
     }
 
-    function borrow(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        bytes calldata extraData
-    ) external override {
-        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(
-            extraData,
-            (MarketParams, uint256)
-        );
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
+        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(extraData, (MarketParams, uint256));
 
         morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
     }
 
-    function repay(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        bytes calldata extraData
-    ) public {
-        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(
-            extraData,
-            (MarketParams, uint256)
-        );
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public {
+        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(extraData, (MarketParams, uint256));
 
         IERC20(asset).approve(address(morpho), amount);
         morpho.repay(marketParams, amount, 0, onBehalfOf, "");

@@ -40,7 +40,6 @@ contract AaveV3SafeHandler is IProtocolHandler {
         address toAsset,
         uint256 amount,
         uint256 amountInMax,
-        uint256 totalFee,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,

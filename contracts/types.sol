@@ -13,3 +13,9 @@ struct CollateralAsset {
     address asset;
     uint256 amount;
 }
+
+struct ParaswapParams {
+    address router;
+    address tokenTransferProxy;
+    bytes swapData;
+}

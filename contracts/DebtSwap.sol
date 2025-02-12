@@ -4,15 +4,7 @@ pragma solidity =0.8.27;
 import {IERC20} from "./dependencies/IERC20.sol";
 import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
 import {IFlashLoanSimpleReceiver} from "@aave/core-v3/contracts/flashloan/interfaces/IFlashLoanSimpleReceiver.sol";
-
-import {IDebtToken} from "./interfaces/aaveV3/IDebtToken.sol";
-import {IAaveProtocolDataProvider} from "./interfaces/aaveV3/IAaveProtocolDataProvider.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IMToken} from "./interfaces/moonwell/IMToken.sol";
-import {ISwapRouter02} from "./interfaces/uniswapV3/ISwapRouter02.sol";
-import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
-import {IComet} from "./interfaces/compound/IComet.sol";
-import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
 import {ProtocolRegistry} from "./ProtocolRegistry.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -23,9 +15,8 @@ import "hardhat/console.sol";
 contract DebtSwap is Ownable {
     using GPv2SafeERC20 for IERC20;
     ProtocolRegistry public protocolRegistry;
-
-    ISwapRouter02 public immutable swapRouter;
-    address public immutable uniswapV3Factory;
+    uint8 public protocolFee;
+    address public feeBeneficiary;
 
     struct FlashCallbackData {
         address flashloanPool;
@@ -42,12 +33,6 @@ contract DebtSwap is Ownable {
         ParaswapParams paraswapParams;
     }
 
-    struct ParaswapParams {
-        address router;
-        address tokenTransferProxy;
-        bytes swapData;
-    }
-
     event DebtSwapped(
         address indexed onBehalfOf,
         Protocol fromProtocol,
@@ -57,13 +42,16 @@ contract DebtSwap is Ownable {
         uint256 amount
     );
 
-    constructor(address _uniswap_v3_factory, address _uniswap_v3_swap_router) {
-        uniswapV3Factory = _uniswap_v3_factory;
-        swapRouter = ISwapRouter02(_uniswap_v3_swap_router);
+    constructor(address _registry) {
+        protocolRegistry = ProtocolRegistry(_registry);
     }
 
-    function setRegistry(address _registry) public onlyOwner {
-        protocolRegistry = ProtocolRegistry(_registry);
+    function setProtocolFee(uint8 _fee) public onlyOwner {
+        protocolFee = _fee;
+    }
+
+    function setFeeBeneficiary(address _feeBeneficiary) public onlyOwner {
+        feeBeneficiary = _feeBeneficiary;
     }
 
     function executeDebtSwap(
@@ -128,17 +116,13 @@ contract DebtSwap is Ownable {
         require(msg.sender == address(decoded.flashloanPool), "Caller is not flashloan pool");
 
         // suppose either of fee0 or fee1 is 0
-        uint totalFee = fee0 + fee1;
+        uint flashloanFee = fee0 + fee1;
 
-        uint8 fromDecimals = IERC20(decoded.fromAsset).decimals();
-        uint8 toDecimals = IERC20(decoded.toAsset).decimals();
-        uint8 decimalDiff = fromDecimals > toDecimals ? fromDecimals - toDecimals : toDecimals - fromDecimals;
+        uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
+        console.log("protocolFeeAmount:", protocolFeeAmount);
 
         uint256 amountInMax = decoded.srcAmount == 0 ? decoded.amount : decoded.srcAmount;
-
-        if (decimalDiff > 0) {
-            amountInMax = amountInMax * 10 ** decimalDiff;
-        }
+        uint256 amountTotal = amountInMax + flashloanFee + protocolFeeAmount;
 
         if (decoded.fromProtocol == decoded.toProtocol) {
             address handler = protocolRegistry.getHandler(decoded.fromProtocol);
@@ -150,8 +134,7 @@ contract DebtSwap is Ownable {
                         decoded.fromAsset,
                         decoded.toAsset,
                         decoded.amount,
-                        amountInMax,
-                        totalFee,
+                        amountTotal,
                         decoded.onBehalfOf,
                         decoded.collateralAssets,
                         decoded.fromExtraData,
@@ -178,13 +161,7 @@ contract DebtSwap is Ownable {
             toHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchTo,
-                    (
-                        decoded.toAsset,
-                        amountInMax + totalFee,
-                        decoded.onBehalfOf,
-                        decoded.collateralAssets,
-                        decoded.toExtraData
-                    )
+                    (decoded.toAsset, amountTotal, decoded.onBehalfOf, decoded.collateralAssets, decoded.toExtraData)
                 )
             );
         }
@@ -200,11 +177,14 @@ contract DebtSwap is Ownable {
 
         // repay flashloan
         IERC20 fromToken = IERC20(decoded.fromAsset);
-        fromToken.transfer(address(decoded.flashloanPool), decoded.amount + totalFee);
+        fromToken.transfer(address(decoded.flashloanPool), decoded.amount + flashloanFee);
+
+        if (protocolFee > 0) {
+            IERC20(decoded.toAsset).transfer(feeBeneficiary, protocolFeeAmount);
+        }
 
         // repay remaining amount
-        IERC20 toToken = IERC20(decoded.toAsset);
-        uint256 remainingBalance = toToken.balanceOf(address(this));
+        uint256 remainingBalance = IERC20(decoded.toAsset).balanceOf(address(this));
 
         if (remainingBalance > 0) {
             address handler = protocolRegistry.getHandler(decoded.toProtocol);
@@ -216,8 +196,6 @@ contract DebtSwap is Ownable {
                 )
             );
         }
-
-        uint256 remainingBalanceAfter = toToken.balanceOf(address(this));
 
         emit DebtSwapped(
             decoded.onBehalfOf,

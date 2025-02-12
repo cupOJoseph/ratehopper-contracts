@@ -6,8 +6,8 @@ import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 // import { DebtSwap,  MorphoHandler } from "../typechain-types";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { approve, deployContractFixture, formatAmount, getAmountInMax } from "./utils";
-import { Contract, MaxUint256 } from "ethers";
+import { approve, deployContractFixture, formatAmount, getAmountInMax, getParaswapData } from "./utils";
+import { Contract, MaxUint256, ZeroAddress } from "ethers";
 import {
     USDC_ADDRESS,
     USDbC_ADDRESS,
@@ -19,6 +19,7 @@ import {
     DEFAULT_SUPPLY_AMOUNT,
     eUSD_ADDRESS,
     MAI_ADDRESS,
+    TEST_FEE_BENEFICIARY_ADDRESS,
 } from "./constants";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
 import {
@@ -44,11 +45,7 @@ describe("Morpho DebtSwap", function () {
         const { debtSwap } = await loadFixture(deployContractFixture);
         deployedContractAddress = await debtSwap.getAddress();
 
-        myContract = await ethers.getContractAt(
-            "DebtSwap",
-            deployedContractAddress,
-            impersonatedSigner,
-        );
+        myContract = await ethers.getContractAt("DebtSwap", deployedContractAddress, impersonatedSigner);
     });
 
     async function executeDebtSwap(
@@ -65,11 +62,7 @@ describe("Morpho DebtSwap", function () {
         const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
         const usdcBalance = await usdcContract.balanceOf(TEST_ADDRESS);
 
-        const collateralToken = new ethers.Contract(
-            collateralTokenAddress,
-            ERC20_ABI,
-            impersonatedSigner,
-        );
+        const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, impersonatedSigner);
         const collateralBalance = await collateralToken.balanceOf(TEST_ADDRESS);
         const collateralAmount = await morphoHelper.getCollateralAmount(fromMarketId);
 
@@ -85,6 +78,35 @@ describe("Morpho DebtSwap", function () {
         const fromExtraData = await morphoHelper.encodeExtraData(fromMarketId, borrowShares);
         const toExtraData = await morphoHelper.encodeExtraData(toMarketId, borrowShares);
 
+        let srcAmount = BigInt(0);
+        let paraswapData = {
+            router: ZeroAddress,
+            tokenTransferProxy: ZeroAddress,
+            swapData: "0x",
+        };
+
+        const srcDecimals = toMarketId === morphoMarket3Id ? 18 : 6;
+
+        [srcAmount, paraswapData] = await getParaswapData(
+            fromTokenAddress,
+            toTokenAddress,
+            deployedContractAddress,
+            beforeFromTokenDebt,
+            srcDecimals,
+        );
+
+        // add 0.3% slippage(must be set by user)
+        const amountPlusSlippage = (BigInt(srcAmount) * 1003n) / 1000n;
+
+        // set protocol fee
+        const signers = await ethers.getSigners();
+        const contractByOwner = await ethers.getContractAt("DebtSwap", deployedContractAddress, signers[0]);
+        const setTx = await contractByOwner.setProtocolFee(10);
+        await setTx.wait();
+
+        const setFeeBeneficiaryTx = await contractByOwner.setFeeBeneficiary(TEST_FEE_BENEFICIARY_ADDRESS);
+        await setFeeBeneficiaryTx.wait();
+
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
             Protocols.MORPHO,
@@ -92,10 +114,11 @@ describe("Morpho DebtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             MaxUint256,
-            2000,
+            amountPlusSlippage,
             [{ asset: collateralTokenAddress, amount: collateralAmount }],
             fromExtraData,
             toExtraData,
+            paraswapData,
         );
         await tx.wait();
 

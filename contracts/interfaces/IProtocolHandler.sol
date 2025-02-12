@@ -4,18 +4,13 @@ pragma solidity =0.8.27;
 import "../Types.sol";
 
 interface IProtocolHandler {
-    function getDebtAmount(
-        address asset,
-        address onBehalfOf,
-        bytes calldata extraData
-    ) external view returns (uint256);
+    function getDebtAmount(address asset, address onBehalfOf, bytes calldata extraData) external view returns (uint256);
 
     function switchIn(
         address fromAsset,
         address toAsset,
         uint256 amount,
-        uint256 amountInMaximum,
-        uint256 totalFee,
+        uint256 amountTotal,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
@@ -38,24 +33,9 @@ interface IProtocolHandler {
         bytes calldata extraData
     ) external;
 
-    function supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        bytes calldata extraData
-    ) external;
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external;
 
-    function borrow(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        bytes calldata extraData
-    ) external;
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external;
 
-    function repay(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        bytes calldata extraData
-    ) external;
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external;
 }

@@ -35,7 +35,6 @@ contract MoonwellHandler is IProtocolHandler {
         address toAsset,
         uint256 amount,
         uint256 amountInMaximum,
-        uint256 totalFee,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
@@ -47,7 +46,7 @@ contract MoonwellHandler is IProtocolHandler {
 
         IMToken(fromContract).repayBorrowBehalf(onBehalfOf, amount);
 
-        uint borrowAmount = amountInMaximum + totalFee;
+        uint borrowAmount = amountInMaximum;
 
         bytes memory borrowData = abi.encodeCall(IMToken.borrow, (borrowAmount));
         bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(

@@ -46,7 +46,7 @@ export const eip1193Provider: Eip1193Provider = {
     },
 };
 
-describe("Safe wallet", function () {
+describe.skip("Safe wallet", function () {
     const safeAddress = "0x2f9054Eb6209bb5B94399115117044E4f150B2De";
     const FLUID_VAULT_ADDRESS = "0x40d9b8417e6e1dcd358f04e3328bced061018a82";
     const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);

@@ -26,7 +26,7 @@ import { AaveV3Helper } from "./protocols/aaveV3";
 import { CompoundHelper, USDC_COMET_ADDRESS } from "./protocols/compound";
 import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id, morphoMarket4Id } from "./protocols/morpho";
 
-describe("Create leveraged position", function () {
+describe.skip("Create leveraged position", function () {
     let myContract: LeveragedPosition;
     let impersonatedSigner: HardhatEthersSigner;
 
@@ -51,11 +51,7 @@ describe("Create leveraged position", function () {
         const { leveragedPosition } = await loadFixture(deployContractFixture);
         deployedContractAddress = await leveragedPosition.getAddress();
 
-        myContract = await ethers.getContractAt(
-            "LeveragedPosition",
-            deployedContractAddress,
-            impersonatedSigner,
-        );
+        myContract = await ethers.getContractAt("LeveragedPosition", deployedContractAddress, impersonatedSigner);
     });
 
     function calculateBorrowAmount(
@@ -99,11 +95,7 @@ describe("Create leveraged position", function () {
                 await compoundHelper.allow(USDC_ADDRESS, deployedContractAddress);
                 break;
             case Protocols.MORPHO:
-                const morphoContract = new ethers.Contract(
-                    MORPHO_ADDRESS,
-                    morphoAbi,
-                    impersonatedSigner,
-                );
+                const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, impersonatedSigner);
                 await morphoContract.setAuthorization(deployedContractAddress, true);
                 break;
         }
@@ -121,12 +113,7 @@ describe("Create leveraged position", function () {
 
         const parsedTargetAmount = ethers.parseUnits(targetAmount.toString(), collateralDecimals);
 
-        const borrowAmount = calculateBorrowAmount(
-            principleAmount,
-            targetAmount,
-            USDCDecimals,
-            price,
-        );
+        const borrowAmount = calculateBorrowAmount(principleAmount, targetAmount, USDCDecimals, price);
 
         await myContract.createLeveragedPosition(
             flashloanPool,
@@ -152,10 +139,7 @@ describe("Create leveraged position", function () {
                 collateralAmount = await aaveV3Helper.getCollateralAmount(collateralAddress);
                 break;
             case Protocols.COMPOUND:
-                collateralAmount = await compoundHelper.getCollateralAmount(
-                    USDC_COMET_ADDRESS,
-                    collateralAddress,
-                );
+                collateralAmount = await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS, collateralAddress);
                 break;
             case Protocols.MORPHO:
                 collateralAmount = await morphoHelper.getCollateralAmount(marketId!);

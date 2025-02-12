@@ -130,6 +130,8 @@ contract SafeModule {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
+        // TODO: add protocolFee
+
         uint8 fromDecimals = IERC20(decoded.fromAsset).decimals();
         uint8 toDecimals = IERC20(decoded.toAsset).decimals();
         uint8 decimalDiff = fromDecimals > toDecimals ? fromDecimals - toDecimals : toDecimals - fromDecimals;
@@ -151,8 +153,7 @@ contract SafeModule {
                         decoded.fromAsset,
                         decoded.toAsset,
                         decoded.amount,
-                        amountInMax,
-                        totalFee,
+                        amountInMax + totalFee,
                         address(decoded.safe),
                         decoded.collateralAssets,
                         decoded.fromExtraData,

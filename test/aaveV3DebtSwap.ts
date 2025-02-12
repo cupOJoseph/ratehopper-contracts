@@ -20,10 +20,11 @@ import {
     cbETH_ADDRESS,
     WETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
+    TEST_FEE_BENEFICIARY_ADDRESS,
 } from "./constants";
 import { AaveV3Helper } from "./protocols/aaveV3";
 
-describe.only("Aave DebtSwap", function () {
+describe("Aave DebtSwap", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
     let aaveV3Pool: Contract;
@@ -83,6 +84,15 @@ describe.only("Aave DebtSwap", function () {
         // add 0.3% slippage(must be set by user)
         const amountPlusSlippage = (BigInt(srcAmount) * 1003n) / 1000n;
 
+        // set protocol fee
+        const signers = await ethers.getSigners();
+        const contractByOwner = await ethers.getContractAt("DebtSwap", deployedContractAddress, signers[0]);
+        const setTx = await contractByOwner.setProtocolFee(10);
+        await setTx.wait();
+
+        const setFeeBeneficiaryTx = await contractByOwner.setFeeBeneficiary(TEST_FEE_BENEFICIARY_ADDRESS);
+        await setFeeBeneficiaryTx.wait();
+
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
             Protocols.AAVE_V3,
@@ -121,6 +131,18 @@ describe.only("Aave DebtSwap", function () {
         expect(collateralBalanceAfter).to.be.equal(collateralBalance);
         expect(afterFromTokenDebt).to.be.lessThan(beforeFromTokenDebt);
         expect(afterToTokenDebt).to.be.greaterThanOrEqual(beforeToTokenDebt);
+
+        const usdbcContract = new ethers.Contract(USDbC_ADDRESS, ERC20_ABI, impersonatedSigner);
+        const usdbcBalance = await usdbcContract.balanceOf("0x1e88f23864a8FE784eB152967AccDb394D3b88AD");
+        console.log("USDbC fee Balance:", formatAmount(usdbcBalance));
+
+        const fromToken = new ethers.Contract(fromTokenAddress, ERC20_ABI, impersonatedSigner);
+        const fromRemainingBalance = await fromToken.balanceOf(deployedContractAddress);
+        console.log("fromRemainingBalance: ", fromRemainingBalance);
+
+        const toToken = new ethers.Contract(toTokenAddress, ERC20_ABI, impersonatedSigner);
+        const toRemainingBalance = await toToken.balanceOf(deployedContractAddress);
+        console.log("toRemainingBalance: ", toRemainingBalance);
     }
 
     it("should return debt token address", async function () {
