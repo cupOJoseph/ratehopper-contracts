@@ -47,6 +47,7 @@ contract CompoundHandler is IProtocolHandler {
 
         // withdraw collateral
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(collateralAssets[i].amount > 0, "Invalid collateral amount");
             fromComet.withdrawFrom(onBehalfOf, address(this), collateralAssets[i].asset, collateralAssets[i].amount);
         }
     }

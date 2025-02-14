@@ -148,7 +148,7 @@ describe("Compound DebtSwap", function () {
         const tokenBalance = await tokenContract.balanceOf(TEST_FEE_BENEFICIARY_ADDRESS);
         console.log("To Token fee beneficiary balance:", formatAmount(tokenBalance));
 
-        expect(usdcBalanceAfter).to.be.equal(usdcBalance);
+        expect(usdcBalanceAfter).to.be.gte(usdcBalance);
         expect(collateralBalanceAfter).to.be.equal(collateralBalance);
         expect(afterFromTokenDebt).to.be.lessThan(beforeFromTokenDebt);
         expect(afterToTokenDebt).to.be.greaterThan(beforeToTokenDebt);

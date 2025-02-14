@@ -152,7 +152,7 @@ contract LeveragedPosition is Ownable {
 
         IERC20 token = IERC20(decoded.collateralAsset);
 
-        token.transfer(address(decoded.flashloanPool), flashloanBorrowAmount + totalFee);
+        token.safeTransfer(address(decoded.flashloanPool), flashloanBorrowAmount + totalFee);
 
         // repay remaining amount
         IERC20 debtToken = IERC20(decoded.debtAsset);

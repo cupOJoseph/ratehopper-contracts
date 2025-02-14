@@ -6,17 +6,15 @@ import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
 import {IFlashLoanSimpleReceiver} from "@aave/core-v3/contracts/flashloan/interfaces/IFlashLoanSimpleReceiver.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
-import {ProtocolRegistry} from "./ProtocolRegistry.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Types.sol";
 
-import "hardhat/console.sol";
-
-contract DebtSwap is Ownable {
+contract DebtSwap is Ownable, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
-    ProtocolRegistry public protocolRegistry;
     uint8 public protocolFee;
     address public feeBeneficiary;
+    mapping(Protocol => address) public protocolHandlers;
 
     struct FlashCallbackData {
         address flashloanPool;
@@ -42,16 +40,27 @@ contract DebtSwap is Ownable {
         uint256 amount
     );
 
-    constructor(address _registry) {
-        protocolRegistry = ProtocolRegistry(_registry);
+    constructor(Protocol[] memory protocols, address[] memory handlers) {
+        require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
+
+        for (uint256 i = 0; i < protocols.length; i++) {
+            require(handlers[i] != address(0), "Invalid handler address");
+            protocolHandlers[protocols[i]] = handlers[i];
+        }
     }
 
     function setProtocolFee(uint8 _fee) public onlyOwner {
+        require(_fee <= 100, "_fee cannot be greater than 1%");
         protocolFee = _fee;
     }
 
     function setFeeBeneficiary(address _feeBeneficiary) public onlyOwner {
+        require(_feeBeneficiary != address(0), "_feeBeneficiary cannot be zero address");
         feeBeneficiary = _feeBeneficiary;
+    }
+
+    function getHandler(Protocol protocol) public view returns (address) {
+        return protocolHandlers[protocol];
     }
 
     function executeDebtSwap(
@@ -66,24 +75,24 @@ contract DebtSwap is Ownable {
         bytes calldata _fromExtraData,
         bytes calldata _toExtraData,
         ParaswapParams calldata _paraswapParams
-    ) public {
-        require(_fromDebtAsset != address(0), "Invalid from asset address");
-        require(_toDebtAsset != address(0), "Invalid to asset address");
+    ) public nonReentrant {
+        require(_fromDebtAsset != address(0), "_fromDebtAsset cannot be zero address");
+        require(_toDebtAsset != address(0), "_toDebtAsset cannot be zero address");
+        require(_amount > 0, "_amount cannot be zero");
 
         IUniswapV3Pool pool = IUniswapV3Pool(_flashloanPool);
-        uint256 debtAmount = _amount;
-
-        if (_amount == type(uint256).max) {
-            address handler = protocolRegistry.getHandler(_fromProtocol);
-
-            debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, msg.sender, _fromExtraData);
-        }
-
         address token0;
         try pool.token0() returns (address result) {
             token0 = result;
         } catch {
             revert("Invalid flashloan pool address");
+        }
+
+        uint256 debtAmount = _amount;
+        if (_amount == type(uint256).max) {
+            address handler = getHandler(_fromProtocol);
+
+            debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, msg.sender, _fromExtraData);
         }
 
         uint256 amount0 = _fromDebtAsset == token0 ? debtAmount : 0;
@@ -119,15 +128,14 @@ contract DebtSwap is Ownable {
         uint flashloanFee = fee0 + fee1;
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
-        console.log("protocolFeeAmount:", protocolFeeAmount);
 
         uint256 amountInMax = decoded.srcAmount == 0 ? decoded.amount : decoded.srcAmount;
         uint256 amountTotal = amountInMax + flashloanFee + protocolFeeAmount;
 
         if (decoded.fromProtocol == decoded.toProtocol) {
-            address handler = protocolRegistry.getHandler(decoded.fromProtocol);
+            address handler = getHandler(decoded.fromProtocol);
 
-            handler.delegatecall(
+            (bool success, ) = handler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchIn,
                     (
@@ -142,9 +150,10 @@ contract DebtSwap is Ownable {
                     )
                 )
             );
+            require(success, "protocol switchIn failed");
         } else {
-            address fromHandler = protocolRegistry.getHandler(decoded.fromProtocol);
-            fromHandler.delegatecall(
+            address fromHandler = getHandler(decoded.fromProtocol);
+            (bool successFrom, ) = fromHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchFrom,
                     (
@@ -156,19 +165,22 @@ contract DebtSwap is Ownable {
                     )
                 )
             );
+            require(successFrom, "protocol switchFrom failed");
 
-            address toHandler = protocolRegistry.getHandler(decoded.toProtocol);
-            toHandler.delegatecall(
+            address toHandler = getHandler(decoded.toProtocol);
+            (bool successTo, ) = toHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchTo,
                     (decoded.toAsset, amountTotal, decoded.onBehalfOf, decoded.collateralAssets, decoded.toExtraData)
                 )
             );
+            require(successTo, "protocol switchTo failed");
         }
 
         if (decoded.fromAsset != decoded.toAsset) {
             swapByParaswap(
                 decoded.toAsset,
+                amountTotal,
                 decoded.paraswapParams.tokenTransferProxy,
                 decoded.paraswapParams.router,
                 decoded.paraswapParams.swapData
@@ -177,24 +189,31 @@ contract DebtSwap is Ownable {
 
         // repay flashloan
         IERC20 fromToken = IERC20(decoded.fromAsset);
-        fromToken.transfer(address(decoded.flashloanPool), decoded.amount + flashloanFee);
+        fromToken.safeTransfer(address(decoded.flashloanPool), decoded.amount + flashloanFee);
 
         if (protocolFee > 0) {
-            IERC20(decoded.toAsset).transfer(feeBeneficiary, protocolFeeAmount);
+            IERC20(decoded.toAsset).safeTransfer(feeBeneficiary, protocolFeeAmount);
         }
 
         // repay remaining amount
         uint256 remainingBalance = IERC20(decoded.toAsset).balanceOf(address(this));
 
         if (remainingBalance > 0) {
-            address handler = protocolRegistry.getHandler(decoded.toProtocol);
+            address handler = getHandler(decoded.toProtocol);
 
-            handler.delegatecall(
+            (bool success, ) = handler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.repay,
                     (decoded.toAsset, remainingBalance, decoded.onBehalfOf, decoded.toExtraData)
                 )
             );
+            require(success, "Repay remainingBalance failed");
+        }
+
+        // send dust amount back to user if it exists
+        uint256 fromTokenRemainingBalance = IERC20(decoded.fromAsset).balanceOf(address(this));
+        if (fromTokenRemainingBalance > 0) {
+            IERC20(decoded.fromAsset).safeTransfer(decoded.onBehalfOf, fromTokenRemainingBalance);
         }
 
         emit DebtSwapped(
@@ -209,14 +228,17 @@ contract DebtSwap is Ownable {
 
     function swapByParaswap(
         address asset,
+        uint256 amount,
         address tokenTransferProxy,
         address router,
         bytes memory _txParams
     ) internal {
-        IERC20(asset).approve(tokenTransferProxy, type(uint256).max);
+        IERC20(asset).approve(tokenTransferProxy, amount);
+        (bool success, ) = router.call(_txParams);
+        require(success, "Token swap by paraSwap failed");
+    }
 
-        (bool success, bytes memory returnData) = router.call(_txParams);
-
-        require(success, "Token swap failed");
+    function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
+        IERC20(token).safeTransfer(owner(), amount);
     }
 }

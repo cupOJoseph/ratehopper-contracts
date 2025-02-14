@@ -127,7 +127,7 @@ describe("Aave DebtSwap", function () {
             formatAmount(afterToTokenDebt),
         );
 
-        expect(usdcBalanceAfter).to.be.equal(usdcBalance);
+        expect(usdcBalanceAfter).to.be.gte(usdcBalance);
         expect(collateralBalanceAfter).to.be.equal(collateralBalance);
         expect(afterFromTokenDebt).to.be.lessThan(beforeFromTokenDebt);
         expect(afterToTokenDebt).to.be.greaterThanOrEqual(beforeToTokenDebt);

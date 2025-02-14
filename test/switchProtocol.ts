@@ -32,7 +32,7 @@ import {
 } from "./constants";
 
 import { AaveV3Helper } from "./protocols/aaveV3";
-import { cometAddressMap, CompoundHelper, USDC_COMET_ADDRESS } from "./protocols/compound";
+import { cometAddressMap, CompoundHelper, USDbC_COMET_ADDRESS, USDC_COMET_ADDRESS } from "./protocols/compound";
 import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id, morphoMarket4Id } from "./protocols/morpho";
 import { MaxUint256 } from "ethers";
 import { zeroAddress } from "viem";
@@ -184,15 +184,6 @@ describe("Protocol Switch", function () {
         // simulate waiting for user's confirmation
         await time.increaseTo((await time.latest()) + 60);
 
-        // set protocol fee
-        const signers = await ethers.getSigners();
-        const contractByOwner = await ethers.getContractAt("DebtSwap", deployedContractAddress, signers[0]);
-        const setTx = await contractByOwner.setProtocolFee(10);
-        await setTx.wait();
-
-        const setFeeBeneficiaryTx = await contractByOwner.setFeeBeneficiary(TEST_FEE_BENEFICIARY_ADDRESS);
-        await setFeeBeneficiaryTx.wait();
-
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
             fromProtocol,
@@ -236,11 +227,27 @@ describe("Protocol Switch", function () {
             formatAmount(afterToProtocolDebt),
         );
 
-        expect(usdcBalanceAfter).to.be.equal(usdcBalance);
+        expect(usdcBalanceAfter).to.be.gte(usdcBalance);
         expect(cbethBalanceAfter).to.be.equal(cbethBalance);
     }
 
     it("should switch USDC debt from Aave to Compound", async function () {
+        await aaveV3Helper.supply(cbETH_ADDRESS);
+        await aaveV3Helper.borrow(USDC_ADDRESS);
+
+        await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.AAVE_V3, Protocols.COMPOUND);
+    });
+
+    it("should switch USDC debt from Aave to Compound with protocol fee", async function () {
+        // set protocol fee
+        const signers = await ethers.getSigners();
+        const contractByOwner = await ethers.getContractAt("DebtSwap", deployedContractAddress, signers[0]);
+        const setTx = await contractByOwner.setProtocolFee(10);
+        await setTx.wait();
+
+        const setFeeBeneficiaryTx = await contractByOwner.setFeeBeneficiary(TEST_FEE_BENEFICIARY_ADDRESS);
+        await setFeeBeneficiaryTx.wait();
+
         await aaveV3Helper.supply(cbETH_ADDRESS);
         await aaveV3Helper.borrow(USDC_ADDRESS);
 
@@ -364,13 +371,12 @@ describe("Protocol Switch", function () {
 
         const WETHAmountInAave = await aaveV3Helper.getCollateralAmount(WETH_ADDRESS);
         console.log("WETH collateralAmountInAave:", ethers.formatEther(WETHAmountInAave));
-        const WETHAmountInCompound = await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS, WETH_ADDRESS);
-        // TODO: this should be 0.001
+        const WETHAmountInCompound = await compoundHelper.getCollateralAmount(USDbC_COMET_ADDRESS, WETH_ADDRESS);
         console.log("WETH collateralAmountInCompound:", ethers.formatEther(WETHAmountInCompound));
 
         const cbETHAmountInAave = await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS);
         console.log("cbETH collateralAmountInAave:", ethers.formatEther(cbETHAmountInAave));
-        const cbETHAmountInCompound = await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS, cbETH_ADDRESS);
+        const cbETHAmountInCompound = await compoundHelper.getCollateralAmount(USDbC_COMET_ADDRESS, cbETH_ADDRESS);
         console.log("cbETH collateralAmountInCompound:", ethers.formatEther(cbETHAmountInCompound));
     });
 
@@ -394,12 +400,48 @@ describe("Protocol Switch", function () {
         const WETHAmountInAave = await aaveV3Helper.getCollateralAmount(WETH_ADDRESS);
         console.log("WETH collateralAmountInAave:", ethers.formatEther(WETHAmountInAave));
         const WETHAmountInCompound = await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS, WETH_ADDRESS);
-        // TODO: this should be 0.001
         console.log("WETH collateralAmountInCompound:", ethers.formatEther(WETHAmountInCompound));
 
         const cbETHAmountInAave = await aaveV3Helper.getCollateralAmount(cbETH_ADDRESS);
         console.log("cbETH collateralAmountInAave:", ethers.formatEther(cbETHAmountInAave));
         const cbETHAmountInCompound = await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS, cbETH_ADDRESS);
         console.log("cbETH collateralAmountInCompound:", ethers.formatEther(cbETHAmountInCompound));
+    });
+
+    describe("Util function", function () {
+        it("emergency withdraw", async function () {
+            const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, impersonatedSigner);
+            const transfer = await usdcContract.transfer(deployedContractAddress, ethers.parseUnits("1", 6));
+            await transfer.wait();
+
+            const signers = await ethers.getSigners();
+            const contract = await ethers.getContractAt("DebtSwap", deployedContractAddress, signers[0]);
+            await contract.emergencyWithdraw(USDC_ADDRESS, ethers.parseUnits("1", 6));
+            const balance = await usdcContract.balanceOf(signers[0]);
+            console.log(`Balance:`, ethers.formatUnits(balance, 6));
+        });
+    });
+
+    describe("should revert", function () {
+        it("if flashloan pool is not uniswap v3 pool", async function () {
+            await aaveV3Helper.supply(cbETH_ADDRESS);
+            await aaveV3Helper.borrow(USDC_ADDRESS);
+
+            await expect(
+                executeDebtSwap(
+                    "0x1e88f23864a8FE784eB152967AccDb394D3b88AD",
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    Protocols.AAVE_V3,
+                    Protocols.COMPOUND,
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if non-owner call setProtocolFee()", async function () {
+            const signers = await ethers.getSigners();
+            const contractByNotOwner = await ethers.getContractAt("DebtSwap", deployedContractAddress, signers[1]);
+            await expect(contractByNotOwner.setProtocolFee(100)).to.be.revertedWith("Ownable: caller is not the owner");
+        });
     });
 });

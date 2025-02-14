@@ -53,31 +53,35 @@ export async function deployContractFixture() {
     // const FluidHandler = await hre.ethers.getContractFactory("FluidHandler");
     // const fluidHandler = await FluidHandler.deploy();
 
-    const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
-    const protocolRegistry = await ProtocolRegistry.deploy({
-        maxFeePerGas: gasPrice * BigInt(5),
-    });
-
-    await protocolRegistry.setHandler(Protocols.AAVE_V3, aaveV3Handler.getAddress());
-    await protocolRegistry.setHandler(Protocols.COMPOUND, compoundHandler.getAddress());
-    await protocolRegistry.setHandler(Protocols.MORPHO, morphoHandler.getAddress());
+    // const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
+    // const protocolRegistry = await ProtocolRegistry.deploy(
+    //     [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO],
+    //     [aaveV3Handler.getAddress(), compoundHandler.getAddress(), morphoHandler.getAddress()],
+    //     {
+    //         maxFeePerGas: gasPrice * BigInt(5),
+    //     },
+    // );
 
     const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
-    const debtSwap = await DebtSwap.deploy(protocolRegistry.getAddress(), {
-        maxFeePerGas: gasPrice * BigInt(5),
-    });
+    const debtSwap = await DebtSwap.deploy(
+        [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO],
+        [aaveV3Handler.getAddress(), compoundHandler.getAddress(), morphoHandler.getAddress()],
+        {
+            maxFeePerGas: gasPrice * BigInt(5),
+        },
+    );
     console.log("DebtSwap deployed to:", await debtSwap.getAddress());
 
-    const LeveragedPosition = await hre.ethers.getContractFactory("LeveragedPosition");
-    const leveragedPosition = await LeveragedPosition.deploy(protocolRegistry.getAddress(), {
-        maxFeePerGas: gasPrice * BigInt(5),
-    });
+    // const LeveragedPosition = await hre.ethers.getContractFactory("LeveragedPosition");
+    // const leveragedPosition = await LeveragedPosition.deploy(protocolRegistry.getAddress(), {
+    //     maxFeePerGas: gasPrice * BigInt(5),
+    // });
 
-    console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
+    // console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
 
     return {
         debtSwap,
-        leveragedPosition,
+        // leveragedPosition,
     };
 }
 

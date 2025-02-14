@@ -53,6 +53,8 @@ contract AaveV3Handler is IProtocolHandler {
         repay(address(fromAsset), amount, onBehalfOf, extraData);
 
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(collateralAssets[i].amount > 0, "Invalid collateral amount");
+
             DataTypes.ReserveData memory reserveData = aaveV3Pool.getReserveData(collateralAssets[i].asset);
 
             IERC20(reserveData.aTokenAddress).safeTransferFrom(onBehalfOf, address(this), collateralAssets[i].amount);

@@ -26,7 +26,7 @@ async function main() {
     // await protocolRegistry.setHandler(Protocols.AAVE_V3, await aaveV3Handler.getAddress());
     // await protocolRegistry.setHandler(Protocols.COMPOUND, await compoundHandler.getAddress());
     // await protocolRegistry.setHandler(Protocols.MORPHO, await morphoHandler.getAddress());
-    await debtSwap.setRegistry("0x6BFDA05cD4438dF03dC3388c0CfD7EFD27Bc665C");
+    // await debtSwap.setRegistry("0x6BFDA05cD4438dF03dC3388c0CfD7EFD27Bc665C");
 }
 
 main().catch(console.error);
