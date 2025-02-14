@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 /// @notice common Fluid vaults interface, some methods only available for vaults > T1 (type, simulateLiquidate, rebalance is different)
 interface IFluidVault {

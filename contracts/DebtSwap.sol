@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.27;
+pragma solidity =0.8.28;
 
 import {IERC20} from "./dependencies/IERC20.sol";
 import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
@@ -207,7 +207,12 @@ contract DebtSwap is Ownable {
         );
     }
 
-    function swapByParaswap(address asset, address tokenTransferProxy, address router, bytes memory _txParams) public {
+    function swapByParaswap(
+        address asset,
+        address tokenTransferProxy,
+        address router,
+        bytes memory _txParams
+    ) internal {
         IERC20(asset).approve(tokenTransferProxy, type(uint256).max);
 
         (bool success, bytes memory returnData) = router.call(_txParams);
