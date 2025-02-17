@@ -6,7 +6,7 @@ import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { LeveragedPosition } from "../typechain-types";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
-import { approve, deployContractFixture, formatAmount, protocolHelperMap } from "./utils";
+import { approve, deployContractFixture, formatAmount, getParaswapData, protocolHelperMap } from "./utils";
 
 import {
     USDC_ADDRESS,
@@ -113,7 +113,21 @@ describe.skip("Create leveraged position", function () {
 
         const parsedTargetAmount = ethers.parseUnits(targetAmount.toString(), collateralDecimals);
 
+        const diffAmount = parsedTargetAmount - BigInt(principleAmount);
+
         const borrowAmount = calculateBorrowAmount(principleAmount, targetAmount, USDCDecimals, price);
+
+        const [srcAmount, paraswapData] = await getParaswapData(
+            collateralAddress,
+            USDC_ADDRESS,
+            deployedContractAddress,
+            diffAmount,
+            USDCDecimals,
+            collateralDecimals,
+        );
+
+        // add 0.3% slippage(must be set by user)
+        const amountPlusSlippage = (BigInt(srcAmount) * 1003n) / 1000n;
 
         await myContract.createLeveragedPosition(
             flashloanPool,
@@ -123,9 +137,9 @@ describe.skip("Create leveraged position", function () {
             parsedTargetAmount,
             USDC_ADDRESS,
             borrowAmount,
-            slipage,
-            3000,
+            amountPlusSlippage,
             extraData,
+            paraswapData,
         );
 
         const debtAmountParameter = protocol === Protocols.MORPHO ? marketId! : USDC_ADDRESS;

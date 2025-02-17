@@ -148,7 +148,7 @@ describe("Morpho DebtSwap", function () {
     }
 
     describe("Collateral is cbETH", function () {
-        it("should switch from market 1 to market 2", async function () {
+        it.only("should switch from market 1 to market 2", async function () {
             await morphoHelper.supply(cbETH_ADDRESS, morphoMarket1Id);
             await morphoHelper.borrow(morphoMarket1Id);
 

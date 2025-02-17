@@ -72,16 +72,20 @@ export async function deployContractFixture() {
     );
     console.log("DebtSwap deployed to:", await debtSwap.getAddress());
 
-    // const LeveragedPosition = await hre.ethers.getContractFactory("LeveragedPosition");
-    // const leveragedPosition = await LeveragedPosition.deploy(protocolRegistry.getAddress(), {
-    //     maxFeePerGas: gasPrice * BigInt(5),
-    // });
+    const LeveragedPosition = await hre.ethers.getContractFactory("LeveragedPosition");
+    const leveragedPosition = await LeveragedPosition.deploy(
+        [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO],
+        [aaveV3Handler.getAddress(), compoundHandler.getAddress(), morphoHandler.getAddress()],
+        {
+            maxFeePerGas: gasPrice * BigInt(5),
+        },
+    );
 
-    // console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
+    console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
 
     return {
         debtSwap,
-        // leveragedPosition,
+        leveragedPosition,
     };
 }
 

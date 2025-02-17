@@ -3,29 +3,19 @@ pragma solidity =0.8.28;
 
 import {IERC20} from "./dependencies/IERC20.sol";
 import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
-import {IFlashLoanSimpleReceiver} from "@aave/core-v3/contracts/flashloan/interfaces/IFlashLoanSimpleReceiver.sol";
-
-import {IDebtToken} from "./interfaces/aaveV3/IDebtToken.sol";
-import {IAaveProtocolDataProvider} from "./interfaces/aaveV3/IAaveProtocolDataProvider.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IMToken} from "./interfaces/moonwell/IMToken.sol";
-import {ISwapRouter02} from "./interfaces/uniswapV3/ISwapRouter02.sol";
-import {IV3SwapRouter} from "./interfaces/uniswapV3/IV3SwapRouter.sol";
-import {IComet} from "./interfaces/compound/IComet.sol";
-import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
-import {ProtocolRegistry} from "./ProtocolRegistry.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Types.sol";
 
 import "hardhat/console.sol";
 
-contract LeveragedPosition is Ownable {
+contract LeveragedPosition is Ownable, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
-    ProtocolRegistry private protocolRegistry;
-
-    ISwapRouter02 public immutable swapRouter;
-    address public immutable uniswapV3Factory;
+    uint8 public protocolFee;
+    address public feeBeneficiary;
+    mapping(Protocol => address) public protocolHandlers;
 
     struct FlashCallbackData {
         address flashloanPool;
@@ -35,9 +25,8 @@ contract LeveragedPosition is Ownable {
         uint256 principleCollateralAmount;
         uint256 targetCollateralAmount;
         uint256 debtAmount;
-        uint16 allowedSlippage;
+        uint256 srcAmount;
         address onBehalfOf;
-        uint16 swapFee;
         bytes extraData;
         ParaswapParams paraswapParams;
     }
@@ -51,8 +40,27 @@ contract LeveragedPosition is Ownable {
         address debtAsset
     );
 
-    constructor(address _registry) {
-        protocolRegistry = ProtocolRegistry(_registry);
+    constructor(Protocol[] memory protocols, address[] memory handlers) {
+        require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
+
+        for (uint256 i = 0; i < protocols.length; i++) {
+            require(handlers[i] != address(0), "Invalid handler address");
+            protocolHandlers[protocols[i]] = handlers[i];
+        }
+    }
+
+    function setProtocolFee(uint8 _fee) public onlyOwner {
+        require(_fee <= 100, "_fee cannot be greater than 1%");
+        protocolFee = _fee;
+    }
+
+    function setFeeBeneficiary(address _feeBeneficiary) public onlyOwner {
+        require(_feeBeneficiary != address(0), "_feeBeneficiary cannot be zero address");
+        feeBeneficiary = _feeBeneficiary;
+    }
+
+    function getHandler(Protocol protocol) public view returns (address) {
+        return protocolHandlers[protocol];
     }
 
     function createLeveragedPosition(
@@ -63,11 +71,10 @@ contract LeveragedPosition is Ownable {
         uint256 _targetCollateralAmount,
         address _debtAsset,
         uint256 _debtAmount,
-        uint16 _allowedSlippage,
-        uint16 _swapFee,
+        uint256 _srcAmount,
         bytes calldata _extraData,
         ParaswapParams calldata _paraswapParams
-    ) public {
+    ) public nonReentrant {
         require(_collateralAsset != address(0), "Invalid collateral asset address");
         require(_debtAsset != address(0), "Invalid debt asset address");
 
@@ -96,8 +103,7 @@ contract LeveragedPosition is Ownable {
                 principleCollateralAmount: _principleCollateralAmount,
                 targetCollateralAmount: _targetCollateralAmount,
                 debtAmount: _debtAmount,
-                allowedSlippage: _allowedSlippage,
-                swapFee: _swapFee,
+                srcAmount: _srcAmount,
                 onBehalfOf: msg.sender,
                 extraData: _extraData,
                 paraswapParams: _paraswapParams
@@ -117,23 +123,25 @@ contract LeveragedPosition is Ownable {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
-        uint256 amountInMax = (decoded.debtAmount * (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
+        uint256 amountInMax = decoded.srcAmount;
 
-        address handler = protocolRegistry.getHandler(decoded.protocol);
+        address handler = getHandler(decoded.protocol);
 
-        handler.delegatecall(
+        (bool successSupply, ) = handler.delegatecall(
             abi.encodeCall(
                 IProtocolHandler.supply,
                 (decoded.collateralAsset, decoded.targetCollateralAmount, decoded.onBehalfOf, decoded.extraData)
             )
         );
+        require(successSupply, "Supply failed");
 
-        handler.delegatecall(
+        (bool successBorrow, ) = handler.delegatecall(
             abi.encodeCall(
                 IProtocolHandler.borrow,
                 (decoded.debtAsset, amountInMax, decoded.onBehalfOf, decoded.extraData)
             )
         );
+        require(successBorrow, "Borrow failed");
 
         // swapToken(
         //     address(decoded.debtAsset),
@@ -144,14 +152,14 @@ contract LeveragedPosition is Ownable {
         // );
 
         swapByParaswap(
-            decoded.collateralAsset,
+            decoded.debtAsset,
             decoded.paraswapParams.tokenTransferProxy,
             decoded.paraswapParams.router,
             decoded.paraswapParams.swapData
         );
 
+        // repay flashloan
         IERC20 token = IERC20(decoded.collateralAsset);
-
         token.safeTransfer(address(decoded.flashloanPool), flashloanBorrowAmount + totalFee);
 
         // repay remaining amount

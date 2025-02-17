@@ -3,17 +3,11 @@ pragma solidity =0.8.28;
 
 import {IERC20} from "../dependencies/IERC20.sol";
 import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
-import {IFlashLoanSimpleReceiver} from "@aave/core-v3/contracts/flashloan/interfaces/IFlashLoanSimpleReceiver.sol";
-import {IPoolV3} from "../interfaces/aaveV3/IPoolV3.sol";
-
-import {IDebtToken} from "../interfaces/aaveV3/IDebtToken.sol";
-import {IAaveProtocolDataProvider} from "../interfaces/aaveV3/IAaveProtocolDataProvider.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IMToken} from "../interfaces/moonwell/IMToken.sol";
+
 import {ISwapRouter02} from "../interfaces/uniswapV3/ISwapRouter02.sol";
 import {IV3SwapRouter} from "../interfaces/uniswapV3/IV3SwapRouter.sol";
 import {PoolAddress} from "../dependencies/uniswapV3/PoolAddress.sol";
-import {ProtocolRegistry} from "../ProtocolRegistry.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../Types.sol";
 import "../interfaces/safe/ISafe.sol";
@@ -23,8 +17,9 @@ import "hardhat/console.sol";
 
 contract SafeModule {
     ISwapRouter02 public immutable swapRouter;
-    ProtocolRegistry public protocolRegistry;
+
     address public immutable moonwellHandler;
+    mapping(Protocol => address) public protocolHandlers;
 
     mapping(address => address) public ownerToSafe;
 
@@ -50,9 +45,18 @@ contract SafeModule {
         _;
     }
 
-    constructor(address _uniswap_v3_swap_router, address _protocol_registry) {
+    constructor(address _uniswap_v3_swap_router, Protocol[] memory protocols, address[] memory handlers) {
         swapRouter = ISwapRouter02(_uniswap_v3_swap_router);
-        protocolRegistry = ProtocolRegistry(_protocol_registry);
+        require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
+
+        for (uint256 i = 0; i < protocols.length; i++) {
+            require(handlers[i] != address(0), "Invalid handler address");
+            protocolHandlers[protocols[i]] = handlers[i];
+        }
+    }
+
+    function getHandler(Protocol protocol) public view returns (address) {
+        return protocolHandlers[protocol];
     }
 
     // suppose this function is called from Safe wallet
@@ -81,7 +85,7 @@ contract SafeModule {
         uint256 debtAmount = _amount;
 
         if (_amount == type(uint256).max) {
-            address handler = protocolRegistry.getHandler(_fromProtocol);
+            address handler = getHandler(_fromProtocol);
 
             debtAmount = IProtocolHandler(handler).getDebtAmount(
                 _fromDebtAsset,
@@ -144,7 +148,7 @@ contract SafeModule {
         console.log("amountInMax:", amountInMax);
 
         if (decoded.fromProtocol == decoded.toProtocol) {
-            address handler = protocolRegistry.getHandler(decoded.fromProtocol);
+            address handler = getHandler(decoded.fromProtocol);
 
             handler.delegatecall(
                 abi.encodeCall(
@@ -162,7 +166,7 @@ contract SafeModule {
                 )
             );
         } else {
-            address fromHandler = protocolRegistry.getHandler(decoded.fromProtocol);
+            address fromHandler = getHandler(decoded.fromProtocol);
             fromHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchFrom,
@@ -176,7 +180,7 @@ contract SafeModule {
                 )
             );
 
-            address toHandler = protocolRegistry.getHandler(decoded.toProtocol);
+            address toHandler = getHandler(decoded.toProtocol);
             toHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchTo,
@@ -204,7 +208,7 @@ contract SafeModule {
         console.log("remainingBalance:", remainingBalance);
 
         if (remainingBalance > 0) {
-            address handler = protocolRegistry.getHandler(decoded.toProtocol);
+            address handler = getHandler(decoded.toProtocol);
 
             (bool success, bytes memory returnData) = handler.delegatecall(
                 abi.encodeCall(
