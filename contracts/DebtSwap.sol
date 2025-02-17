@@ -40,6 +40,8 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         uint256 amount
     );
 
+    event FlashLoanBorrowed(address indexed pool, address indexed asset, uint256 amount, uint256 fee);
+
     constructor(Protocol[] memory protocols, address[] memory handlers) {
         require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
 
@@ -126,6 +128,8 @@ contract DebtSwap is Ownable, ReentrancyGuard {
 
         // suppose either of fee0 or fee1 is 0
         uint flashloanFee = fee0 + fee1;
+
+        emit FlashLoanBorrowed(decoded.flashloanPool, decoded.fromAsset, decoded.amount, flashloanFee);
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 
