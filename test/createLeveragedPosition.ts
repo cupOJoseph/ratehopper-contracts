@@ -6,6 +6,7 @@ import "dotenv/config";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { LeveragedPosition } from "../typechain-types";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
+import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { approve, deployContractFixture, formatAmount, getParaswapData, protocolHelperMap } from "./utils";
 
 import {
@@ -19,6 +20,7 @@ import {
     cbETH_ETH_POOL,
     cbBTC_ADDRESS,
     cbBTC_USDC_POOL,
+    cbETH_USDC_POOL,
 } from "./constants";
 
 import { MaxUint256 } from "ethers";
@@ -26,7 +28,7 @@ import { AaveV3Helper } from "./protocols/aaveV3";
 import { CompoundHelper, USDC_COMET_ADDRESS } from "./protocols/compound";
 import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id, morphoMarket4Id } from "./protocols/morpho";
 
-describe.skip("Create leveraged position", function () {
+describe.only("Create leveraged position", function () {
     let myContract: LeveragedPosition;
     let impersonatedSigner: HardhatEthersSigner;
 
@@ -35,10 +37,7 @@ describe.skip("Create leveraged position", function () {
     let compoundHelper: CompoundHelper;
     let morphoHelper: MorphoHelper;
 
-    const slipage = 10;
     const defaultTargetSupplyAmount = "0.002";
-    const sampleEthPrice = 3300;
-    const sampleBtcPrice = 103000;
     const USDCDecimals = 6;
     const cbBTCDecimals = 8;
 
@@ -54,24 +53,6 @@ describe.skip("Create leveraged position", function () {
         myContract = await ethers.getContractAt("LeveragedPosition", deployedContractAddress, impersonatedSigner);
     });
 
-    function calculateBorrowAmount(
-        principleSupplyAmount: number,
-        targetSupplyAmount: number,
-        borrowTokenDecimal: number,
-        supplyTokenPrice: number,
-    ): bigint {
-        const amountDiff = targetSupplyAmount - principleSupplyAmount;
-        // add buffer of 10%. remaining amount is repaid on contract
-        const amountToBorrow = amountDiff * supplyTokenPrice * 1.1;
-        const roundedAmount = parseFloat(amountToBorrow.toFixed(borrowTokenDecimal));
-
-        const borrowAmount = ethers.parseUnits(roundedAmount.toString(), borrowTokenDecimal);
-
-        console.log("borrowAmount: ", formatAmount(borrowAmount));
-
-        return borrowAmount;
-    }
-
     async function createLeveragedPosition(
         flashloanPool: string,
         protocol: Protocols,
@@ -79,7 +60,6 @@ describe.skip("Create leveraged position", function () {
         principleAmount: number,
         targetAmount: number,
         collateralDecimals: number,
-        price: number,
         marketId?: string,
     ) {
         const Helper = protocolHelperMap.get(protocol)!;
@@ -113,9 +93,7 @@ describe.skip("Create leveraged position", function () {
 
         const parsedTargetAmount = ethers.parseUnits(targetAmount.toString(), collateralDecimals);
 
-        const diffAmount = parsedTargetAmount - BigInt(principleAmount);
-
-        const borrowAmount = calculateBorrowAmount(principleAmount, targetAmount, USDCDecimals, price);
+        const diffAmount = parsedTargetAmount - ethers.parseUnits(principleAmount.toString(), collateralDecimals);
 
         const [srcAmount, paraswapData] = await getParaswapData(
             collateralAddress,
@@ -126,8 +104,8 @@ describe.skip("Create leveraged position", function () {
             collateralDecimals,
         );
 
-        // add 0.3% slippage(must be set by user)
-        const amountPlusSlippage = (BigInt(srcAmount) * 1003n) / 1000n;
+        // add 2% slippage(must be set by user)
+        const amountPlusSlippage = (BigInt(srcAmount) * 1200n) / 1000n;
 
         await myContract.createLeveragedPosition(
             flashloanPool,
@@ -136,7 +114,6 @@ describe.skip("Create leveraged position", function () {
             ethers.parseUnits(principleAmount.toString(), collateralDecimals),
             parsedTargetAmount,
             USDC_ADDRESS,
-            borrowAmount,
             amountPlusSlippage,
             extraData,
             paraswapData,
@@ -165,26 +142,37 @@ describe.skip("Create leveraged position", function () {
 
         expect(debtAmount).to.be.gt(0);
         expect(Number(collateralAmount)).to.be.equal(parsedTargetAmount);
-    }
 
-    it("calculate borrow amount", async function () {
-        const amount = calculateBorrowAmount(0.001, 0.002, 6, 3300);
-        console.log("amount: ", amount);
-    });
+        const collateralToken = new ethers.Contract(collateralAddress, ERC20_ABI, impersonatedSigner);
+        const collateralRemainingBalance = await collateralToken.balanceOf(deployedContractAddress);
+        expect(Number(collateralRemainingBalance)).to.be.equal(0);
+    }
 
     it("should create on Aave with cbETH", async function () {
         await createLeveragedPosition(
             cbETH_ETH_POOL,
+            // cbETH_USDC_POOL,
             Protocols.AAVE_V3,
             cbETH_ADDRESS,
             Number(DEFAULT_SUPPLY_AMOUNT),
             Number(defaultTargetSupplyAmount),
             18,
-            sampleEthPrice,
         );
     });
 
-    it("should create on Aave with cbBTC", async function () {
+    it.skip("should create on Aave with cbETH and USDbC debt", async function () {
+        await createLeveragedPosition(
+            cbETH_ETH_POOL,
+            // cbETH_USDC_POOL,
+            Protocols.AAVE_V3,
+            cbETH_ADDRESS,
+            Number(DEFAULT_SUPPLY_AMOUNT),
+            Number(defaultTargetSupplyAmount),
+            18,
+        );
+    });
+
+    it.only("should create on Aave with cbBTC", async function () {
         const principleAmount = 0.00006;
         const targetAmount = principleAmount * 2;
 
@@ -195,7 +183,6 @@ describe.skip("Create leveraged position", function () {
             principleAmount,
             targetAmount,
             cbBTCDecimals,
-            sampleBtcPrice,
         );
     });
 
@@ -210,7 +197,6 @@ describe.skip("Create leveraged position", function () {
             principleAmount,
             targetAmount,
             cbBTCDecimals,
-            sampleBtcPrice,
         );
     });
 
@@ -222,7 +208,6 @@ describe.skip("Create leveraged position", function () {
             Number(DEFAULT_SUPPLY_AMOUNT),
             Number(defaultTargetSupplyAmount),
             18,
-            sampleEthPrice,
         );
     });
 
@@ -236,7 +221,6 @@ describe.skip("Create leveraged position", function () {
             principleAmount,
             targetAmount,
             cbBTCDecimals,
-            sampleBtcPrice,
         );
     });
 
@@ -248,7 +232,6 @@ describe.skip("Create leveraged position", function () {
             Number(DEFAULT_SUPPLY_AMOUNT),
             Number(defaultTargetSupplyAmount),
             18,
-            sampleEthPrice,
             morphoMarket1Id,
         );
     });
@@ -263,7 +246,6 @@ describe.skip("Create leveraged position", function () {
             principleAmount,
             targetAmount,
             cbBTCDecimals,
-            sampleBtcPrice,
             morphoMarket4Id,
         );
     });

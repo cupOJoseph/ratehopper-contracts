@@ -168,7 +168,8 @@ export async function getParaswapData(
     const url = "https://api.paraswap.io/swap";
 
     // suppose flashloan fee is 0.01%, must be fetched dynamically
-    const debtAmountPlusFee = amount + (amount * 1n) / 10000n;
+    // use the Ceiling Division formula
+    const debtAmountPlusFee = amount + (amount * 1n + 9999n) / 10000n;
 
     // deal with debt amount is slightly increased after getting quote from Dex aggregator
     const debtAmountPlusBuffer = (BigInt(debtAmountPlusFee) * 100001n) / 100000n;
@@ -182,9 +183,10 @@ export async function getParaswapData(
         // side must be BUY to use exactAmountOutSwap
         side: "BUY",
         network: "8453",
-        // should be passed by user dynamically
-        slippage: "30",
+        // 2% slippage, should be passed by user dynamically
+        slippage: "200",
         userAddress: contractAddress,
+        // excludeDEXS: "UniswapV3",
     };
 
     try {
@@ -192,6 +194,8 @@ export async function getParaswapData(
         if (!response?.data?.txParams || !response?.data?.priceRoute) {
             throw new Error("Invalid response from ParaSwap API");
         }
+
+        console.log("selected dex:", response.data.priceRoute.bestRoute[0].swaps[0].swapExchanges[0].exchange);
 
         return [
             response.data.priceRoute.srcAmount,

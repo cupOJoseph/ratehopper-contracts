@@ -24,7 +24,6 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         address debtAsset;
         uint256 principleCollateralAmount;
         uint256 targetCollateralAmount;
-        uint256 debtAmount;
         uint256 srcAmount;
         address onBehalfOf;
         bytes extraData;
@@ -70,7 +69,6 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         uint256 _principleCollateralAmount,
         uint256 _targetCollateralAmount,
         address _debtAsset,
-        uint256 _debtAmount,
         uint256 _srcAmount,
         bytes calldata _extraData,
         ParaswapParams calldata _paraswapParams
@@ -102,7 +100,6 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
                 debtAsset: _debtAsset,
                 principleCollateralAmount: _principleCollateralAmount,
                 targetCollateralAmount: _targetCollateralAmount,
-                debtAmount: _debtAmount,
                 srcAmount: _srcAmount,
                 onBehalfOf: msg.sender,
                 extraData: _extraData,
@@ -123,7 +120,7 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
-        uint256 amountInMax = decoded.srcAmount;
+        uint256 amountInMax = decoded.srcAmount + 1;
 
         address handler = getHandler(decoded.protocol);
 
@@ -142,14 +139,6 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
             )
         );
         require(successBorrow, "Borrow failed");
-
-        // swapToken(
-        //     address(decoded.debtAsset),
-        //     address(decoded.collateralAsset),
-        //     flashloanBorrowAmount + totalFee,
-        //     amountInMax,
-        //     decoded.swapFee
-        // );
 
         swapByParaswap(
             decoded.debtAsset,
@@ -175,8 +164,6 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
             );
         }
 
-        uint256 remainingBalanceAfter = debtToken.balanceOf(address(this));
-
         emit LeveragedPositionCreated(
             decoded.onBehalfOf,
             decoded.protocol,
@@ -189,9 +176,7 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
 
     function swapByParaswap(address asset, address tokenTransferProxy, address router, bytes memory _txParams) public {
         IERC20(asset).approve(tokenTransferProxy, type(uint256).max);
-
         (bool success, bytes memory returnData) = router.call(_txParams);
-
         require(success, "Token swap failed");
     }
 }
