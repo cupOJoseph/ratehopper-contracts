@@ -148,21 +148,21 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         );
 
         // repay flashloan
-        IERC20 token = IERC20(decoded.collateralAsset);
-        token.safeTransfer(address(decoded.flashloanPool), flashloanBorrowAmount + totalFee);
+        IERC20 collateralToken = IERC20(decoded.collateralAsset);
+        collateralToken.safeTransfer(address(decoded.flashloanPool), flashloanBorrowAmount + totalFee);
 
-        // repay remaining amount
-        IERC20 debtToken = IERC20(decoded.debtAsset);
-        uint256 remainingBalance = debtToken.balanceOf(address(this));
+        // transfer dust amount back to user
+        uint256 remainingCollateralBalance = IERC20(decoded.collateralAsset).balanceOf(address(this));
+        collateralToken.safeTransfer(decoded.onBehalfOf, remainingCollateralBalance);
 
-        if (remainingBalance > 0) {
-            handler.delegatecall(
-                abi.encodeCall(
-                    IProtocolHandler.repay,
-                    (decoded.debtAsset, remainingBalance, decoded.onBehalfOf, decoded.extraData)
-                )
-            );
-        }
+        // repay remaining debt amount
+        uint256 remainingBalance = IERC20(decoded.debtAsset).balanceOf(address(this));
+        handler.delegatecall(
+            abi.encodeCall(
+                IProtocolHandler.repay,
+                (decoded.debtAsset, remainingBalance, decoded.onBehalfOf, decoded.extraData)
+            )
+        );
 
         emit LeveragedPositionCreated(
             decoded.onBehalfOf,

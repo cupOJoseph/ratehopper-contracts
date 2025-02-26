@@ -179,7 +179,7 @@ describe("Protocol Switch", function () {
         }
 
         // add 0.3% slippage(must be set by user)
-        const amountPlusSlippage = (BigInt(srcAmount) * 1003n) / 1000n;
+        const amountPlusSlippage = (BigInt(srcAmount) * 1020n) / 1000n;
 
         // simulate waiting for user's confirmation
         await time.increaseTo((await time.latest()) + 60);

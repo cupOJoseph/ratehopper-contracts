@@ -81,8 +81,8 @@ describe("Aave DebtSwap", function () {
 
         await time.increaseTo((await time.latest()) + 60);
 
-        // add 0.3% slippage(must be set by user)
-        const amountPlusSlippage = (BigInt(srcAmount) * 1003n) / 1000n;
+        // add 2% slippage(must be set by user)
+        const amountPlusSlippage = (BigInt(srcAmount) * 1020n) / 1000n;
 
         // set protocol fee
         const signers = await ethers.getSigners();

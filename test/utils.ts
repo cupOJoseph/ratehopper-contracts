@@ -136,6 +136,11 @@ export async function approve(tokenAddress: string, spenderAddress: string, sign
     console.log("approve:" + tokenAddress + "token to " + spenderAddress);
 }
 
+export async function getDecimals(tokenAddress: string, signer: HardhatEthersSigner): Promise<number> {
+    const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+    return await tokenContract.decimals();
+}
+
 export function getAmountInMax(amountOut: bigint): bigint {
     // Suppose 1% slippage is allowed. must be fetched from quote to get actual slippage
     const slippage = 1.01;
@@ -158,35 +163,36 @@ export async function wrapETH(amountIn: string, signer: HardhatEthersSigner) {
 }
 
 export async function getParaswapData(
-    fromAsset: string,
-    toAsset: string,
+    destToken: string,
+    srcToken: string,
     contractAddress: string,
     amount: bigint,
-    srcTokenDecimals?: number,
-    destTokenDecimals?: number,
+    srcDecimals = 6,
+    destDecimals = 6,
 ) {
     const url = "https://api.paraswap.io/swap";
 
     // suppose flashloan fee is 0.01%, must be fetched dynamically
     // use the Ceiling Division formula
-    const debtAmountPlusFee = amount + (amount * 1n + 9999n) / 10000n;
+    const amountPlusFee = amount + (amount * 1n + 9999n) / 10000n;
 
     // deal with debt amount is slightly increased after getting quote from Dex aggregator
-    const debtAmountPlusBuffer = (BigInt(debtAmountPlusFee) * 100001n) / 100000n;
+    const amountPlusBuffer = (BigInt(amountPlusFee) * 100001n) / 100000n;
 
     const params = {
-        srcToken: toAsset,
-        srcDecimals: srcTokenDecimals || 6,
-        destToken: fromAsset,
-        destDecimals: destTokenDecimals || 6,
-        amount: debtAmountPlusBuffer,
+        srcToken,
+        srcDecimals,
+        destToken,
+        destDecimals,
+        amount: amountPlusBuffer,
         // side must be BUY to use exactAmountOutSwap
         side: "BUY",
         network: "8453",
         // 2% slippage, should be passed by user dynamically
         slippage: "200",
         userAddress: contractAddress,
-        // excludeDEXS: "UniswapV3",
+        // exclude Uniswap V3 to avoid conflict with flashloan pool. More sophisticated mechanism should be implemented
+        excludeDEXS: "UniswapV3",
     };
 
     try {

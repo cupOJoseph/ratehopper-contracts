@@ -5,9 +5,11 @@ import {
     cbBTC_ADDRESS,
     cbETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
+    eUSD_ADDRESS,
     MAI_ADDRESS,
     TEST_ADDRESS,
     USDC_ADDRESS,
+    WETH_ADDRESS,
 } from "../constants";
 
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
@@ -23,6 +25,8 @@ export const morphoMarket1Id = "0x1c21c59df9db44bf6f645d854ee710a8ca17b479451447
 export const morphoMarket2Id = "0xdba352d93a64b17c71104cbddc6aef85cd432322a1446b5b65163cbbc615cd0c";
 export const morphoMarket3Id = "0xf761e909ee2f87f118e36b7efb42c5915752a6d39263eec0c000c15d0ab7f489";
 export const morphoMarket4Id = "0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836";
+export const morphoMarket5Id = "0xb5d424e4af49244b074790f1f2dc9c20df948ce291fc6bcc6b59149ecf91196d";
+export const morphoMarket6Id = "0x3b3769cfca57be2eaed03fcc5299c25691b77781a1e124e7a8d520eb9a7eabb5";
 
 const market1Params = {
     collateralToken: cbETH_ADDRESS,
@@ -56,20 +60,30 @@ const market4Params = {
     lltv: 860000000000000000n,
 };
 
+const market5Params = {
+    collateralToken: cbETH_ADDRESS,
+    loanToken: eUSD_ADDRESS,
+    irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
+    oracle: "0xc3Fa71D77d80f671F366DAA6812C8bD6C7749cEc",
+    lltv: 860000000000000000n,
+};
+
+const market6Params = {
+    collateralToken: USDC_ADDRESS,
+    loanToken: WETH_ADDRESS,
+    irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
+    oracle: "0xD09048c8B568Dbf5f189302beA26c9edABFC4858",
+    lltv: 860000000000000000n,
+};
+
 export const marketParamsMap = new Map<string, any>([
     [morphoMarket1Id, market1Params],
     [morphoMarket2Id, market2Params],
     [morphoMarket3Id, market3Params],
     [morphoMarket4Id, market4Params],
+    [morphoMarket5Id, market5Params],
+    [morphoMarket6Id, market6Params],
 ]);
-
-// const toMarketParams = {
-//     collateralToken: cbETH_ADDRESS,
-//     loanToken: eUSD_ADDRESS,
-//     irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
-//     oracle: "0xc3Fa71D77d80f671F366DAA6812C8bD6C7749cEc",
-//     lltv: 860000000000000000n,
-// };
 
 export class MorphoHelper {
     private morpho;
@@ -81,6 +95,7 @@ export class MorphoHelper {
     async getDebtAmount(marketId: string): Promise<bigint> {
         const positionData = await this.getPosition(marketId);
         const marketData = await this.getMarketData(marketId);
+        // picked this logic from AP-API Morpho BP
         const borrowShares = BigInt(positionData.borrowShares);
         const totalBorrowAssets = BigInt(marketData.totalBorrowAssets) + BigInt(1);
         const totalBorrowShares = BigInt(marketData.totalBorrowShares) + BigInt(1000000);
