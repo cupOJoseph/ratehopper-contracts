@@ -47,10 +47,10 @@ export class CompoundHelper {
         console.log(`Supplied ${ethers.formatEther(suppliedAmount)} ${collateralTokenAddress}`);
     }
 
-    async borrow(tokenAddress: string) {
+    async borrow(tokenAddress: string, amount = "1", decimals = 6) {
         const comet = new ethers.Contract(cometAddressMap.get(tokenAddress)!, cometAbi, this.signer);
 
-        const borrowAmount = ethers.parseUnits("1", 6);
+        const borrowAmount = ethers.parseUnits(amount, decimals);
         const tx = await comet.withdraw(tokenAddress, borrowAmount);
         await tx.wait();
         const borrowedAmount = await this.getDebtAmount(tokenAddress);

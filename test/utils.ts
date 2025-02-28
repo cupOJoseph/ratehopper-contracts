@@ -50,18 +50,6 @@ export async function deployContractFixture() {
     const MorphoHandler = await hre.ethers.getContractFactory("MorphoHandler");
     const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS);
 
-    // const FluidHandler = await hre.ethers.getContractFactory("FluidHandler");
-    // const fluidHandler = await FluidHandler.deploy();
-
-    // const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
-    // const protocolRegistry = await ProtocolRegistry.deploy(
-    //     [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO],
-    //     [aaveV3Handler.getAddress(), compoundHandler.getAddress(), morphoHandler.getAddress()],
-    //     {
-    //         maxFeePerGas: gasPrice * BigInt(5),
-    //     },
-    // );
-
     const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
     const debtSwap = await DebtSwap.deploy(
         [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO],
@@ -113,12 +101,10 @@ export async function deploySafeContractFixture() {
     const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER);
     console.log("FluidHandler deployed to:", await fluidHandler.getAddress());
 
-    await protocolRegistry.setHandler(Protocols.AAVE_V3, aaveV3Handler.getAddress());
-    await protocolRegistry.setHandler(Protocols.MOONWELL, moonwellHandler.getAddress());
-    await protocolRegistry.setHandler(Protocols.FLUID, fluidHandler.getAddress());
-
     const SafeModule = await hre.ethers.getContractFactory("SafeModule");
-    const safeModule = await SafeModule.deploy(UNISWAP_V3_SWAP_ROUTER_ADDRESS, protocolRegistry.getAddress(), {
+    const safeModule = await SafeModule.deploy(   
+        [Protocols.AAVE_V3, Protocols.MOONWELL, Protocols.FLUID],
+        [aaveV3Handler.getAddress(), moonwellHandler.getAddress(), fluidHandler.getAddress()],, {
         maxFeePerGas: gasPrice * BigInt(5),
     });
 

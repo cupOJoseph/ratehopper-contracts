@@ -5,22 +5,20 @@ import {IERC20} from "../dependencies/IERC20.sol";
 import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-import {ISwapRouter02} from "../interfaces/uniswapV3/ISwapRouter02.sol";
-import {IV3SwapRouter} from "../interfaces/uniswapV3/IV3SwapRouter.sol";
-import {PoolAddress} from "../dependencies/uniswapV3/PoolAddress.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "../Types.sol";
 import "../interfaces/safe/ISafe.sol";
 import {IProtocolHandler} from "../interfaces/IProtocolHandler.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
 import "hardhat/console.sol";
 
-contract SafeModule {
-    ISwapRouter02 public immutable swapRouter;
-
-    address public immutable moonwellHandler;
+contract SafeModule is Ownable, ReentrancyGuard {
+    using GPv2SafeERC20 for IERC20;
+    uint8 public protocolFee;
+    address public feeBeneficiary;
     mapping(Protocol => address) public protocolHandlers;
-
     mapping(address => address) public ownerToSafe;
 
     struct FlashCallbackData {
@@ -31,11 +29,12 @@ contract SafeModule {
         address fromAsset;
         address toAsset;
         uint256 amount;
-        uint256 allowedSlippage;
+        uint256 srcAmount;
         CollateralAsset[] collateralAssets;
         address onBehalfOf;
         bytes fromExtraData;
         bytes toExtraData;
+        ParaswapParams paraswapParams;
     }
 
     event TransactionExecuted(address indexed target, bytes data);
@@ -45,14 +44,23 @@ contract SafeModule {
         _;
     }
 
-    constructor(address _uniswap_v3_swap_router, Protocol[] memory protocols, address[] memory handlers) {
-        swapRouter = ISwapRouter02(_uniswap_v3_swap_router);
+    constructor(Protocol[] memory protocols, address[] memory handlers) {
         require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
 
         for (uint256 i = 0; i < protocols.length; i++) {
             require(handlers[i] != address(0), "Invalid handler address");
             protocolHandlers[protocols[i]] = handlers[i];
         }
+    }
+
+    function setProtocolFee(uint8 _fee) public onlyOwner {
+        require(_fee <= 100, "_fee cannot be greater than 1%");
+        protocolFee = _fee;
+    }
+
+    function setFeeBeneficiary(address _feeBeneficiary) public onlyOwner {
+        require(_feeBeneficiary != address(0), "_feeBeneficiary cannot be zero address");
+        feeBeneficiary = _feeBeneficiary;
     }
 
     function getHandler(Protocol protocol) public view returns (address) {
@@ -73,13 +81,16 @@ contract SafeModule {
         address _fromDebtAsset,
         address _toDebtAsset,
         uint256 _amount,
-        uint16 _allowedSlippage,
+        uint256 _srcAmount,
         CollateralAsset[] calldata _collateralAssets,
         bytes calldata _fromExtraData,
-        bytes calldata _toExtraData
+        bytes calldata _toExtraData,
+        ParaswapParams calldata _paraswapParams
     ) public onlySafeOwner {
         require(_fromDebtAsset != address(0), "Invalid from asset address");
         require(_toDebtAsset != address(0), "Invalid to asset address");
+        require(_amount > 0, "_amount cannot be zero");
+        require(_srcAmount > 0, "_srcAmount cannot be zero");
 
         IUniswapV3Pool pool = IUniswapV3Pool(_flashloanPool);
         uint256 debtAmount = _amount;
@@ -114,11 +125,12 @@ contract SafeModule {
                 fromAsset: _fromDebtAsset,
                 toAsset: _toDebtAsset,
                 amount: debtAmount,
-                allowedSlippage: _allowedSlippage,
+                srcAmount: _srcAmount,
                 onBehalfOf: msg.sender,
                 collateralAssets: _collateralAssets,
                 fromExtraData: _fromExtraData,
-                toExtraData: _toExtraData
+                toExtraData: _toExtraData,
+                paraswapParams: _paraswapParams
             })
         );
 
@@ -132,32 +144,24 @@ contract SafeModule {
         require(msg.sender == address(decoded.flashloanPool), "Caller is not flashloan pool");
 
         // suppose either of fee0 or fee1 is 0
-        uint totalFee = fee0 + fee1;
+        uint flashloanFee = fee0 + fee1;
 
-        // TODO: add protocolFee
+        uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 
-        uint8 fromDecimals = IERC20(decoded.fromAsset).decimals();
-        uint8 toDecimals = IERC20(decoded.toAsset).decimals();
-        uint8 decimalDiff = fromDecimals > toDecimals ? fromDecimals - toDecimals : toDecimals - fromDecimals;
-
-        uint256 amountInMax = (decoded.amount * (10 ** 4 + decoded.allowedSlippage)) / 10 ** 4;
-
-        if (decimalDiff > 0) {
-            amountInMax = amountInMax * 10 ** decimalDiff;
-        }
-        console.log("amountInMax:", amountInMax);
+        uint256 amountInMax = decoded.srcAmount == 0 ? decoded.amount : decoded.srcAmount;
+        uint256 amountTotal = amountInMax + flashloanFee + protocolFeeAmount;
 
         if (decoded.fromProtocol == decoded.toProtocol) {
             address handler = getHandler(decoded.fromProtocol);
 
-            handler.delegatecall(
+            (bool success, ) = handler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchIn,
                     (
                         decoded.fromAsset,
                         decoded.toAsset,
                         decoded.amount,
-                        amountInMax + totalFee,
+                        amountTotal,
                         address(decoded.safe),
                         decoded.collateralAssets,
                         decoded.fromExtraData,
@@ -165,9 +169,10 @@ contract SafeModule {
                     )
                 )
             );
+            require(success, "protocol switchIn failed");
         } else {
             address fromHandler = getHandler(decoded.fromProtocol);
-            fromHandler.delegatecall(
+            (bool successFrom, ) = fromHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchFrom,
                     (
@@ -179,66 +184,66 @@ contract SafeModule {
                     )
                 )
             );
+            require(successFrom, "protocol switchFrom failed");
 
             address toHandler = getHandler(decoded.toProtocol);
-            toHandler.delegatecall(
+            (bool successTo, ) = toHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchTo,
-                    (
-                        decoded.toAsset,
-                        amountInMax + totalFee,
-                        address(decoded.safe),
-                        decoded.collateralAssets,
-                        decoded.toExtraData
-                    )
+                    (decoded.toAsset, amountTotal, address(decoded.safe), decoded.collateralAssets, decoded.toExtraData)
                 )
             );
+            require(successTo, "protocol switchTo failed");
         }
 
         if (decoded.fromAsset != decoded.toAsset) {
-            swapToken(address(decoded.toAsset), address(decoded.fromAsset), decoded.amount + totalFee, amountInMax);
+            swapByParaswap(
+                decoded.toAsset,
+                amountTotal,
+                decoded.paraswapParams.tokenTransferProxy,
+                decoded.paraswapParams.router,
+                decoded.paraswapParams.swapData
+            );
         }
 
         // repay flashloan
-        IERC20(decoded.fromAsset).transfer(address(decoded.flashloanPool), decoded.amount + totalFee);
+        IERC20(decoded.fromAsset).transfer(address(decoded.flashloanPool), decoded.amount + flashloanFee);
+
+        if (protocolFee > 0) {
+            IERC20(decoded.toAsset).safeTransfer(feeBeneficiary, protocolFeeAmount);
+        }
 
         // repay remaining amount
         IERC20 toToken = IERC20(decoded.toAsset);
         uint256 remainingBalance = toToken.balanceOf(address(this));
-        console.log("remainingBalance:", remainingBalance);
 
         if (remainingBalance > 0) {
             address handler = getHandler(decoded.toProtocol);
 
-            (bool success, bytes memory returnData) = handler.delegatecall(
+            (bool success, ) = handler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.repay,
                     (decoded.toAsset, remainingBalance, address(decoded.safe), decoded.toExtraData)
                 )
             );
 
-            require(success);
+            require(success, "Repay remainingBalance failed");
         }
-
-        uint256 remainingBalanceAfter = toToken.balanceOf(address(this));
-        console.log("remainingBalanceAfter:", remainingBalanceAfter);
     }
 
-    function swapToken(address inputToken, address outputToken, uint256 amountOut, uint256 amountInMaximum) internal {
-        IERC20(inputToken).approve(address(swapRouter), type(uint256).max);
+    function swapByParaswap(
+        address asset,
+        uint256 amount,
+        address tokenTransferProxy,
+        address router,
+        bytes memory _txParams
+    ) internal {
+        IERC20(asset).approve(tokenTransferProxy, amount);
+        (bool success, ) = router.call(_txParams);
+        require(success, "Token swap by paraSwap failed");
+    }
 
-        IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter.ExactOutputSingleParams({
-            tokenIn: inputToken,
-            tokenOut: outputToken,
-            fee: 100,
-            recipient: address(this),
-            amountOut: amountOut,
-            amountInMaximum: amountInMaximum,
-            sqrtPriceLimitX96: 0
-        });
-
-        uint256 amountIn = swapRouter.exactOutputSingle(params);
-
-        console.log("swap from ", inputToken, " to ", outputToken);
+    function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
+        IERC20(token).safeTransfer(owner(), amount);
     }
 }
