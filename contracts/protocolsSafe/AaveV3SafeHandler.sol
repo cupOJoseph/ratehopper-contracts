@@ -39,12 +39,32 @@ contract AaveV3SafeHandler is IProtocolHandler {
         address fromAsset,
         address toAsset,
         uint256 amount,
-        uint256 amountInMax,
+        uint256 amountTotal,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
-    ) external override {}
+    ) external override {
+        repay(address(fromAsset), amount, onBehalfOf, fromExtraData);
+
+        bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
+            aaveV3PoolAddress,
+            0,
+            abi.encodeCall(IPoolV3.borrow, (toAsset, amountTotal, 2, 0, onBehalfOf)),
+            ISafe.Operation.Call
+        );
+
+        require(successBorrow, "Aave v3 borrow failed");
+
+        bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
+            toAsset,
+            0,
+            abi.encodeCall(IERC20.transfer, (address(this), amountTotal)),
+            ISafe.Operation.Call
+        );
+
+        require(successTransfer, "Aave v3 transfer failed");
+    }
 
     function switchFrom(
         address fromAsset,

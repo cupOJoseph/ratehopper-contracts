@@ -81,7 +81,6 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         require(_fromDebtAsset != address(0), "_fromDebtAsset cannot be zero address");
         require(_toDebtAsset != address(0), "_toDebtAsset cannot be zero address");
         require(_amount > 0, "_amount cannot be zero");
-        require(_srcAmount > 0, "_srcAmount cannot be zero");
 
         IUniswapV3Pool pool = IUniswapV3Pool(_flashloanPool);
         address token0;

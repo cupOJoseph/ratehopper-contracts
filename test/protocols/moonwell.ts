@@ -1,16 +1,22 @@
 import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { Contract, MaxUint256 } from "ethers";
-import { cbBTC_ADDRESS, DEFAULT_SUPPLY_AMOUNT, TEST_ADDRESS } from "../constants";
+import { cbBTC_ADDRESS, DAI_ADDRESS, DEFAULT_SUPPLY_AMOUNT, TEST_ADDRESS, USDC_ADDRESS } from "../constants";
 
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { approve, formatAmount } from "../utils";
+import { mDAI, mUSDC } from "../moonwellDebtSwap";
 
 const MErc20DelegatorAbi = require("../../externalAbi/moonwell/MErc20Delegator.json");
 const ComptrollerAbi = require("../../externalAbi/moonwell/comptroller.json");
 const ViewAbi = require("../../externalAbi/moonwell/moonwellViewsV3.json");
 export const COMPTROLLER_ADDRESS = "0xfbb21d0380bee3312b33c4353c8936a0f13ef26c";
 const view_address = "0x821ff3a967b39bcbe8a018a9b1563eaf878bad39";
+
+export const mContractAddressMap = new Map<string, string>([
+    [USDC_ADDRESS, mUSDC],
+    [DAI_ADDRESS, mDAI],
+]);
 
 export class MoonwellHelper {
     constructor(private signer: HardhatEthersSigner | any) {}
@@ -31,11 +37,12 @@ export class MoonwellHelper {
         return BigInt(collateralAmount);
     }
 
-    async getDebtAmount(mContractAddress: string, userAddress?: string): Promise<bigint> {
+    async getDebtAmount(tokenAddress: string, userAddress?: string): Promise<bigint> {
+        const mContractAddress = mContractAddressMap.get(tokenAddress)!;
         const mToken = new ethers.Contract(mContractAddress, MErc20DelegatorAbi, this.signer);
         const debtAmount = await mToken.borrowBalanceStored(userAddress || TEST_ADDRESS);
 
-        console.log("debtAmount:", debtAmount);
+        console.log("moonwell debtAmount:", debtAmount);
         return BigInt(debtAmount);
     }
 

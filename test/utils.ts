@@ -1,14 +1,6 @@
 import hre from "hardhat";
 import { ethers } from "hardhat";
-import {
-    AAVE_V3_DATA_PROVIDER_ADDRESS,
-    AAVE_V3_POOL_ADDRESS,
-    Protocols,
-    TEST_ADDRESS,
-    UNISWAP_V3_FACTORY_ADRESS,
-    UNISWAP_V3_SWAP_ROUTER_ADDRESS,
-    WETH_ADDRESS,
-} from "./constants";
+import { AAVE_V3_DATA_PROVIDER_ADDRESS, AAVE_V3_POOL_ADDRESS, Protocols, WETH_ADDRESS } from "./constants";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { Contract, MaxUint256 } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
@@ -17,14 +9,16 @@ import { MORPHO_ADDRESS } from "./protocols/morpho";
 import { AaveV3Helper } from "./protocols/aaveV3";
 import { CompoundHelper } from "./protocols/compound";
 import { MorphoHelper } from "./protocols/morpho";
-import { COMPTROLLER_ADDRESS } from "./protocols/moonwell";
-import { FLUID_VAULT_RESOLVER } from "./protocols/fluid";
+import { COMPTROLLER_ADDRESS, MoonwellHelper } from "./protocols/moonwell";
+import { FLUID_VAULT_RESOLVER, FluidHelper } from "./protocols/fluid";
 import axios from "axios";
 
 export const protocolHelperMap = new Map<Protocols, any>([
     [Protocols.AAVE_V3, AaveV3Helper],
     [Protocols.COMPOUND, CompoundHelper],
     [Protocols.MORPHO, MorphoHelper],
+    [Protocols.MOONWELL, MoonwellHelper],
+    [Protocols.FLUID, FluidHelper],
 ]);
 
 // We define a fixture to reuse the same setup in every test.
@@ -80,16 +74,18 @@ export async function deployContractFixture() {
 export async function deploySafeContractFixture() {
     const feeData = await ethers.provider.getFeeData();
     const gasPrice = feeData.gasPrice!;
-    const ProtocolRegistry = await hre.ethers.getContractFactory("ProtocolRegistry");
-    const protocolRegistry = await ProtocolRegistry.deploy({
-        maxFeePerGas: gasPrice * BigInt(5),
-    });
 
     const AaveV3SafeHandler = await hre.ethers.getContractFactory("AaveV3SafeHandler");
     const aaveV3Handler = await AaveV3SafeHandler.deploy(AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS, {
         maxFeePerGas: gasPrice * BigInt(5),
     });
     console.log("AaveV3Handler deployed to:", await aaveV3Handler.getAddress());
+
+    const CompoundSafeHandler = await hre.ethers.getContractFactory("CompoundSafeHandler");
+    const compoundHandler = await CompoundSafeHandler.deploy({
+        maxFeePerGas: gasPrice * BigInt(5),
+    });
+    console.log("compoundHandler deployed to:", await compoundHandler.getAddress());
 
     const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
     const moonwellHandler = await MoonwellHandler.deploy(COMPTROLLER_ADDRESS, {
@@ -102,11 +98,18 @@ export async function deploySafeContractFixture() {
     console.log("FluidHandler deployed to:", await fluidHandler.getAddress());
 
     const SafeModule = await hre.ethers.getContractFactory("SafeModule");
-    const safeModule = await SafeModule.deploy(   
-        [Protocols.AAVE_V3, Protocols.MOONWELL, Protocols.FLUID],
-        [aaveV3Handler.getAddress(), moonwellHandler.getAddress(), fluidHandler.getAddress()],, {
-        maxFeePerGas: gasPrice * BigInt(5),
-    });
+    const safeModule = await SafeModule.deploy(
+        [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MOONWELL, Protocols.FLUID],
+        [
+            aaveV3Handler.getAddress(),
+            compoundHandler.getAddress(),
+            moonwellHandler.getAddress(),
+            fluidHandler.getAddress(),
+        ],
+        {
+            maxFeePerGas: gasPrice * BigInt(5),
+        },
+    );
 
     console.log("SafeModule deployed to:", await safeModule.getAddress());
 
@@ -122,8 +125,10 @@ export async function approve(tokenAddress: string, spenderAddress: string, sign
     console.log("approve:" + tokenAddress + "token to " + spenderAddress);
 }
 
-export async function getDecimals(tokenAddress: string, signer: HardhatEthersSigner): Promise<number> {
-    const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+export async function getDecimals(tokenAddress: string): Promise<number> {
+    const provider = new ethers.JsonRpcProvider("https://base.llamarpc.com");
+
+    const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
     return await tokenContract.decimals();
 }
 
@@ -148,14 +153,7 @@ export async function wrapETH(amountIn: string, signer: HardhatEthersSigner) {
     console.log("Wrapped ETH to WETH:", amount);
 }
 
-export async function getParaswapData(
-    destToken: string,
-    srcToken: string,
-    contractAddress: string,
-    amount: bigint,
-    srcDecimals = 6,
-    destDecimals = 6,
-) {
+export async function getParaswapData(destToken: string, srcToken: string, contractAddress: string, amount: bigint) {
     const url = "https://api.paraswap.io/swap";
 
     // suppose flashloan fee is 0.01%, must be fetched dynamically
@@ -164,6 +162,9 @@ export async function getParaswapData(
 
     // deal with debt amount is slightly increased after getting quote from Dex aggregator
     const amountPlusBuffer = (BigInt(amountPlusFee) * 100001n) / 100000n;
+
+    const srcDecimals = await getDecimals(srcToken);
+    const destDecimals = await getDecimals(destToken);
 
     const params = {
         srcToken,

@@ -75,8 +75,8 @@ describe("Create leveraged position", function () {
 
         const debtAsset = debtTokenAddress || USDC_ADDRESS;
 
-        const collateralDecimals = await getDecimals(collateralAddress, impersonatedSigner);
-        const debtDecimals = await getDecimals(debtAsset, impersonatedSigner);
+        const collateralDecimals = await getDecimals(collateralAddress);
+        const debtDecimals = await getDecimals(debtAsset);
 
         switch (protocol) {
             case Protocols.AAVE_V3:
@@ -111,8 +111,6 @@ describe("Create leveraged position", function () {
             debtAsset,
             deployedContractAddress,
             diffAmount,
-            debtDecimals,
-            collateralDecimals,
         );
 
         // add 2% slippage(must be set by user)

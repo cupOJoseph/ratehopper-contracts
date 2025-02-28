@@ -25,14 +25,20 @@ export const cometAddressMap = new Map<string, string>([
 export class CompoundHelper {
     constructor(private signer: HardhatEthersSigner) {}
 
-    async getDebtAmount(tokenAddress: string): Promise<bigint> {
+    async getDebtAmount(tokenAddress: string, userAddress?: string): Promise<bigint> {
         const comet = new ethers.Contract(cometAddressMap.get(tokenAddress)!, cometAbi, this.signer);
-        return await comet.borrowBalanceOf(TEST_ADDRESS);
+        const debtAmount = await comet.borrowBalanceOf(userAddress || TEST_ADDRESS);
+        console.log("compound debtAmount:", debtAmount);
+        return debtAmount;
     }
 
-    async getCollateralAmount(cometAddress: string, collateralTokenAddress: string): Promise<bigint> {
+    async getCollateralAmount(
+        cometAddress: string,
+        collateralTokenAddress: string,
+        userAddress?: string,
+    ): Promise<bigint> {
         const comet = new ethers.Contract(cometAddress, cometAbi, this.signer);
-        const response = await comet.userCollateral(TEST_ADDRESS, collateralTokenAddress);
+        const response = await comet.userCollateral(userAddress || TEST_ADDRESS, collateralTokenAddress);
         return response.balance;
     }
 

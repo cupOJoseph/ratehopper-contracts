@@ -40,8 +40,8 @@ contract MoonwellHandler is IProtocolHandler {
         bytes calldata fromExtraData,
         bytes calldata toExtraData
     ) external override {
-        address fromContract = abi.decode(fromExtraData, (address));
-        address toContract = abi.decode(toExtraData, (address));
+        (address fromContract, ) = abi.decode(fromExtraData, (address, address[]));
+        (address toContract, ) = abi.decode(toExtraData, (address, address[]));
         IERC20(fromAsset).approve(address(fromContract), type(uint256).max);
 
         IMToken(fromContract).repayBorrowBehalf(onBehalfOf, amount);
@@ -86,6 +86,8 @@ contract MoonwellHandler is IProtocolHandler {
                 abi.encodeCall(IMToken.redeemUnderlying, (collateralAssets[i].amount)),
                 ISafe.Operation.Call
             );
+
+            require(successWithdraw, "Withdraw failed");
         }
     }
 
@@ -115,7 +117,7 @@ contract MoonwellHandler is IProtocolHandler {
                 abi.encodeCall(IMToken.mint, (currentBalance)),
                 ISafe.Operation.Call
             );
-            console.log("successMint:", successMint);
+            require(successMint, "moonwell mint failed");
 
             address[] memory collateralContracts = new address[](1);
             collateralContracts[0] = mTokens[i];
@@ -135,7 +137,7 @@ contract MoonwellHandler is IProtocolHandler {
             ISafe.Operation.Call
         );
 
-        console.log("successBorrow:", successBorrow);
+        require(successBorrow, "moonwell borrow failed");
 
         bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
             toAsset,
@@ -143,6 +145,8 @@ contract MoonwellHandler is IProtocolHandler {
             abi.encodeCall(IERC20.transfer, (address(this), amount)),
             ISafe.Operation.Call
         );
+
+        require(successTransfer, "moonwell transfer failed");
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {

@@ -22,7 +22,6 @@ contract SafeModule is Ownable, ReentrancyGuard {
     mapping(address => address) public ownerToSafe;
 
     struct FlashCallbackData {
-        address safe;
         address flashloanPool;
         Protocol fromProtocol;
         Protocol toProtocol;
@@ -90,7 +89,6 @@ contract SafeModule is Ownable, ReentrancyGuard {
         require(_fromDebtAsset != address(0), "Invalid from asset address");
         require(_toDebtAsset != address(0), "Invalid to asset address");
         require(_amount > 0, "_amount cannot be zero");
-        require(_srcAmount > 0, "_srcAmount cannot be zero");
 
         IUniswapV3Pool pool = IUniswapV3Pool(_flashloanPool);
         uint256 debtAmount = _amount;
@@ -118,7 +116,6 @@ contract SafeModule is Ownable, ReentrancyGuard {
 
         bytes memory data = abi.encode(
             FlashCallbackData({
-                safe: ownerToSafe[msg.sender],
                 flashloanPool: _flashloanPool,
                 fromProtocol: _fromProtocol,
                 toProtocol: _toProtocol,
@@ -143,6 +140,8 @@ contract SafeModule is Ownable, ReentrancyGuard {
         // implement the same logic as CallbackValidation.verifyCallback()
         require(msg.sender == address(decoded.flashloanPool), "Caller is not flashloan pool");
 
+        address safe = ownerToSafe[decoded.onBehalfOf];
+
         // suppose either of fee0 or fee1 is 0
         uint flashloanFee = fee0 + fee1;
 
@@ -162,7 +161,7 @@ contract SafeModule is Ownable, ReentrancyGuard {
                         decoded.toAsset,
                         decoded.amount,
                         amountTotal,
-                        address(decoded.safe),
+                        safe,
                         decoded.collateralAssets,
                         decoded.fromExtraData,
                         decoded.toExtraData
@@ -175,13 +174,7 @@ contract SafeModule is Ownable, ReentrancyGuard {
             (bool successFrom, ) = fromHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchFrom,
-                    (
-                        decoded.fromAsset,
-                        decoded.amount,
-                        address(decoded.safe),
-                        decoded.collateralAssets,
-                        decoded.fromExtraData
-                    )
+                    (decoded.fromAsset, decoded.amount, safe, decoded.collateralAssets, decoded.fromExtraData)
                 )
             );
             require(successFrom, "protocol switchFrom failed");
@@ -190,7 +183,7 @@ contract SafeModule is Ownable, ReentrancyGuard {
             (bool successTo, ) = toHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchTo,
-                    (decoded.toAsset, amountTotal, address(decoded.safe), decoded.collateralAssets, decoded.toExtraData)
+                    (decoded.toAsset, amountTotal, safe, decoded.collateralAssets, decoded.toExtraData)
                 )
             );
             require(successTo, "protocol switchTo failed");
@@ -221,10 +214,7 @@ contract SafeModule is Ownable, ReentrancyGuard {
             address handler = getHandler(decoded.toProtocol);
 
             (bool success, ) = handler.delegatecall(
-                abi.encodeCall(
-                    IProtocolHandler.repay,
-                    (decoded.toAsset, remainingBalance, address(decoded.safe), decoded.toExtraData)
-                )
+                abi.encodeCall(IProtocolHandler.repay, (decoded.toAsset, remainingBalance, safe, decoded.toExtraData))
             );
 
             require(success, "Repay remainingBalance failed");

@@ -44,7 +44,7 @@ import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id, morphoMarket2Id, morphoM
 import { MaxUint256 } from "ethers";
 import { zeroAddress } from "viem";
 
-describe.only("DebtSwap should switch", function () {
+describe("DebtSwap should switch", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
 
@@ -608,14 +608,11 @@ describe.only("DebtSwap should switch", function () {
         };
 
         if (fromTokenAddress !== toTokenAddress) {
-            const srcDecimals = options.morphoToMarketId === morphoMarket3Id ? 18 : 6;
-
             [srcAmount, paraswapData] = await getParaswapData(
                 fromTokenAddress,
                 toTokenAddress,
                 deployedContractAddress,
                 beforeFromProtocolDebt,
-                srcDecimals,
             );
         }
 
