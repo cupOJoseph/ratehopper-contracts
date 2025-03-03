@@ -75,17 +75,16 @@ export async function deploySafeContractFixture() {
     const feeData = await ethers.provider.getFeeData();
     const gasPrice = feeData.gasPrice!;
 
-    const AaveV3SafeHandler = await hre.ethers.getContractFactory("AaveV3SafeHandler");
-    const aaveV3Handler = await AaveV3SafeHandler.deploy(AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS, {
+    const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
+    const aaveV3Handler = await AaveV3Handler.deploy(AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS, {
         maxFeePerGas: gasPrice * BigInt(5),
     });
     console.log("AaveV3Handler deployed to:", await aaveV3Handler.getAddress());
 
-    const CompoundSafeHandler = await hre.ethers.getContractFactory("CompoundSafeHandler");
-    const compoundHandler = await CompoundSafeHandler.deploy({
+    const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
+    const compoundHandler = await CompoundHandler.deploy({
         maxFeePerGas: gasPrice * BigInt(5),
     });
-    console.log("compoundHandler deployed to:", await compoundHandler.getAddress());
 
     const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
     const moonwellHandler = await MoonwellHandler.deploy(COMPTROLLER_ADDRESS, {
@@ -97,12 +96,17 @@ export async function deploySafeContractFixture() {
     const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER);
     console.log("FluidHandler deployed to:", await fluidHandler.getAddress());
 
+    const MorphoHandler = await hre.ethers.getContractFactory("MorphoHandler");
+    const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS);
+    console.log("MorphoHandler deployed to:", await morphoHandler.getAddress());
+
     const SafeModule = await hre.ethers.getContractFactory("SafeModule");
     const safeModule = await SafeModule.deploy(
-        [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MOONWELL, Protocols.FLUID],
+        [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO, Protocols.MOONWELL, Protocols.FLUID],
         [
             aaveV3Handler.getAddress(),
             compoundHandler.getAddress(),
+            morphoHandler.getAddress(),
             moonwellHandler.getAddress(),
             fluidHandler.getAddress(),
         ],
@@ -118,9 +122,9 @@ export async function deploySafeContractFixture() {
     };
 }
 
-export async function approve(tokenAddress: string, spenderAddress: string, signer: HardhatEthersSigner) {
+export async function approve(tokenAddress: string, spenderAddress: string, signer: any) {
     const token = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
-    const approveTx = await token.approve(spenderAddress, MaxUint256, { maxFeePerGas: 40_000_000 });
+    const approveTx = await token.approve(spenderAddress, MaxUint256);
     await approveTx.wait();
     console.log("approve:" + tokenAddress + "token to " + spenderAddress);
 }

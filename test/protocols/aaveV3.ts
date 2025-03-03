@@ -6,8 +6,8 @@ const aaveV3ProtocolDataProvider = "0xd82a47fdebB5bf5329b09441C3DaB4b5df2153Ad";
 const aaveProtocolDataProviderAbi = require("../../externalAbi/aaveV3/aaveProtocolDataProvider.json");
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { approve, formatAmount } from "../utils";
-const aaveDebtTokenJson = require("../../externalAbi/aaveV3/aaveDebtToken.json");
-const aaveV3PoolJson = require("../../externalAbi/aaveV3/aaveV3Pool.json");
+import aaveDebtTokenJson from "../../externalAbi/aaveV3/aaveDebtToken.json";
+import aaveV3PoolJson from "../../externalAbi/aaveV3/aaveV3Pool.json";
 
 export class AaveV3Helper {
     private protocolDataProvider;

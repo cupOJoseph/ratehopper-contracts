@@ -87,7 +87,16 @@ contract MoonwellHandler is IProtocolHandler {
                 ISafe.Operation.Call
             );
 
-            require(successWithdraw, "Withdraw failed");
+            require(successWithdraw, "Moonwell Withdraw failed");
+
+            bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
+                collateralAssets[i].asset,
+                0,
+                abi.encodeCall(IERC20.transfer, (address(this), collateralAssets[i].amount)),
+                ISafe.Operation.Call
+            );
+
+            require(successTransfer, "Moonwell transfer failed");
         }
     }
 
@@ -101,12 +110,14 @@ contract MoonwellHandler is IProtocolHandler {
         (address toContract, address[] memory mTokens) = abi.decode(extraData, (address, address[]));
 
         for (uint256 i = 0; i < collateralAssets.length; i++) {
-            uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(onBehalfOf);
+            uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
+
+            IERC20(collateralAssets[i].asset).transfer(onBehalfOf, currentBalance);
 
             bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
                 collateralAssets[i].asset,
                 0,
-                abi.encodeCall(IERC20.approve, (mTokens[i], collateralAssets[i].amount)),
+                abi.encodeCall(IERC20.approve, (mTokens[i], currentBalance)),
                 ISafe.Operation.Call
             );
 

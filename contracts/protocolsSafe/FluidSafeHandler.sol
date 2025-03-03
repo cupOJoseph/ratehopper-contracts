@@ -93,7 +93,7 @@ contract FluidSafeHandler is IProtocolHandler {
         bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
             vaultAddress,
             0,
-            abi.encodeCall(IFluidVault.operate, (nftId, type(int).min, 0, onBehalfOf)),
+            abi.encodeCall(IFluidVault.operate, (nftId, type(int).min, 0, address(this))),
             ISafe.Operation.Call
         );
         console.log("successWithdraw:", successWithdraw);
@@ -107,6 +107,8 @@ contract FluidSafeHandler is IProtocolHandler {
         bytes calldata extraData
     ) external override {
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
+
+        IERC20(collateralAssets[0].asset).transfer(onBehalfOf, collateralAssets[0].amount);
 
         bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
             collateralAssets[0].asset,

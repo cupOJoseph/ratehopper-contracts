@@ -92,8 +92,8 @@ export class MorphoHelper {
         this.morpho = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, signer);
     }
 
-    async getDebtAmount(marketId: string): Promise<bigint> {
-        const positionData = await this.getPosition(marketId);
+    async getDebtAmount(marketId: string, userAddress?: string): Promise<bigint> {
+        const positionData = await this.getPosition(marketId, userAddress);
         const marketData = await this.getMarketData(marketId);
         // picked this logic from AP-API Morpho BP
         const borrowShares = BigInt(positionData.borrowShares);
@@ -103,26 +103,26 @@ export class MorphoHelper {
         const result1 = borrowShares * totalBorrowAssets;
         const result2 = totalBorrowShares - BigInt(1);
         const debtAmount = result1 / result2;
-        console.log("morphoDebtAmount:", debtAmount);
+        console.log(`morpho DebtAmount ${marketId}:`, debtAmount);
         return debtAmount;
     }
 
-    async getCollateralAmount(marketId: string): Promise<bigint> {
-        const positionData = await this.getPosition(marketId);
+    async getCollateralAmount(marketId: string, userAddress?: string): Promise<bigint> {
+        const positionData = await this.getPosition(marketId, userAddress);
         const collateralAmount = positionData.collateral;
-        console.log("collateralAmount:", collateralAmount);
+        console.log(`morpho collateralAmount ${marketId}:`, collateralAmount);
         return collateralAmount;
     }
 
-    async getBorrowShares(marketId: string): Promise<bigint> {
-        const positionData = await this.getPosition(marketId);
+    async getBorrowShares(marketId: string, userAddress?: string): Promise<bigint> {
+        const positionData = await this.getPosition(marketId, userAddress);
         const borrowShares = positionData.borrowShares;
-        console.log("borrowShares:", borrowShares);
+        console.log(`morpho borrowShares ${marketId}:`, borrowShares);
         return borrowShares;
     }
 
-    async getPosition(marketId: string) {
-        return await this.morpho.position(marketId, TEST_ADDRESS);
+    async getPosition(marketId: string, userAddress?: string) {
+        return await this.morpho.position(marketId, userAddress || TEST_ADDRESS);
     }
 
     async getMarketData(marketId: string) {
