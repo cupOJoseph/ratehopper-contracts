@@ -71,8 +71,10 @@ contract AaveV3Handler is IProtocolHandler {
         bytes calldata extraData
     ) external override {
         for (uint256 i = 0; i < collateralAssets.length; i++) {
-            IERC20(collateralAssets[i].asset).approve(address(aaveV3Pool), collateralAssets[i].amount);
-            aaveV3Pool.supply(collateralAssets[i].asset, collateralAssets[i].amount, onBehalfOf, 0);
+            uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
+
+            IERC20(collateralAssets[i].asset).approve(address(aaveV3Pool), currentBalance);
+            aaveV3Pool.supply(collateralAssets[i].asset, currentBalance, onBehalfOf, 0);
         }
         aaveV3Pool.borrow(toAsset, amount, 2, 0, onBehalfOf);
     }

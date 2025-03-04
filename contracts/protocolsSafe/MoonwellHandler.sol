@@ -54,7 +54,7 @@ contract MoonwellHandler is IProtocolHandler {
             ISafe.Operation.Call
         );
 
-        console.log("successBorrow: ", successBorrow);
+        require(successBorrow, "Borrow transaction failed");
 
         bytes memory transferData = abi.encodeCall(IERC20.transfer, (address(this), amountTotal));
         bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
@@ -63,7 +63,7 @@ contract MoonwellHandler is IProtocolHandler {
             transferData,
             ISafe.Operation.Call
         );
-        console.log("successTransfer: ", successTransfer);
+        require(successTransfer, "Transfer failed");
     }
 
     function switchFrom(
@@ -108,6 +108,7 @@ contract MoonwellHandler is IProtocolHandler {
         (address toContract, address[] memory mTokens) = abi.decode(extraData, (address, address[]));
 
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            // use balanceOf() because collateral amount is slightly decreased when switching from Fluid
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
 
             IERC20(collateralAssets[i].asset).transfer(onBehalfOf, currentBalance);
@@ -119,10 +120,11 @@ contract MoonwellHandler is IProtocolHandler {
                 ISafe.Operation.Call
             );
 
+            require(successApprove, "moonwell approve failed");
+
             bool successMint = ISafe(onBehalfOf).execTransactionFromModule(
                 mTokens[i],
                 0,
-                // abi.encodeCall(IMToken.mint, (collateralAssets[i].amount)),
                 abi.encodeCall(IMToken.mint, (currentBalance)),
                 ISafe.Operation.Call
             );
@@ -137,6 +139,8 @@ contract MoonwellHandler is IProtocolHandler {
                 abi.encodeCall(IComptroller.enterMarkets, (collateralContracts)),
                 ISafe.Operation.Call
             );
+
+            require(successEnterMarkets, "moonwell enter markets failed");
         }
 
         bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(

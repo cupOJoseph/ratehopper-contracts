@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.28;
 
-import {IERC20} from "../dependencies/IERC20.sol";
-import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
+import {IERC20} from "./dependencies/IERC20.sol";
+import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-import "../Types.sol";
-import "../interfaces/safe/ISafe.sol";
-import {IProtocolHandler} from "../interfaces/IProtocolHandler.sol";
+import "./Types.sol";
+import "./interfaces/safe/ISafe.sol";
+import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "hardhat/console.sol";
 
-contract SafeModule is Ownable, ReentrancyGuard {
+contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
     uint8 public protocolFee;
     address public feeBeneficiary;
+    address public executor;
     mapping(Protocol => address) public protocolHandlers;
     mapping(address => address) public ownerToSafe;
 
@@ -36,10 +37,19 @@ contract SafeModule is Ownable, ReentrancyGuard {
         ParaswapParams paraswapParams;
     }
 
-    event TransactionExecuted(address indexed target, bytes data);
+    event DebtSwapped(
+        address indexed onBehalfOf,
+        Protocol fromProtocol,
+        Protocol toProtocol,
+        address fromAsset,
+        address toAsset,
+        uint256 amount
+    );
 
-    modifier onlySafeOwner() {
-        require(ownerToSafe[msg.sender] != address(0), "SafeModule: Caller is not the Safe owner");
+    event FlashLoanBorrowed(address indexed pool, address indexed asset, uint256 amount, uint256 fee);
+
+    modifier onlyOwnerOrExecutor() {
+        require(ownerToSafe[msg.sender] != address(0) || msg.sender == executor, "Caller is not authorized");
         _;
     }
 
@@ -50,6 +60,8 @@ contract SafeModule is Ownable, ReentrancyGuard {
             require(handlers[i] != address(0), "Invalid handler address");
             protocolHandlers[protocols[i]] = handlers[i];
         }
+
+        executor = msg.sender;
     }
 
     function setProtocolFee(uint8 _fee) public onlyOwner {
@@ -60,6 +72,11 @@ contract SafeModule is Ownable, ReentrancyGuard {
     function setFeeBeneficiary(address _feeBeneficiary) public onlyOwner {
         require(_feeBeneficiary != address(0), "_feeBeneficiary cannot be zero address");
         feeBeneficiary = _feeBeneficiary;
+    }
+
+    function setExecutor(address _executor) public onlyOwner {
+        require(_executor != address(0), "_executor cannot be zero address");
+        executor = _executor;
     }
 
     function getHandler(Protocol protocol) public view returns (address) {
@@ -85,7 +102,7 @@ contract SafeModule is Ownable, ReentrancyGuard {
         bytes calldata _fromExtraData,
         bytes calldata _toExtraData,
         ParaswapParams calldata _paraswapParams
-    ) public onlySafeOwner {
+    ) public onlyOwnerOrExecutor {
         require(_fromDebtAsset != address(0), "Invalid from asset address");
         require(_toDebtAsset != address(0), "Invalid to asset address");
         require(_amount > 0, "_amount cannot be zero");
@@ -148,14 +165,13 @@ contract SafeModule is Ownable, ReentrancyGuard {
         uint8 toAssetDecimals = IERC20(decoded.toAsset).decimals();
         uint8 conversionFactor = (fromAssetDecimals > toAssetDecimals) ? (fromAssetDecimals - toAssetDecimals) : 0;
         uint flashloanFee = flashloanFeeOriginal / (10 ** conversionFactor);
-        // uint flashloanFee = fee0 + fee1;
-        console.log("flashloan fee:", flashloanFee);
+
+        emit FlashLoanBorrowed(decoded.flashloanPool, decoded.fromAsset, decoded.amount, flashloanFee);
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 
         uint256 amountInMax = decoded.srcAmount == 0 ? decoded.amount : decoded.srcAmount;
         uint256 amountTotal = amountInMax + flashloanFee + protocolFeeAmount;
-        console.log("amount total:", amountTotal);
 
         if (decoded.fromProtocol == decoded.toProtocol) {
             address handler = getHandler(decoded.fromProtocol);
@@ -226,6 +242,21 @@ contract SafeModule is Ownable, ReentrancyGuard {
 
             require(success, "Repay remainingBalance failed");
         }
+
+        // send dust amount back to user if it exists
+        uint256 fromTokenRemainingBalance = IERC20(decoded.fromAsset).balanceOf(address(this));
+        if (fromTokenRemainingBalance > 0) {
+            IERC20(decoded.fromAsset).safeTransfer(decoded.onBehalfOf, fromTokenRemainingBalance);
+        }
+
+        emit DebtSwapped(
+            decoded.onBehalfOf,
+            decoded.fromProtocol,
+            decoded.toProtocol,
+            decoded.fromAsset,
+            decoded.toAsset,
+            decoded.amount
+        );
     }
 
     function swapByParaswap(

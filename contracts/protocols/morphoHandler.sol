@@ -78,8 +78,10 @@ contract MorphoHandler is IProtocolHandler {
     ) public override {
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
 
-        IERC20(marketParams.collateralToken).approve(address(morpho), collateralAssets[0].amount);
-        morpho.supplyCollateral(marketParams, collateralAssets[0].amount, onBehalfOf, "");
+        uint256 currentBalance = IERC20(collateralAssets[0].asset).balanceOf(address(this));
+
+        IERC20(marketParams.collateralToken).approve(address(morpho), currentBalance);
+        morpho.supplyCollateral(marketParams, currentBalance, onBehalfOf, "");
 
         morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
     }

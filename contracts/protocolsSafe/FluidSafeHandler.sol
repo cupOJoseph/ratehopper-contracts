@@ -28,7 +28,7 @@ contract FluidSafeHandler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata fromExtraData
     ) public view returns (uint256) {
-        (address vaultAddress, uint256 nftId) = abi.decode(fromExtraData, (address, uint256));
+        (address vaultAddress, ) = abi.decode(fromExtraData, (address, uint256));
 
         IFluidVaultResolver resolver = IFluidVaultResolver(FLUID_VAULT_RESOLVER);
 
@@ -37,7 +37,8 @@ contract FluidSafeHandler is IProtocolHandler {
         for (uint256 i = 0; i < vaultsData_.length; i++) {
             if (vaultsData_[i].vault == vaultAddress) {
                 uint256 debtAmount = userPositions_[i].borrow;
-                return debtAmount + 10;
+                // add tiny amount buffer to avoid repay amount is slightly increased and revert
+                return (debtAmount * 100001) / 100000;
             }
         }
         revert("Vault not found");
@@ -76,16 +77,10 @@ contract FluidSafeHandler is IProtocolHandler {
         );
         require(successApprove, "Fluid approve failed");
 
-        // int256 debtAmount = type(int256).min;
-        // uint256 currentDebtAmount = getDebtAmount(fromAsset, onBehalfOf, extraData);
-        // if (amount == currentDebtAmount) {
-        //     debtAmount = -int256(amount);
-        // }
-
         bool successRepay = ISafe(onBehalfOf).execTransactionFromModule(
             vaultAddress,
             0,
-            // abi.encodeCall(IFluidVault.operate, (nftId, 0, debtAmount, onBehalfOf)),
+            // Support only full repay on Fluid to avoid error
             abi.encodeCall(IFluidVault.operate, (nftId, 0, type(int).min, onBehalfOf)),
             ISafe.Operation.Call
         );
@@ -94,6 +89,7 @@ contract FluidSafeHandler is IProtocolHandler {
         bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
             vaultAddress,
             0,
+            // Support only full withdraw on Fluid to avoid error
             abi.encodeCall(IFluidVault.operate, (nftId, type(int).min, 0, address(this))),
             ISafe.Operation.Call
         );
@@ -174,7 +170,7 @@ contract FluidSafeHandler is IProtocolHandler {
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
-        (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
+        (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
         IERC20(asset).safeTransferFrom(onBehalfOf, address(this), uint256(amount));
         IERC20(asset).approve(address(vaultAddress), uint256(amount));
         IFluidVault vault = IFluidVault(vaultAddress);

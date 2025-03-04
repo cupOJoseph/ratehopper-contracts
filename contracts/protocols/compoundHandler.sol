@@ -63,10 +63,11 @@ contract CompoundHandler is IProtocolHandler {
 
         IComet toComet = IComet(cContract);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
-            IERC20(collateralAssets[i].asset).approve(address(cContract), collateralAssets[i].amount);
+            uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
+            IERC20(collateralAssets[i].asset).approve(address(cContract), currentBalance);
 
             // supply collateral
-            toComet.supplyTo(onBehalfOf, collateralAssets[i].asset, collateralAssets[i].amount);
+            toComet.supplyTo(onBehalfOf, collateralAssets[i].asset, currentBalance);
         }
 
         // borrow

@@ -102,7 +102,7 @@ export async function deploySafeContractFixture() {
     const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS);
     console.log("MorphoHandler deployed to:", await morphoHandler.getAddress());
 
-    const SafeModule = await hre.ethers.getContractFactory("SafeModule");
+    const SafeModule = await hre.ethers.getContractFactory("SafeModuleDebtSwap");
     const safeModule = await SafeModule.deploy(
         [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO, Protocols.MOONWELL, Protocols.FLUID],
         [

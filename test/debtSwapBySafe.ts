@@ -19,8 +19,6 @@ import {
     USDC_hyUSD_POOL,
 } from "./constants";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import aaveV3PoolJson from "../externalAbi/aaveV3/aaveV3Pool.json";
-import ComptrollerAbi from "../externalAbi/moonwell/comptroller.json";
 import cometAbi from "../externalAbi/compound/comet.json";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
@@ -36,11 +34,11 @@ import {
     getParaswapData,
     protocolHelperMap,
 } from "./utils";
-import { COMPTROLLER_ADDRESS, mcbETH, mContractAddressMap, mDAI, MoonwellHelper } from "./protocols/moonwell";
+import { mcbETH, mContractAddressMap } from "./protocols/moonwell";
 import { FLUID_cbBTC_sUSDS_VAULT, FLUID_cbETH_USDC_VAULT, FluidHelper } from "./protocols/fluid";
 import { cometAddressMap, USDC_COMET_ADDRESS } from "./protocols/compound";
 import { marketParamsMap, MORPHO_ADDRESS, morphoMarket1Id, morphoMarket2Id } from "./protocols/morpho";
-import MErc20DelegatorAbi from "../externalAbi/moonwell/MErc20Delegator.json";
+
 import FluidVaultAbi from "../externalAbi/fluid/fluidVaultT1.json";
 import aaveDebtTokenJson from "../externalAbi/aaveV3/aaveDebtToken.json";
 
@@ -53,7 +51,7 @@ export const eip1193Provider: Eip1193Provider = {
 
 export const safeAddress = "0x2f9054Eb6209bb5B94399115117044E4f150B2De";
 
-describe.only("Safe wallet should debtSwap", function () {
+describe("Safe wallet should debtSwap", function () {
     const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);
     let safeWallet;
     let safeModuleContract;
@@ -98,7 +96,7 @@ describe.only("Safe wallet should debtSwap", function () {
 
         console.log("Modules:", await safeWallet.getModules());
 
-        const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
+        const moduleContract = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress, signer);
 
         const setSafeTransactionData: MetaTransactionData = {
             to: safeModuleAddress,
@@ -118,8 +116,8 @@ describe.only("Safe wallet should debtSwap", function () {
         const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, signer);
         const tx = await cbETHContract.transfer(safeAddress, ethers.parseEther("0.001"));
         await tx.wait();
-        const balance = await cbETHContract.balanceOf(safeAddress);
-        console.log(`Balance:`, ethers.formatEther(balance), "cbETH");
+        // const balance = await cbETHContract.balanceOf(safeAddress);
+        // console.log(`Balance:`, ethers.formatEther(balance), "cbETH");
     }
 
     async function supplyAndBorrow(protocol: Protocols, debtTokenAddress = USDC_ADDRESS) {
@@ -152,8 +150,8 @@ describe.only("Safe wallet should debtSwap", function () {
         const safeTxHash = await safeWallet.executeTransaction(safeTransaction);
         console.log(`Supplied and borrowed on protocol: ${protocol}`);
 
-        const balanceAfter = await cbETHContract.balanceOf(safeAddress);
-        console.log(`Balance after:`, ethers.formatEther(balanceAfter), "cbETH");
+        // const balanceAfter = await cbETHContract.balanceOf(safeAddress);
+        // console.log(`Balance after:`, ethers.formatEther(balanceAfter), "cbETH");
 
         // const collateral = await moonwellHelper.getCollateralAmount(mcbETH, safeAddress);
 
@@ -293,6 +291,31 @@ describe.only("Safe wallet should debtSwap", function () {
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.FLUID, Protocols.MOONWELL);
     });
 
+    it("from Fluid to Aave", async function () {
+        await supplyAndBorrowOnFluid();
+        await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.FLUID, Protocols.AAVE_V3);
+    });
+
+    it("from Fluid to Morpho", async function () {
+        await supplyAndBorrowOnFluid();
+        await executeDebtSwap(
+            USDC_hyUSD_POOL,
+            USDC_ADDRESS,
+            USDC_ADDRESS,
+            Protocols.FLUID,
+            Protocols.MORPHO,
+            cbETH_ADDRESS,
+            {
+                morphoToMarketId: morphoMarket2Id,
+            },
+        );
+    });
+
+    it.only("from Fluid to Compound", async function () {
+        await supplyAndBorrowOnFluid();
+        await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.FLUID, Protocols.COMPOUND);
+    });
+
     it("from Moonwell to Fluid", async function () {
         await supplyAndBorrow(Protocols.MOONWELL);
 
@@ -300,7 +323,6 @@ describe.only("Safe wallet should debtSwap", function () {
     });
 
     it("from Moonwell DAI to Fluid USDC", async function () {
-        // await supplyAndBorrowOnMoonwell(DAI_ADDRESS);
         await supplyAndBorrow(Protocols.MOONWELL, DAI_ADDRESS);
         await executeDebtSwap(DAI_USDC_POOL, DAI_ADDRESS, USDC_ADDRESS, Protocols.MOONWELL, Protocols.FLUID);
     });
@@ -336,7 +358,7 @@ describe.only("Safe wallet should debtSwap", function () {
         const toHelper = new ToHelper(signer);
 
         const safeModuleAddress = await safeModuleContract.getAddress();
-        const moduleContract = await ethers.getContractAt("SafeModule", safeModuleAddress, signer);
+        const moduleContract = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress, signer);
 
         const fromDebtAmountParameter =
             fromProtocol === Protocols.MORPHO ? options!.morphoFromMarketId! : fromTokenAddress;
@@ -418,21 +440,7 @@ describe.only("Safe wallet should debtSwap", function () {
                 fromExtraData = fromHelper.encodeExtraData(fromCometAddress);
                 break;
             case Protocols.MORPHO:
-                const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, signer);
-
-                const authTransactionData: MetaTransactionData = {
-                    to: MORPHO_ADDRESS,
-                    value: "0",
-                    data: morphoContract.interface.encodeFunctionData("setAuthorization", [safeModuleAddress, true]),
-                    operation: OperationType.Call,
-                };
-
-                const safeTransaction = await safeWallet.createTransaction({
-                    transactions: [authTransactionData],
-                });
-
-                const safeTxHash = await safeWallet.executeTransaction(safeTransaction);
-                console.log("Safe transaction: setAuthorization");
+                await morphoAuthorizeTxBySafe();
 
                 const borrowShares = await fromHelper.getBorrowShares(options!.morphoFromMarketId!, safeAddress);
 
@@ -498,6 +506,11 @@ describe.only("Safe wallet should debtSwap", function () {
                 toExtraData = toHelper.encodeExtraData(toCometAddress);
                 break;
             case Protocols.MORPHO:
+                // TODO: refactor this
+                if (fromProtocol != Protocols.MORPHO) {
+                    await morphoAuthorizeTxBySafe();
+                }
+
                 const borrowShares = await toHelper.getBorrowShares(options!.morphoToMarketId!, safeAddress);
 
                 toExtraData = toHelper.encodeExtraData(options!.morphoToMarketId!, borrowShares);
@@ -559,5 +572,23 @@ describe.only("Safe wallet should debtSwap", function () {
             " -> ",
             ethers.formatUnits(dstDebtAfter, dstDecimals),
         );
+    }
+
+    async function morphoAuthorizeTxBySafe() {
+        const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, signer);
+
+        const authTransactionData: MetaTransactionData = {
+            to: MORPHO_ADDRESS,
+            value: "0",
+            data: morphoContract.interface.encodeFunctionData("setAuthorization", [safeModuleAddress, true]),
+            operation: OperationType.Call,
+        };
+
+        const safeTransaction = await safeWallet.createTransaction({
+            transactions: [authTransactionData],
+        });
+
+        const safeTxHash = await safeWallet.executeTransaction(safeTransaction);
+        console.log("Safe transaction: setAuthorization");
     }
 });
