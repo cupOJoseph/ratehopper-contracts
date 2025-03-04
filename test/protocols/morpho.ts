@@ -13,10 +13,12 @@ import {
 } from "../constants";
 
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { approve, formatAmount } from "../utils";
+import { approve, defaultProvider, formatAmount } from "../utils";
 import chainAgnosticBundlerV2Abi from "../../externalAbi/morpho/chainAgnosticBundlerV2.json";
 import morphoAbi from "../../externalAbi/morpho/morpho.json";
 import { BundlerAction } from "@morpho-org/bundler-sdk-ethers";
+import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
+import { safeAddress } from "../debtSwapBySafe";
 
 export const bundlerAddress = "0x23055618898e202386e6c13955a58d3c68200bfb";
 export const MORPHO_ADDRESS = "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb";
@@ -198,5 +200,46 @@ export class MorphoHelper {
             const decodedData = iface.decodeFunctionData(calldata[0].slice(0, 10), calldata[0]);
             console.log("Decoded Data:", decodedData);
         }
+    }
+
+    async getSupplyAndBorrowTxdata(debtTokenAddress): Promise<MetaTransactionData[]> {
+        const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, defaultProvider);
+        const marketParams = marketParamsMap.get(morphoMarket1Id)!;
+
+        const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, defaultProvider);
+
+        const approveTransactionData: MetaTransactionData = {
+            to: cbETH_ADDRESS,
+            value: "0",
+            data: cbETHContract.interface.encodeFunctionData("approve", [MORPHO_ADDRESS, ethers.parseEther("1")]),
+            operation: OperationType.Call,
+        };
+
+        const supplyTransactionData: MetaTransactionData = {
+            to: MORPHO_ADDRESS,
+            value: "0",
+            data: morphoContract.interface.encodeFunctionData("supplyCollateral", [
+                marketParams,
+                ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
+                safeAddress,
+                "0x",
+            ]),
+            operation: OperationType.Call,
+        };
+
+        const amount = ethers.parseUnits("1", 6);
+        const borrowTransactionData: MetaTransactionData = {
+            to: MORPHO_ADDRESS,
+            value: "0",
+            data: morphoContract.interface.encodeFunctionData("borrow", [
+                marketParams,
+                amount,
+                0,
+                safeAddress,
+                safeAddress,
+            ]),
+            operation: OperationType.Call,
+        };
+        return [approveTransactionData, supplyTransactionData, borrowTransactionData];
     }
 }

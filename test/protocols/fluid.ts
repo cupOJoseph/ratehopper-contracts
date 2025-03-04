@@ -15,10 +15,13 @@ import {
 
 export const FLUID_VAULT_RESOLVER = "0x79B3102173EB84E6BCa182C7440AfCa5A41aBcF8";
 export const FLUID_cbETH_USDC_VAULT = "0x40d9b8417e6e1dcd358f04e3328bced061018a82";
+export const FLUID_cbBTC_sUSDS_VAULT = "0xF2c8F54447cbd591C396b0Dd7ac15FAF552d0FA4";
 
 export const fluidVaultMap = new Map<string, string>([
     // https://fluid.instadapp.io/vaults/8453/6
     [USDC_ADDRESS, FLUID_cbETH_USDC_VAULT],
+    // https://fluid.instadapp.io/vaults/8453/19
+    [sUSDS_ADDRESS, FLUID_cbBTC_sUSDS_VAULT],
 ]);
 
 export class FluidHelper {

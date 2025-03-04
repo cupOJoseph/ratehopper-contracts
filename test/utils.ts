@@ -21,6 +21,8 @@ export const protocolHelperMap = new Map<Protocols, any>([
     [Protocols.FLUID, FluidHelper],
 ]);
 
+export const defaultProvider = new ethers.JsonRpcProvider("https://base.llamarpc.com");
+
 // We define a fixture to reuse the same setup in every test.
 // We use loadFixture to run this setup once, snapshot that state,
 // and reset Hardhat Network to that snapshot in every test.
@@ -175,6 +177,7 @@ export async function getParaswapData(destToken: string, srcToken: string, contr
         srcDecimals,
         destToken,
         destDecimals,
+        // destToken amount
         amount: amountPlusBuffer,
         // side must be BUY to use exactAmountOutSwap
         side: "BUY",

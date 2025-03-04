@@ -143,12 +143,19 @@ contract SafeModule is Ownable, ReentrancyGuard {
         address safe = ownerToSafe[decoded.onBehalfOf];
 
         // suppose either of fee0 or fee1 is 0
-        uint flashloanFee = fee0 + fee1;
+        uint flashloanFeeOriginal = fee0 + fee1;
+        uint8 fromAssetDecimals = IERC20(decoded.fromAsset).decimals();
+        uint8 toAssetDecimals = IERC20(decoded.toAsset).decimals();
+        uint8 conversionFactor = (fromAssetDecimals > toAssetDecimals) ? (fromAssetDecimals - toAssetDecimals) : 0;
+        uint flashloanFee = flashloanFeeOriginal / (10 ** conversionFactor);
+        // uint flashloanFee = fee0 + fee1;
+        console.log("flashloan fee:", flashloanFee);
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 
         uint256 amountInMax = decoded.srcAmount == 0 ? decoded.amount : decoded.srcAmount;
         uint256 amountTotal = amountInMax + flashloanFee + protocolFeeAmount;
+        console.log("amount total:", amountTotal);
 
         if (decoded.fromProtocol == decoded.toProtocol) {
             address handler = getHandler(decoded.fromProtocol);
@@ -200,7 +207,7 @@ contract SafeModule is Ownable, ReentrancyGuard {
         }
 
         // repay flashloan
-        IERC20(decoded.fromAsset).transfer(address(decoded.flashloanPool), decoded.amount + flashloanFee);
+        IERC20(decoded.fromAsset).transfer(address(decoded.flashloanPool), decoded.amount + flashloanFeeOriginal);
 
         if (protocolFee > 0) {
             IERC20(decoded.toAsset).safeTransfer(feeBeneficiary, protocolFeeAmount);

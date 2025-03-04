@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { Contract, MaxUint256 } from "ethers";
 import cometAbi from "../../externalAbi/compound/comet.json";
-import { approve, formatAmount } from "../utils";
+import { approve, defaultProvider, formatAmount } from "../utils";
 import {
     cbETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
@@ -11,6 +11,8 @@ import {
     USDC_ADDRESS,
     WETH_ADDRESS,
 } from "../constants";
+import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
+import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 
 export const USDC_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
 export const USDbC_COMET_ADDRESS = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
@@ -72,5 +74,36 @@ export class CompoundHelper {
 
     encodeExtraData(cometAddress: string) {
         return ethers.AbiCoder.defaultAbiCoder().encode(["address"], [cometAddress]);
+    }
+
+    async getSupplyAndBorrowTxdata(debtTokenAddress): Promise<MetaTransactionData[]> {
+        const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, defaultProvider);
+        const approveTransactionData: MetaTransactionData = {
+            to: cbETH_ADDRESS,
+            value: "0",
+            data: cbETHContract.interface.encodeFunctionData("approve", [USDC_COMET_ADDRESS, ethers.parseEther("1")]),
+            operation: OperationType.Call,
+        };
+
+        const cometContract = new ethers.Contract(USDC_COMET_ADDRESS, cometAbi, defaultProvider);
+
+        const supplyTransactionData: MetaTransactionData = {
+            to: USDC_COMET_ADDRESS,
+            value: "0",
+            data: cometContract.interface.encodeFunctionData("supply", [
+                cbETH_ADDRESS,
+                ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
+            ]),
+            operation: OperationType.Call,
+        };
+
+        const borrowTransactionData: MetaTransactionData = {
+            to: USDC_COMET_ADDRESS,
+            value: "0",
+            data: cometContract.interface.encodeFunctionData("withdraw", [USDC_ADDRESS, ethers.parseUnits("1", 6)]),
+            operation: OperationType.Call,
+        };
+
+        return [approveTransactionData, supplyTransactionData, borrowTransactionData];
     }
 }

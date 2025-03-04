@@ -37,7 +37,7 @@ contract FluidSafeHandler is IProtocolHandler {
         for (uint256 i = 0; i < vaultsData_.length; i++) {
             if (vaultsData_[i].vault == vaultAddress) {
                 uint256 debtAmount = userPositions_[i].borrow;
-                return debtAmount;
+                return debtAmount + 10;
             }
         }
         revert("Vault not found");
@@ -47,13 +47,14 @@ contract FluidSafeHandler is IProtocolHandler {
         address fromAsset,
         address toAsset,
         uint256 amount,
-        uint256 amountInMax,
+        uint256 amountTotal,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
     ) external override {
-        // no case for fluid at the moment
+        switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
+        switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
 
     function switchFrom(
@@ -62,7 +63,7 @@ contract FluidSafeHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
-    ) external override {
+    ) public override {
         (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
         IERC20(fromAsset).transfer(onBehalfOf, amount);
@@ -73,7 +74,7 @@ contract FluidSafeHandler is IProtocolHandler {
             abi.encodeCall(IERC20.approve, (address(vaultAddress), type(uint256).max)),
             ISafe.Operation.Call
         );
-        console.log("successApprove:", successApprove);
+        require(successApprove, "Fluid approve failed");
 
         // int256 debtAmount = type(int256).min;
         // uint256 currentDebtAmount = getDebtAmount(fromAsset, onBehalfOf, extraData);
@@ -88,7 +89,7 @@ contract FluidSafeHandler is IProtocolHandler {
             abi.encodeCall(IFluidVault.operate, (nftId, 0, type(int).min, onBehalfOf)),
             ISafe.Operation.Call
         );
-        console.log("successRepay:", successRepay);
+        require(successRepay, "Fluid repay failed");
 
         bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
             vaultAddress,
@@ -96,7 +97,7 @@ contract FluidSafeHandler is IProtocolHandler {
             abi.encodeCall(IFluidVault.operate, (nftId, type(int).min, 0, address(this))),
             ISafe.Operation.Call
         );
-        console.log("successWithdraw:", successWithdraw);
+        require(successWithdraw, "Fluid withdraw failed");
     }
 
     function switchTo(
@@ -105,7 +106,7 @@ contract FluidSafeHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
-    ) external override {
+    ) public override {
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
 
         IERC20(collateralAssets[0].asset).transfer(onBehalfOf, collateralAssets[0].amount);
@@ -116,7 +117,7 @@ contract FluidSafeHandler is IProtocolHandler {
             abi.encodeCall(IERC20.approve, (address(vaultAddress), type(uint256).max)),
             ISafe.Operation.Call
         );
-        console.log("successApprove:", successApprove);
+        require(successApprove, "Approval failed");
 
         (bool successSupply, bytes memory returnData) = ISafe(onBehalfOf).execTransactionFromModuleReturnData(
             vaultAddress,
@@ -124,10 +125,9 @@ contract FluidSafeHandler is IProtocolHandler {
             abi.encodeCall(IFluidVault.operate, (0, int256(collateralAssets[0].amount), 0, onBehalfOf)),
             ISafe.Operation.Call
         );
-        console.log("successSupply:", successSupply);
+        require(successSupply, "Fluid supply failed");
 
-        (uint256 nftId, int256 colAmount_, int256 debtAmount_) = abi.decode(returnData, (uint256, int256, int256));
-        console.log("nftId_:", nftId);
+        (uint256 nftId, , ) = abi.decode(returnData, (uint256, int256, int256));
 
         bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
             vaultAddress,
@@ -135,11 +135,10 @@ contract FluidSafeHandler is IProtocolHandler {
             abi.encodeCall(IFluidVault.operate, (nftId, 0, int256(amount), address(this))),
             ISafe.Operation.Call
         );
-        console.log("successBorrow:", successBorrow);
+        require(successBorrow, "Fluid borrow failed");
     }
 
     function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override {
-        // (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
 
         IERC20(asset).transfer(onBehalfOf, amount);
@@ -150,7 +149,7 @@ contract FluidSafeHandler is IProtocolHandler {
             abi.encodeCall(IERC20.approve, (address(vaultAddress), type(uint256).max)),
             ISafe.Operation.Call
         );
-        console.log("successApprove:", successApprove);
+        require(successApprove, "Approval failed");
 
         IFluidVaultResolver resolver = IFluidVaultResolver(FLUID_VAULT_RESOLVER);
 
@@ -171,7 +170,7 @@ contract FluidSafeHandler is IProtocolHandler {
             ISafe.Operation.Call
         );
 
-        require(successRepay);
+        require(successRepay, "Repay failed");
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {

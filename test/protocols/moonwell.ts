@@ -1,17 +1,28 @@
 import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { Contract, MaxUint256 } from "ethers";
-import { cbBTC_ADDRESS, DAI_ADDRESS, DEFAULT_SUPPLY_AMOUNT, TEST_ADDRESS, USDC_ADDRESS } from "../constants";
+import {
+    cbBTC_ADDRESS,
+    cbETH_ADDRESS,
+    DAI_ADDRESS,
+    DEFAULT_SUPPLY_AMOUNT,
+    TEST_ADDRESS,
+    USDC_ADDRESS,
+} from "../constants";
 
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { approve, formatAmount } from "../utils";
-import { mDAI, mUSDC } from "../moonwellDebtSwap";
+import { approve, defaultProvider, formatAmount, getDecimals } from "../utils";
+import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 
 const MErc20DelegatorAbi = require("../../externalAbi/moonwell/MErc20Delegator.json");
 const ComptrollerAbi = require("../../externalAbi/moonwell/comptroller.json");
 const ViewAbi = require("../../externalAbi/moonwell/moonwellViewsV3.json");
 export const COMPTROLLER_ADDRESS = "0xfbb21d0380bee3312b33c4353c8936a0f13ef26c";
 const view_address = "0x821ff3a967b39bcbe8a018a9b1563eaf878bad39";
+
+export const mcbETH = "0x3bf93770f2d4a794c3d9ebefbaebae2a8f09a5e5";
+export const mUSDC = "0xedc817a28e8b93b03976fbd4a3ddbc9f7d176c22";
+export const mDAI = "0x73b06d8d18de422e269645eace15400de7462417";
 
 export const mContractAddressMap = new Map<string, string>([
     [USDC_ADDRESS, mUSDC],
@@ -85,5 +96,48 @@ export class MoonwellHelper {
         // const tx = await mToken.redeem();
         await tx.wait();
         console.log("withdrawn collateral from moonwell:", withdrawAmount);
+    }
+
+    async getSupplyAndBorrowTxdata(debtTokenAddress): Promise<MetaTransactionData[]> {
+        const cbETHmToken = new ethers.Contract(mcbETH, MErc20DelegatorAbi, defaultProvider);
+
+        const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, defaultProvider);
+        const approveTransactionData: MetaTransactionData = {
+            to: cbETH_ADDRESS,
+            value: "0",
+            data: cbETHContract.interface.encodeFunctionData("approve", [mcbETH, ethers.parseEther("1")]),
+            operation: OperationType.Call,
+        };
+
+        const supplyTransactionData: MetaTransactionData = {
+            to: mcbETH,
+            value: "0",
+            data: cbETHmToken.interface.encodeFunctionData("mint", [ethers.parseEther(DEFAULT_SUPPLY_AMOUNT)]),
+            operation: OperationType.Call,
+        };
+
+        const comptroller = new ethers.Contract(COMPTROLLER_ADDRESS, ComptrollerAbi, defaultProvider);
+
+        const enableTransactionData: MetaTransactionData = {
+            to: COMPTROLLER_ADDRESS,
+            value: "0",
+            data: comptroller.interface.encodeFunctionData("enterMarkets", [[mcbETH]]),
+            operation: OperationType.Call,
+        };
+
+        const mContractAddress = mContractAddressMap.get(debtTokenAddress)!;
+
+        const mToken = new ethers.Contract(mContractAddress, MErc20DelegatorAbi, defaultProvider);
+
+        const decimals = await getDecimals(debtTokenAddress);
+
+        const borrowTransactionData: MetaTransactionData = {
+            to: mContractAddress,
+            value: "0",
+            data: mToken.interface.encodeFunctionData("borrow", [ethers.parseUnits("1", decimals)]),
+            operation: OperationType.Call,
+        };
+
+        return [approveTransactionData, supplyTransactionData, enableTransactionData, borrowTransactionData];
     }
 }
