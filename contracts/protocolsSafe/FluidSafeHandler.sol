@@ -72,7 +72,7 @@ contract FluidSafeHandler is IProtocolHandler {
         bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
             fromAsset,
             0,
-            abi.encodeCall(IERC20.approve, (address(vaultAddress), type(uint256).max)),
+            abi.encodeCall(IERC20.approve, (address(vaultAddress), amount)),
             ISafe.Operation.Call
         );
         require(successApprove, "Fluid approve failed");
@@ -110,7 +110,7 @@ contract FluidSafeHandler is IProtocolHandler {
         bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
             collateralAssets[0].asset,
             0,
-            abi.encodeCall(IERC20.approve, (address(vaultAddress), type(uint256).max)),
+            abi.encodeCall(IERC20.approve, (address(vaultAddress), collateralAssets[0].amount)),
             ISafe.Operation.Call
         );
         require(successApprove, "Approval failed");
@@ -142,7 +142,7 @@ contract FluidSafeHandler is IProtocolHandler {
         bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
             asset,
             0,
-            abi.encodeCall(IERC20.approve, (address(vaultAddress), type(uint256).max)),
+            abi.encodeCall(IERC20.approve, (address(vaultAddress), amount)),
             ISafe.Operation.Call
         );
         require(successApprove, "Approval failed");

@@ -41,6 +41,8 @@ import { marketParamsMap, MORPHO_ADDRESS, morphoMarket1Id, morphoMarket2Id } fro
 
 import FluidVaultAbi from "../externalAbi/fluid/fluidVaultT1.json";
 import aaveDebtTokenJson from "../externalAbi/aaveV3/aaveDebtToken.json";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { expect } from "chai";
 
 export const eip1193Provider: Eip1193Provider = {
     request: async (args: RequestArguments) => {
@@ -51,7 +53,7 @@ export const eip1193Provider: Eip1193Provider = {
 
 export const safeAddress = "0x2f9054Eb6209bb5B94399115117044E4f150B2De";
 
-describe("Safe wallet should debtSwap", function () {
+describe.only("Safe wallet should debtSwap", function () {
     const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);
     let safeWallet;
     let safeModuleContract;
@@ -311,7 +313,7 @@ describe("Safe wallet should debtSwap", function () {
         );
     });
 
-    it.only("from Fluid to Compound", async function () {
+    it("from Fluid to Compound", async function () {
         await supplyAndBorrowOnFluid();
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.FLUID, Protocols.COMPOUND);
     });
@@ -338,6 +340,50 @@ describe("Safe wallet should debtSwap", function () {
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.AAVE_V3, Protocols.MOONWELL);
     });
 
+    it("Set executor address and Call executeDebtSwap by executor", async function () {
+        const safeModuleAddress = await safeModuleContract.getAddress();
+        const [_, wallet2] = await ethers.getSigners();
+        const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
+
+        await safeModule.setExecutor(wallet2.address);
+
+        await supplyAndBorrow(Protocols.MOONWELL);
+        await executeDebtSwap(
+            USDC_hyUSD_POOL,
+            USDC_ADDRESS,
+            USDC_ADDRESS,
+            Protocols.MOONWELL,
+            Protocols.AAVE_V3,
+            cbETH_ADDRESS,
+            {
+                executor: wallet2,
+            },
+        );
+    });
+
+    it("Revert when calling executeDebtSwap by non executor(wallet3)", async function () {
+        const safeModuleAddress = await safeModuleContract.getAddress();
+        const [_, wallet2, wallet3] = await ethers.getSigners();
+        const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
+
+        await safeModule.setExecutor(wallet2.address);
+
+        await supplyAndBorrow(Protocols.MOONWELL);
+        await expect(
+            executeDebtSwap(
+                USDC_hyUSD_POOL,
+                USDC_ADDRESS,
+                USDC_ADDRESS,
+                Protocols.MOONWELL,
+                Protocols.AAVE_V3,
+                cbETH_ADDRESS,
+                {
+                    executor: wallet3,
+                },
+            ),
+        ).to.be.reverted;
+    });
+
     async function executeDebtSwap(
         flashloanPool: string,
         fromTokenAddress: string,
@@ -350,6 +396,7 @@ describe("Safe wallet should debtSwap", function () {
             morphoToMarketId?: string;
             useMaxAmount?: boolean;
             anotherCollateralTokenAddress?: string;
+            executor?: HardhatEthersSigner;
         } = { useMaxAmount: true },
     ) {
         const FromHelper = protocolHelperMap.get(fromProtocol)!;
@@ -358,7 +405,11 @@ describe("Safe wallet should debtSwap", function () {
         const toHelper = new ToHelper(signer);
 
         const safeModuleAddress = await safeModuleContract.getAddress();
-        const moduleContract = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress, signer);
+        const moduleContract = await ethers.getContractAt(
+            "SafeModuleDebtSwap",
+            safeModuleAddress,
+            options.executor || signer,
+        );
 
         const fromDebtAmountParameter =
             fromProtocol === Protocols.MORPHO ? options!.morphoFromMarketId! : fromTokenAddress;
@@ -545,8 +596,8 @@ describe("Safe wallet should debtSwap", function () {
             MaxUint256,
             amountPlusSlippage,
             [{ asset: collateralTokenAddress, amount: collateralAmount }],
-            fromExtraData,
-            toExtraData,
+            safeAddress,
+            [fromExtraData, toExtraData],
             paraswapData,
             {
                 gasLimit: "2000000",

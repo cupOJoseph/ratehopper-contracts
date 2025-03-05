@@ -23,7 +23,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
     mapping(address => address) public ownerToSafe;
 
     struct FlashCallbackData {
-        address flashloanPool;
+        // address flashloanPool;
         Protocol fromProtocol;
         Protocol toProtocol;
         address fromAsset;
@@ -46,10 +46,8 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         uint256 amount
     );
 
-    event FlashLoanBorrowed(address indexed pool, address indexed asset, uint256 amount, uint256 fee);
-
-    modifier onlyOwnerOrExecutor() {
-        require(ownerToSafe[msg.sender] != address(0) || msg.sender == executor, "Caller is not authorized");
+    modifier onlyOwnerOrExecutor(address onBehalfOf) {
+        require(ownerToSafe[msg.sender] == onBehalfOf || msg.sender == executor, "Caller is not authorized");
         _;
     }
 
@@ -99,10 +97,10 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         uint256 _amount,
         uint256 _srcAmount,
         CollateralAsset[] calldata _collateralAssets,
-        bytes calldata _fromExtraData,
-        bytes calldata _toExtraData,
+        address _onBehalfOf,
+        bytes[2] calldata _extraData,
         ParaswapParams calldata _paraswapParams
-    ) public onlyOwnerOrExecutor {
+    ) public onlyOwnerOrExecutor(_onBehalfOf) {
         require(_fromDebtAsset != address(0), "Invalid from asset address");
         require(_toDebtAsset != address(0), "Invalid to asset address");
         require(_amount > 0, "_amount cannot be zero");
@@ -113,11 +111,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         if (_amount == type(uint256).max) {
             address handler = getHandler(_fromProtocol);
 
-            debtAmount = IProtocolHandler(handler).getDebtAmount(
-                _fromDebtAsset,
-                ownerToSafe[msg.sender],
-                _fromExtraData
-            );
+            debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, _onBehalfOf, _extraData[0]);
             console.log("on-chain debtAmount:", debtAmount);
         }
 
@@ -133,17 +127,16 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
 
         bytes memory data = abi.encode(
             FlashCallbackData({
-                flashloanPool: _flashloanPool,
                 fromProtocol: _fromProtocol,
                 toProtocol: _toProtocol,
                 fromAsset: _fromDebtAsset,
                 toAsset: _toDebtAsset,
                 amount: debtAmount,
                 srcAmount: _srcAmount,
-                onBehalfOf: msg.sender,
+                onBehalfOf: _onBehalfOf,
                 collateralAssets: _collateralAssets,
-                fromExtraData: _fromExtraData,
-                toExtraData: _toExtraData,
+                fromExtraData: _extraData[0],
+                toExtraData: _extraData[1],
                 paraswapParams: _paraswapParams
             })
         );
@@ -155,9 +148,9 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         FlashCallbackData memory decoded = abi.decode(data, (FlashCallbackData));
 
         // implement the same logic as CallbackValidation.verifyCallback()
-        require(msg.sender == address(decoded.flashloanPool), "Caller is not flashloan pool");
+        // require(msg.sender == address(decoded.flashloanPool), "Caller is not flashloan pool");
 
-        address safe = ownerToSafe[decoded.onBehalfOf];
+        address safe = decoded.onBehalfOf;
 
         // suppose either of fee0 or fee1 is 0
         uint flashloanFeeOriginal = fee0 + fee1;
@@ -165,8 +158,6 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         uint8 toAssetDecimals = IERC20(decoded.toAsset).decimals();
         uint8 conversionFactor = (fromAssetDecimals > toAssetDecimals) ? (fromAssetDecimals - toAssetDecimals) : 0;
         uint flashloanFee = flashloanFeeOriginal / (10 ** conversionFactor);
-
-        emit FlashLoanBorrowed(decoded.flashloanPool, decoded.fromAsset, decoded.amount, flashloanFee);
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 
@@ -223,7 +214,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         }
 
         // repay flashloan
-        IERC20(decoded.fromAsset).transfer(address(decoded.flashloanPool), decoded.amount + flashloanFeeOriginal);
+        IERC20(decoded.fromAsset).transfer(msg.sender, decoded.amount + flashloanFeeOriginal);
 
         if (protocolFee > 0) {
             IERC20(decoded.toAsset).safeTransfer(feeBeneficiary, protocolFeeAmount);

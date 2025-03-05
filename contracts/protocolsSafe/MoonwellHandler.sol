@@ -42,7 +42,7 @@ contract MoonwellHandler is IProtocolHandler {
     ) external override {
         (address fromContract, ) = abi.decode(fromExtraData, (address, address[]));
         (address toContract, ) = abi.decode(toExtraData, (address, address[]));
-        IERC20(fromAsset).approve(address(fromContract), type(uint256).max);
+        IERC20(fromAsset).approve(address(fromContract), amount);
 
         IMToken(fromContract).repayBorrowBehalf(onBehalfOf, amount);
 
@@ -74,7 +74,7 @@ contract MoonwellHandler is IProtocolHandler {
         bytes calldata extraData
     ) external override {
         (address fromContract, address[] memory mTokens) = abi.decode(extraData, (address, address[]));
-        IERC20(fromAsset).approve(address(fromContract), type(uint256).max);
+        IERC20(fromAsset).approve(address(fromContract), amount);
         IMToken(fromContract).repayBorrowBehalf(onBehalfOf, amount);
 
         for (uint256 i = 0; i < collateralAssets.length; i++) {
@@ -202,7 +202,7 @@ contract MoonwellHandler is IProtocolHandler {
             extraData,
             (address, address, uint256)
         );
-        IERC20(asset).approve(address(toContract), type(uint256).max);
+        IERC20(asset).approve(address(toContract), amount);
         IMToken(toContract).repayBorrowBehalf(onBehalfOf, amount);
     }
 }
