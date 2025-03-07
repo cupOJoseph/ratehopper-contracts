@@ -8,15 +8,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { aave, DebtSwap } from "../typechain-types";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
 
-import {
-    approve,
-    deployContractFixture,
-    formatAmount,
-    getAmountInMax,
-    getParaswapData,
-    protocolHelperMap,
-    wrapETH,
-} from "./utils";
+import { approve, formatAmount, getParaswapData, protocolHelperMap, wrapETH } from "./utils";
 import {
     USDC_ADDRESS,
     USDbC_ADDRESS,
@@ -43,6 +35,7 @@ import {
 import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id, morphoMarket2Id, morphoMarket3Id } from "./protocols/morpho";
 import { MaxUint256 } from "ethers";
 import { zeroAddress } from "viem";
+import { deployDebtSwapContractFixture } from "./deployUtils";
 
 describe("DebtSwap should switch", function () {
     let myContract: DebtSwap;
@@ -59,7 +52,7 @@ describe("DebtSwap should switch", function () {
         compoundHelper = new CompoundHelper(impersonatedSigner);
         morphoHelper = new MorphoHelper(impersonatedSigner);
 
-        const { debtSwap } = await loadFixture(deployContractFixture);
+        const debtSwap = await loadFixture(deployDebtSwapContractFixture);
         deployedContractAddress = await debtSwap.getAddress();
 
         myContract = await ethers.getContractAt("DebtSwap", deployedContractAddress, impersonatedSigner);

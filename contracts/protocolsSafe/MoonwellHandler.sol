@@ -175,12 +175,16 @@ contract MoonwellHandler is IProtocolHandler {
             ISafe.Operation.Call
         );
 
+        require(successApprove, "moonwell approve failed");
+
         bool successMint = ISafe(onBehalfOf).execTransactionFromModule(
             collateralContract,
             0,
             abi.encodeCall(IMToken.mint, (collateralAmount)),
             ISafe.Operation.Call
         );
+
+        require(successMint, "moonwell mint failed");
     }
 
     function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
@@ -195,6 +199,17 @@ contract MoonwellHandler is IProtocolHandler {
             abi.encodeCall(IMToken.borrow, (amount)),
             ISafe.Operation.Call
         );
+
+        require(successBorrow, "moonwell borrow failed");
+
+        bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
+            asset,
+            0,
+            abi.encodeCall(IERC20.transfer, (address(this), amount)),
+            ISafe.Operation.Call
+        );
+
+        require(successTransfer, "moonwell transfer failed");
     }
 
     function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override {

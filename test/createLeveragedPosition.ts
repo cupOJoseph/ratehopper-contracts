@@ -7,7 +7,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { LeveragedPosition } from "../typechain-types";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { approve, deployContractFixture, formatAmount, getDecimals, getParaswapData, protocolHelperMap } from "./utils";
+import { approve, getDecimals, getParaswapData, protocolHelperMap } from "./utils";
 
 import {
     USDC_ADDRESS,
@@ -34,6 +34,8 @@ import {
     morphoMarket5Id,
     morphoMarket6Id,
 } from "./protocols/morpho";
+import { deployLeveragedPositionContractFixture } from "./deployUtils";
+import { mcbETH, mContractAddressMap } from "./protocols/moonwell";
 
 describe("Create leveraged position", function () {
     let myContract: LeveragedPosition;
@@ -53,7 +55,7 @@ describe("Create leveraged position", function () {
         compoundHelper = new CompoundHelper(impersonatedSigner);
         morphoHelper = new MorphoHelper(impersonatedSigner);
 
-        const { leveragedPosition } = await loadFixture(deployContractFixture);
+        const leveragedPosition = await loadFixture(deployLeveragedPositionContractFixture);
         deployedContractAddress = await leveragedPosition.getAddress();
 
         myContract = await ethers.getContractAt("LeveragedPosition", deployedContractAddress, impersonatedSigner);

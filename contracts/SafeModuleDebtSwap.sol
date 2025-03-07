@@ -23,7 +23,6 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
     mapping(address => address) public ownerToSafe;
 
     struct FlashCallbackData {
-        // address flashloanPool;
         Protocol fromProtocol;
         Protocol toProtocol;
         address fromAsset;

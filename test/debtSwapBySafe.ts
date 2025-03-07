@@ -25,15 +25,7 @@ import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 import { MaxUint256 } from "ethers";
 
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import {
-    approve,
-    deployContractFixture,
-    deploySafeContractFixture,
-    formatAmount,
-    getDecimals,
-    getParaswapData,
-    protocolHelperMap,
-} from "./utils";
+import { approve, formatAmount, fundETH, getDecimals, getParaswapData, protocolHelperMap } from "./utils";
 import { mcbETH, mContractAddressMap } from "./protocols/moonwell";
 import { FLUID_cbBTC_sUSDS_VAULT, FLUID_cbETH_USDC_VAULT, FluidHelper } from "./protocols/fluid";
 import { cometAddressMap, USDC_COMET_ADDRESS } from "./protocols/compound";
@@ -43,6 +35,7 @@ import FluidVaultAbi from "../externalAbi/fluid/fluidVaultT1.json";
 import aaveDebtTokenJson from "../externalAbi/aaveV3/aaveDebtToken.json";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { expect } from "chai";
+import { deploySafeContractFixture } from "./deployUtils";
 
 export const eip1193Provider: Eip1193Provider = {
     request: async (args: RequestArguments) => {
@@ -53,7 +46,7 @@ export const eip1193Provider: Eip1193Provider = {
 
 export const safeAddress = "0x2f9054Eb6209bb5B94399115117044E4f150B2De";
 
-describe.only("Safe wallet should debtSwap", function () {
+describe("Safe wallet should debtSwap", function () {
     const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);
     let safeWallet;
     let safeModuleContract;
@@ -66,27 +59,13 @@ describe.only("Safe wallet should debtSwap", function () {
             safeAddress: safeAddress,
         });
 
-        const { safeModule } = await loadFixture(deploySafeContractFixture);
+        const safeModule = await loadFixture(deploySafeContractFixture);
         safeModuleContract = safeModule;
         safeModuleAddress = await safeModuleContract.getAddress();
 
-        await fundETH();
+        await fundETH(safeAddress);
         await setSafeOwner();
     });
-
-    async function fundETH() {
-        const wallet = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider); // Replace with a funded Hardhat account
-
-        const tx = await wallet.sendTransaction({
-            to: safeAddress,
-            value: ethers.parseEther("0.001"),
-        });
-
-        console.log("Transaction Hash:", tx.hash);
-
-        const balance = await ethers.provider.getBalance(safeAddress);
-        console.log(`Balance:`, ethers.formatEther(balance), "ETH");
-    }
 
     async function setSafeOwner() {
         const enableModuleTx = await safeWallet.createEnableModuleTx(
