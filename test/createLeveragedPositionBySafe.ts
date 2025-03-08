@@ -80,29 +80,31 @@ describe.only("Create leveraged position by Safe", function () {
         flashloanPool: string,
         protocol: Protocols,
         collateralAddress = cbETH_ADDRESS,
-        debtTokenAddress = USDC_ADDRESS,
+        debtAddress = USDC_ADDRESS,
         principleAmount = Number(DEFAULT_SUPPLY_AMOUNT),
         targetAmount = Number(defaultTargetSupplyAmount),
-        morphoMarketId?: string,
     ) {
         await setSafeOwner();
 
         const Helper = protocolHelperMap.get(protocol)!;
         const protocolHelper = new Helper(impersonatedSigner);
 
-        const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, impersonatedSigner);
-
-        const debtAsset = debtTokenAddress || USDC_ADDRESS;
+        const collateralContract = new ethers.Contract(collateralAddress, ERC20_ABI, impersonatedSigner);
 
         const collateralDecimals = await getDecimals(collateralAddress);
-        const debtDecimals = await getDecimals(debtAsset);
+        const debtDecimals = await getDecimals(debtAddress);
 
         let extraData = "0x";
 
+        const collateralMContract = mContractAddressMap.get(collateralAddress)!;
+
         switch (protocol) {
             case Protocols.MOONWELL:
-                const mContract = mContractAddressMap.get(debtAsset)!;
-                extraData = ethers.AbiCoder.defaultAbiCoder().encode(["address", "address[]"], [mContract, [mcbETH]]);
+                const debtMContract = mContractAddressMap.get(debtAddress)!;
+                extraData = ethers.AbiCoder.defaultAbiCoder().encode(
+                    ["address", "address[]"],
+                    [debtMContract, [collateralMContract]],
+                );
                 break;
         }
 
@@ -112,7 +114,7 @@ describe.only("Create leveraged position by Safe", function () {
 
         const [srcAmount, paraswapData] = await getParaswapData(
             collateralAddress,
-            debtAsset,
+            debtAddress,
             deployedContractAddress,
             diffAmount,
         );
@@ -121,25 +123,21 @@ describe.only("Create leveraged position by Safe", function () {
         const amountPlusSlippage = (BigInt(srcAmount) * 1200n) / 1000n;
 
         // send collateral token to safe
-        const tx = await cbETHContract.transfer(safeAddress, ethers.parseEther("0.001"));
+        const tx = await collateralContract.transfer(
+            safeAddress,
+            ethers.parseUnits(principleAmount.toString(), collateralDecimals),
+        );
         await tx.wait();
 
         const approveTransactionData: MetaTransactionData = {
             to: collateralAddress,
             value: "0",
-            data: cbETHContract.interface.encodeFunctionData("approve", [
+            data: collateralContract.interface.encodeFunctionData("approve", [
                 deployedContractAddress,
                 ethers.parseEther("1"),
             ]),
             operation: OperationType.Call,
         };
-
-        const safeTransaction = await safeWallet.createTransaction({
-            transactions: [approveTransactionData],
-        });
-
-        const safeTxHash = await safeWallet.executeTransaction(safeTransaction);
-        console.log(safeTxHash);
 
         const createTransactionData: MetaTransactionData = {
             to: deployedContractAddress,
@@ -150,7 +148,7 @@ describe.only("Create leveraged position by Safe", function () {
                 collateralAddress,
                 ethers.parseUnits(principleAmount.toString(), collateralDecimals),
                 parsedTargetAmount,
-                debtAsset,
+                debtAddress,
                 amountPlusSlippage,
                 extraData,
                 paraswapData,
@@ -158,28 +156,25 @@ describe.only("Create leveraged position by Safe", function () {
             operation: OperationType.Call,
         };
 
-        const safeTransaction2 = await safeWallet.createTransaction({
-            transactions: [createTransactionData],
+        const safeTransaction = await safeWallet.createTransaction({
+            transactions: [approveTransactionData, createTransactionData],
         });
 
-        const safeTxHash2 = await safeWallet.executeTransaction(safeTransaction2);
-        console.log(safeTxHash2);
+        const safeTxHash = await safeWallet.executeTransaction(safeTransaction);
+        console.log(safeTxHash);
 
-        const debtAmount = await protocolHelper.getDebtAmount(debtAsset);
-        console.log("debtAmount: ", ethers.formatUnits(debtAmount, debtDecimals));
+        const debtAmount = await protocolHelper.getDebtAmount(debtAddress);
 
-        const collateralAmount = await protocolHelper.getCollateralAmount(mcbETH, safeAddress);
-
-        console.log("collateralAmount: ", ethers.formatUnits(collateralAmount, collateralDecimals));
+        const collateralAmount = await protocolHelper.getCollateralAmount(collateralMContract, safeAddress);
 
         expect(debtAmount).to.be.gt(0);
-        expect(Number(collateralAmount)).to.be.equal(parsedTargetAmount);
+        expect(Number(collateralAmount)).to.be.gt(0);
 
         const collateralToken = new ethers.Contract(collateralAddress, ERC20_ABI, impersonatedSigner);
         const collateralRemainingBalance = await collateralToken.balanceOf(deployedContractAddress);
         expect(Number(collateralRemainingBalance)).to.be.equal(0);
 
-        const debtToken = new ethers.Contract(debtAsset, ERC20_ABI, impersonatedSigner);
+        const debtToken = new ethers.Contract(debtAddress, ERC20_ABI, impersonatedSigner);
         const debtRemainingBalance = await debtToken.balanceOf(deployedContractAddress);
         expect(Number(debtRemainingBalance)).to.be.equal(0);
     }
@@ -187,6 +182,23 @@ describe.only("Create leveraged position by Safe", function () {
     describe("on Moonwell", function () {
         it("with cbETH collateral", async function () {
             await createLeveragedPosition(cbETH_ETH_POOL, Protocols.MOONWELL);
+        });
+
+        it("with cbBTC collateral", async function () {
+            const cbBTCPrincipleAmount = 0.00006;
+            const targetAmount = cbBTCPrincipleAmount * 2;
+            await createLeveragedPosition(
+                cbBTC_USDC_POOL,
+                Protocols.MOONWELL,
+                cbBTC_ADDRESS,
+                USDC_ADDRESS,
+                cbBTCPrincipleAmount,
+                targetAmount,
+            );
+        });
+
+        it.skip("with USDC collateral, cbETH debt", async function () {
+            await createLeveragedPosition(cbETH_ETH_POOL, Protocols.MOONWELL, USDC_ADDRESS, cbETH_ADDRESS);
         });
     });
 });

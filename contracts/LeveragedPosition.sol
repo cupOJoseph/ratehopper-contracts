@@ -157,12 +157,14 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
 
         // repay remaining debt amount
         uint256 remainingBalance = IERC20(decoded.debtAsset).balanceOf(address(this));
-        handler.delegatecall(
+        (bool successRepay, ) = handler.delegatecall(
             abi.encodeCall(
                 IProtocolHandler.repay,
                 (decoded.debtAsset, remainingBalance, decoded.onBehalfOf, decoded.extraData)
             )
         );
+
+        require(successRepay, "Repay remaining amount failed");
 
         emit LeveragedPositionCreated(
             decoded.onBehalfOf,

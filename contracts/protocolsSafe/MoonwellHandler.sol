@@ -163,35 +163,42 @@ contract MoonwellHandler is IProtocolHandler {
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
-        (address toContract, address collateralContract, uint256 collateralAmount) = abi.decode(
-            extraData,
-            (address, address, uint256)
-        );
+        (address toContract, address[] memory mTokens) = abi.decode(extraData, (address, address[]));
+        IERC20(asset).transfer(onBehalfOf, amount);
 
         bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
-            collateralContract,
+            asset,
             0,
-            abi.encodeCall(IERC20.approve, (collateralContract, collateralAmount)),
+            abi.encodeCall(IERC20.approve, (mTokens[0], amount)),
             ISafe.Operation.Call
         );
 
         require(successApprove, "moonwell approve failed");
 
         bool successMint = ISafe(onBehalfOf).execTransactionFromModule(
-            collateralContract,
+            mTokens[0],
             0,
-            abi.encodeCall(IMToken.mint, (collateralAmount)),
+            abi.encodeCall(IMToken.mint, (amount)),
             ISafe.Operation.Call
         );
 
         require(successMint, "moonwell mint failed");
+
+        address[] memory collateralContracts = new address[](1);
+        collateralContracts[0] = mTokens[0];
+
+        bool successEnterMarkets = ISafe(onBehalfOf).execTransactionFromModule(
+            comptroller,
+            0,
+            abi.encodeCall(IComptroller.enterMarkets, (collateralContracts)),
+            ISafe.Operation.Call
+        );
+
+        require(successEnterMarkets, "moonwell enter markets failed");
     }
 
     function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
-        (address toContract, address collateralContract, uint256 collateralAmount) = abi.decode(
-            extraData,
-            (address, address, uint256)
-        );
+        (address toContract, address[] memory mTokens) = abi.decode(extraData, (address, address[]));
 
         bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
             toContract,
@@ -213,10 +220,8 @@ contract MoonwellHandler is IProtocolHandler {
     }
 
     function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override {
-        (address toContract, address collateralContract, uint256 collateralAmount) = abi.decode(
-            extraData,
-            (address, address, uint256)
-        );
+        (address toContract, address[] memory mTokens) = abi.decode(extraData, (address, address[]));
+
         IERC20(asset).approve(address(toContract), amount);
         IMToken(toContract).repayBorrowBehalf(onBehalfOf, amount);
     }

@@ -21,12 +21,15 @@ export const COMPTROLLER_ADDRESS = "0xfbb21d0380bee3312b33c4353c8936a0f13ef26c";
 const view_address = "0x821ff3a967b39bcbe8a018a9b1563eaf878bad39";
 
 export const mcbETH = "0x3bf93770f2d4a794c3d9ebefbaebae2a8f09a5e5";
+export const mcbBTC = "0xf877acafa28c19b96727966690b2f44d35ad5976";
 export const mUSDC = "0xedc817a28e8b93b03976fbd4a3ddbc9f7d176c22";
 export const mDAI = "0x73b06d8d18de422e269645eace15400de7462417";
 
 export const mContractAddressMap = new Map<string, string>([
     [USDC_ADDRESS, mUSDC],
     [DAI_ADDRESS, mDAI],
+    [cbETH_ADDRESS, mcbETH],
+    [cbBTC_ADDRESS, mcbBTC],
 ]);
 
 export class MoonwellHelper {
@@ -35,16 +38,18 @@ export class MoonwellHelper {
     async getCollateralAmount(mContractAddress: string, userAddress?: string): Promise<bigint> {
         const viewContract = new ethers.Contract(view_address, ViewAbi, this.signer);
         const collaterals = await viewContract.getUserBalances(userAddress || TEST_ADDRESS);
+        console.log("mContractAddress:", mContractAddress);
 
         const collateralEntry = collaterals.find((collateral) => collateral[1].toLowerCase() === mContractAddress);
 
         const mToken = new ethers.Contract(mContractAddress, MErc20DelegatorAbi, this.signer);
         const exchangeRate = await mToken.exchangeRateStored();
-        const rate = ethers.formatEther(exchangeRate);
+        const decimals = await getDecimals(mContractAddress);
+        const rate = ethers.formatUnits(exchangeRate, decimals);
 
         const collateralAmount = collateralEntry ? collateralEntry[0] * BigInt(Number(rate).toFixed()) : 0;
 
-        console.log("collateralAmount:", ethers.formatUnits(collateralAmount, 18));
+        console.log("collateralAmount:", ethers.formatUnits(collateralAmount, decimals));
         return BigInt(collateralAmount);
     }
 
