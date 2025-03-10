@@ -76,21 +76,6 @@ describe("Safe wallet should debtSwap", function () {
         console.log("Safe enable module transaction");
 
         console.log("Modules:", await safeWallet.getModules());
-
-        const moduleContract = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress, signer);
-
-        const setSafeTransactionData: MetaTransactionData = {
-            to: safeModuleAddress,
-            value: "0",
-            data: moduleContract.interface.encodeFunctionData("setSafe", []),
-            operation: OperationType.Call,
-        };
-
-        const safeTransaction = await safeWallet.createTransaction({
-            transactions: [setSafeTransactionData],
-        });
-        const setSafeTxHash = await safeWallet.executeTransaction(safeTransaction);
-        console.log("Safe setSafe transaction");
     }
 
     async function sendCollateralToSafe() {
@@ -345,7 +330,7 @@ describe("Safe wallet should debtSwap", function () {
         const [_, wallet2, wallet3] = await ethers.getSigners();
         const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
 
-        await safeModule.setExecutor(wallet2.address);
+        // await safeModule.setExecutor(wallet2.address);
 
         await supplyAndBorrow(Protocols.MOONWELL);
         await expect(
@@ -360,7 +345,7 @@ describe("Safe wallet should debtSwap", function () {
                     executor: wallet3,
                 },
             ),
-        ).to.be.reverted;
+        ).to.be.revertedWith("Caller is not authorized");
     });
 
     async function executeDebtSwap(

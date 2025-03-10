@@ -20,7 +20,6 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
     address public feeBeneficiary;
     address public executor;
     mapping(Protocol => address) public protocolHandlers;
-    mapping(address => address) public ownerToSafe;
 
     struct FlashCallbackData {
         Protocol fromProtocol;
@@ -46,7 +45,13 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
     );
 
     modifier onlyOwnerOrExecutor(address onBehalfOf) {
-        require(ownerToSafe[msg.sender] == onBehalfOf || msg.sender == executor, "Caller is not authorized");
+        if (msg.sender == executor) {
+            _;
+            return;
+        }
+
+        // Check if caller is any owner of the Safe
+        require(ISafe(onBehalfOf).isOwner(msg.sender), "Caller is not authorized");
         _;
     }
 
@@ -78,13 +83,6 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
 
     function getHandler(Protocol protocol) public view returns (address) {
         return protocolHandlers[protocol];
-    }
-
-    // suppose this function is called from Safe wallet
-    function setSafe() public {
-        ISafe safe = ISafe(msg.sender);
-        address[] memory owners = safe.getOwners();
-        ownerToSafe[owners[0]] = msg.sender;
     }
 
     function executeDebtSwap(

@@ -26,7 +26,7 @@ import { mcbETH, mContractAddressMap, MoonwellHelper } from "./protocols/moonwel
 import { eip1193Provider, safeAddress } from "./debtSwapBySafe";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 
-describe.only("Create leveraged position by Safe", function () {
+describe("Create leveraged position by Safe", function () {
     let myContract: LeveragedPosition;
     let impersonatedSigner: HardhatEthersSigner;
 
@@ -59,21 +59,7 @@ describe.only("Create leveraged position by Safe", function () {
         );
         const safeTxHash = await safeWallet.executeTransaction(enableModuleTx);
         console.log("Safe enable module transaction");
-
         console.log("Modules:", await safeWallet.getModules());
-
-        // const setSafeTransactionData: MetaTransactionData = {
-        //     to: deployedContractAddress,
-        //     value: "0",
-        //     data: myContract.interface.encodeFunctionData("setSafe", []),
-        //     operation: OperationType.Call,
-        // };
-
-        // const safeTransaction = await safeWallet.createTransaction({
-        //     transactions: [setSafeTransactionData],
-        // });
-        // const setSafeTxHash = await safeWallet.executeTransaction(safeTransaction);
-        // console.log("Safe setSafe transaction");
     }
 
     async function createLeveragedPosition(
