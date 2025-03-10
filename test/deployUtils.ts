@@ -60,12 +60,13 @@ export async function deployLeveragedPositionContractFixture() {
 
     const LeveragedPosition = await hre.ethers.getContractFactory("LeveragedPosition");
     const leveragedPosition = await LeveragedPosition.deploy(
-        [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO, Protocols.MOONWELL],
+        [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO, Protocols.MOONWELL, Protocols.FLUID],
         [
             aaveV3Handler.getAddress(),
             compoundHandler.getAddress(),
             morphoHandler.getAddress(),
             moonwellHandler.getAddress(),
+            fluidHandler.getAddress(),
         ],
         await getGasOptions(),
     );

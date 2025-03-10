@@ -25,8 +25,14 @@ import { deployLeveragedPositionContractFixture } from "./deployUtils";
 import { mcbETH, mContractAddressMap, MoonwellHelper } from "./protocols/moonwell";
 import { eip1193Provider, safeAddress } from "./debtSwapBySafe";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
+import {
+    FLUID_cbBTC_sUSDS_VAULT,
+    FLUID_cbBTC_USDC_VAULT,
+    FLUID_cbETH_USDC_VAULT,
+    fluidVaultMap,
+} from "./protocols/fluid";
 
-describe("Create leveraged position by Safe", function () {
+describe.only("Create leveraged position by Safe", function () {
     let myContract: LeveragedPosition;
     let impersonatedSigner: HardhatEthersSigner;
 
@@ -92,6 +98,10 @@ describe("Create leveraged position by Safe", function () {
                     [debtMContract, [collateralMContract]],
                 );
                 break;
+            case Protocols.FLUID:
+                const vaultAddress = fluidVaultMap.get(collateralAddress)!;
+                extraData = ethers.AbiCoder.defaultAbiCoder().encode(["address", "uint256"], [vaultAddress, 0]);
+                break;
         }
 
         const parsedTargetAmount = ethers.parseUnits(targetAmount.toString(), collateralDecimals);
@@ -149,9 +159,9 @@ describe("Create leveraged position by Safe", function () {
         const safeTxHash = await safeWallet.executeTransaction(safeTransaction);
         console.log(safeTxHash);
 
-        const debtAmount = await protocolHelper.getDebtAmount(debtAddress);
+        const debtAmount = await protocolHelper.getDebtAmount(debtAddress, safeAddress);
 
-        const collateralAmount = await protocolHelper.getCollateralAmount(collateralMContract, safeAddress);
+        const collateralAmount = await protocolHelper.getCollateralAmount(collateralAddress, safeAddress);
 
         expect(debtAmount).to.be.gt(0);
         expect(Number(collateralAmount)).to.be.gt(0);
@@ -183,8 +193,23 @@ describe("Create leveraged position by Safe", function () {
             );
         });
 
-        it.skip("with USDC collateral, cbETH debt", async function () {
-            await createLeveragedPosition(cbETH_ETH_POOL, Protocols.MOONWELL, USDC_ADDRESS, cbETH_ADDRESS);
+        it("with USDC collateral, cbETH debt", async function () {
+            const principleAmount = 0.1;
+            const targetAmount = principleAmount * 2;
+
+            await createLeveragedPosition(
+                cbBTC_USDC_POOL,
+                Protocols.MOONWELL,
+                USDC_ADDRESS,
+                cbETH_ADDRESS,
+                principleAmount,
+                targetAmount,
+            );
+        });
+    });
+    describe("on Fluid", function () {
+        it("with cbETH collateral", async function () {
+            await createLeveragedPosition(cbETH_ETH_POOL, Protocols.FLUID);
         });
     });
 });

@@ -35,7 +35,8 @@ export const mContractAddressMap = new Map<string, string>([
 export class MoonwellHelper {
     constructor(private signer: HardhatEthersSigner | any) {}
 
-    async getCollateralAmount(mContractAddress: string, userAddress?: string): Promise<bigint> {
+    async getCollateralAmount(tokenAddress: string, userAddress?: string): Promise<bigint> {
+        const mContractAddress = mContractAddressMap.get(tokenAddress)!;
         const viewContract = new ethers.Contract(view_address, ViewAbi, this.signer);
         const collaterals = await viewContract.getUserBalances(userAddress || TEST_ADDRESS);
         console.log("mContractAddress:", mContractAddress);

@@ -117,13 +117,6 @@ describe("Safe wallet should debtSwap", function () {
         const safeTxHash = await safeWallet.executeTransaction(safeTransaction);
         console.log(`Supplied and borrowed on protocol: ${protocol}`);
 
-        // const balanceAfter = await cbETHContract.balanceOf(safeAddress);
-        // console.log(`Balance after:`, ethers.formatEther(balanceAfter), "cbETH");
-
-        // const collateral = await moonwellHelper.getCollateralAmount(mcbETH, safeAddress);
-
-        // const debt = await moonwellHelper.getDebtAmount(debtTokenAddress, safeAddress);
-
         const tokenBalance = await tokenContract.balanceOf(safeAddress);
         console.log("Token Balance on Safe:", ethers.formatUnits(tokenBalance, 6));
 
@@ -577,7 +570,7 @@ describe("Safe wallet should debtSwap", function () {
         let collateralAmount = ethers.parseEther(DEFAULT_SUPPLY_AMOUNT);
         switch (fromProtocol) {
             case Protocols.MOONWELL:
-                collateralAmount = await fromHelper.getCollateralAmount(mcbETH, safeAddress);
+                collateralAmount = await fromHelper.getCollateralAmount(collateralTokenAddress, safeAddress);
                 break;
             case Protocols.MORPHO:
                 collateralAmount = await fromHelper.getCollateralAmount(options!.morphoFromMarketId!, safeAddress);

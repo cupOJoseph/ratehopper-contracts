@@ -171,16 +171,46 @@ contract FluidSafeHandler is IProtocolHandler {
 
     function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
-        IERC20(asset).safeTransferFrom(onBehalfOf, address(this), uint256(amount));
-        IERC20(asset).approve(address(vaultAddress), uint256(amount));
-        IFluidVault vault = IFluidVault(vaultAddress);
+        IERC20(asset).transfer(onBehalfOf, amount);
 
-        vault.operate(0, int256(amount), 0, onBehalfOf);
+        bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
+            asset,
+            0,
+            abi.encodeCall(IERC20.approve, (address(vaultAddress), amount)),
+            ISafe.Operation.Call
+        );
+        require(successApprove, "Approval failed");
+
+        (bool successSupply, bytes memory returnData) = ISafe(onBehalfOf).execTransactionFromModuleReturnData(
+            vaultAddress,
+            0,
+            abi.encodeCall(IFluidVault.operate, (0, int256(amount), 0, onBehalfOf)),
+            ISafe.Operation.Call
+        );
+        require(successSupply, "Fluid supply failed");
     }
 
     function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
-        (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
-        IFluidVault vault = IFluidVault(vaultAddress);
-        vault.operate(nftId, 0, int256(amount), onBehalfOf);
+        (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
+
+        IFluidVaultResolver resolver = IFluidVaultResolver(FLUID_VAULT_RESOLVER);
+
+        // get nftId
+        uint256 nftId = 0;
+        (Structs.UserPosition[] memory userPositions_, Structs.VaultEntireData[] memory vaultsData_) = resolver
+            .positionsByUser(onBehalfOf);
+        for (uint256 i = 0; i < vaultsData_.length; i++) {
+            if (vaultsData_[i].vault == vaultAddress) {
+                nftId = userPositions_[i].nftId;
+            }
+        }
+
+        bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
+            vaultAddress,
+            0,
+            abi.encodeCall(IFluidVault.operate, (nftId, 0, int256(amount), address(this))),
+            ISafe.Operation.Call
+        );
+        require(successBorrow, "Fluid borrow failed");
     }
 }

@@ -5,6 +5,7 @@ import fluidAbi from "../../externalAbi/fluid/fluidVaultT1.json";
 import fluidVaultResolverAbi from "../../externalAbi/fluid/fluidVaultResolver.json";
 import { approve, formatAmount } from "../utils";
 import {
+    cbBTC_ADDRESS,
     cbETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
     sUSDS_ADDRESS,
@@ -16,12 +17,17 @@ import {
 export const FLUID_VAULT_RESOLVER = "0x79B3102173EB84E6BCa182C7440AfCa5A41aBcF8";
 export const FLUID_cbETH_USDC_VAULT = "0x40d9b8417e6e1dcd358f04e3328bced061018a82";
 export const FLUID_cbBTC_sUSDS_VAULT = "0xF2c8F54447cbd591C396b0Dd7ac15FAF552d0FA4";
+export const FLUID_cbBTC_USDC_VAULT = "0x4045720a33193b4Fe66c94DFbc8D37B0b4D9B469";
 
 export const fluidVaultMap = new Map<string, string>([
     // https://fluid.instadapp.io/vaults/8453/6
     [USDC_ADDRESS, FLUID_cbETH_USDC_VAULT],
     // https://fluid.instadapp.io/vaults/8453/19
     [sUSDS_ADDRESS, FLUID_cbBTC_sUSDS_VAULT],
+
+    [cbETH_ADDRESS, FLUID_cbETH_USDC_VAULT],
+    // https://fluid.instadapp.io/vaults/8453/7
+    [cbBTC_ADDRESS, FLUID_cbBTC_USDC_VAULT],
 ]);
 
 export class FluidHelper {
@@ -32,6 +38,7 @@ export class FluidHelper {
         const positions = await resolver.positionsByUser(userAddress);
         const positionIndex = positions[1].findIndex((vault) => vault[0].toLowerCase() === vaultAddress);
         if (positionIndex === -1) {
+            console.log("No position found on vault: " + vaultAddress);
             return;
         }
         return positions[0][positionIndex];
@@ -51,6 +58,7 @@ export class FluidHelper {
     async getCollateralAmount(tokenAddress: string, userAddress: string): Promise<bigint> {
         const vaultAddress = fluidVaultMap.get(tokenAddress)!;
         const position = await this.getPosition(vaultAddress, userAddress);
+        if (!position) return BigInt(0);
         const collateralAmount = position[9];
         console.log("collateralAmount:", collateralAmount + " on vault: " + vaultAddress);
         return collateralAmount;
