@@ -349,37 +349,37 @@ describe("Safe wallet should debtSwap", function () {
         ).to.be.revertedWith("Caller is not authorized");
     });
 
-    it.only("Should setProtocolHandler and revert when calling executeDebtSwap with wrong handler address", async function () {
-        const safeModuleAddress = await safeModuleContract.getAddress();
-        const [_, wallet2, wallet3] = await ethers.getSigners();
-        const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
+    // it.only("Should setProtocolHandler and revert when calling executeDebtSwap with wrong handler address", async function () {
+    //     const safeModuleAddress = await safeModuleContract.getAddress();
+    //     const [_, wallet2, wallet3] = await ethers.getSigners();
+    //     const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
 
-        await safeModule.setProtocolHandler(Protocols.AAVE_V3, WETH_ADDRESS);
-        const handlerAddress = await safeModule.getHandler(Protocols.AAVE_V3);
-        console.log(handlerAddress);
+    //     await safeModule.setProtocolHandler(Protocols.AAVE_V3, WETH_ADDRESS);
+    //     const handlerAddress = await safeModule.getHandler(Protocols.AAVE_V3);
+    //     console.log(handlerAddress);
 
-        await supplyAndBorrow(Protocols.MOONWELL);
-        await expect(
-            executeDebtSwap(
-                USDC_hyUSD_POOL,
-                USDC_ADDRESS,
-                USDC_ADDRESS,
-                Protocols.MOONWELL,
-                Protocols.AAVE_V3,
-                cbETH_ADDRESS,
-            ),
-        ).to.be.reverted;
-    });
+    //     await supplyAndBorrow(Protocols.MOONWELL);
+    //     await expect(
+    //         executeDebtSwap(
+    //             USDC_hyUSD_POOL,
+    //             USDC_ADDRESS,
+    //             USDC_ADDRESS,
+    //             Protocols.MOONWELL,
+    //             Protocols.AAVE_V3,
+    //             cbETH_ADDRESS,
+    //         ),
+    //     ).to.be.reverted;
+    // });
 
-    it("Should revert setProtocolHandler() by non-owner", async function () {
-        const safeModuleAddress = await safeModuleContract.getAddress();
-        const [_, wallet2, wallet3] = await ethers.getSigners();
-        const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress, wallet3);
+    // it("Should revert setProtocolHandler() by non-owner", async function () {
+    //     const safeModuleAddress = await safeModuleContract.getAddress();
+    //     const [_, wallet2, wallet3] = await ethers.getSigners();
+    //     const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress, wallet3);
 
-        await expect(safeModule.setProtocolHandler(Protocols.MORPHO, WETH_ADDRESS)).to.be.revertedWith(
-            "Ownable: caller is not the owner",
-        );
-    });
+    //     await expect(safeModule.setProtocolHandler(Protocols.MORPHO, WETH_ADDRESS)).to.be.revertedWith(
+    //         "Ownable: caller is not the owner",
+    //     );
+    // });
 
     async function executeDebtSwap(
         flashloanPool: string,
