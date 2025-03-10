@@ -52,7 +52,7 @@ describe("Create leveraged position by Safe", function () {
         });
     });
 
-    async function setSafeOwner() {
+    async function enableSafeModule() {
         const enableModuleTx = await safeWallet.createEnableModuleTx(
             deployedContractAddress,
             // options // Optional
@@ -70,7 +70,7 @@ describe("Create leveraged position by Safe", function () {
         principleAmount = Number(DEFAULT_SUPPLY_AMOUNT),
         targetAmount = Number(defaultTargetSupplyAmount),
     ) {
-        await setSafeOwner();
+        await enableSafeModule();
 
         const Helper = protocolHelperMap.get(protocol)!;
         const protocolHelper = new Helper(impersonatedSigner);

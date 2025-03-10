@@ -81,6 +81,11 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         executor = _executor;
     }
 
+    function setProtocolHandler(Protocol _protocol, address _handler) public onlyOwner {
+        require(_handler != address(0), "Invalid handler address");
+        protocolHandlers[_protocol] = _handler;
+    }
+
     function getHandler(Protocol protocol) public view returns (address) {
         return protocolHandlers[protocol];
     }
