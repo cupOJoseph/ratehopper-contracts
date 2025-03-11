@@ -3,21 +3,26 @@ pragma solidity =0.8.28;
 
 import {IERC20} from "./dependencies/IERC20.sol";
 import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
-import {IFlashLoanSimpleReceiver} from "@aave/core-v3/contracts/flashloan/interfaces/IFlashLoanSimpleReceiver.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./Types.sol";
 
-contract DebtSwap is Ownable, ReentrancyGuard {
+import "./Types.sol";
+import "./interfaces/safe/ISafe.sol";
+import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+import "hardhat/console.sol";
+
+contract SafeModuleDebtSwapUpgradeable is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using GPv2SafeERC20 for IERC20;
     uint8 public protocolFee;
     address public feeBeneficiary;
+    address public executor;
     mapping(Protocol => address) public protocolHandlers;
 
     struct FlashCallbackData {
-        address flashloanPool;
         Protocol fromProtocol;
         Protocol toProtocol;
         address fromAsset;
@@ -40,15 +45,40 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         uint256 amount
     );
 
-    event FlashLoanBorrowed(address indexed pool, address indexed asset, uint256 amount, uint256 fee);
+    modifier onlyOwnerOrExecutor(address onBehalfOf) {
+        if (msg.sender == executor) {
+            _;
+            return;
+        }
 
-    constructor(Protocol[] memory protocols, address[] memory handlers) Ownable(msg.sender) {
+        // Check if caller is any owner of the Safe
+        require(ISafe(onBehalfOf).isOwner(msg.sender), "Caller is not authorized");
+        _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @dev Initializes the contract with protocol handlers and sets the executor
+     * @param protocols Array of protocols to register
+     * @param handlers Array of handler addresses corresponding to protocols
+     */
+    function initialize(Protocol[] memory protocols, address[] memory handlers) public initializer {
         require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
+
+        __Ownable_init(msg.sender);
+        // __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
 
         for (uint256 i = 0; i < protocols.length; i++) {
             require(handlers[i] != address(0), "Invalid handler address");
             protocolHandlers[protocols[i]] = handlers[i];
         }
+
+        executor = msg.sender;
     }
 
     function setProtocolFee(uint8 _fee) public onlyOwner {
@@ -59,6 +89,11 @@ contract DebtSwap is Ownable, ReentrancyGuard {
     function setFeeBeneficiary(address _feeBeneficiary) public onlyOwner {
         require(_feeBeneficiary != address(0), "_feeBeneficiary cannot be zero address");
         feeBeneficiary = _feeBeneficiary;
+    }
+
+    function setExecutor(address _executor) public onlyOwner {
+        require(_executor != address(0), "_executor cannot be zero address");
+        executor = _executor;
     }
 
     function getHandler(Protocol protocol) public view returns (address) {
@@ -74,15 +109,24 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         uint256 _amount,
         uint256 _srcAmount,
         CollateralAsset[] calldata _collateralAssets,
-        bytes calldata _fromExtraData,
-        bytes calldata _toExtraData,
+        address _onBehalfOf,
+        bytes[2] calldata _extraData,
         ParaswapParams calldata _paraswapParams
-    ) public nonReentrant {
-        require(_fromDebtAsset != address(0), "_fromDebtAsset cannot be zero address");
-        require(_toDebtAsset != address(0), "_toDebtAsset cannot be zero address");
+    ) public onlyOwnerOrExecutor(_onBehalfOf) {
+        require(_fromDebtAsset != address(0), "Invalid from asset address");
+        require(_toDebtAsset != address(0), "Invalid to asset address");
         require(_amount > 0, "_amount cannot be zero");
 
         IUniswapV3Pool pool = IUniswapV3Pool(_flashloanPool);
+        uint256 debtAmount = _amount;
+
+        if (_amount == type(uint256).max) {
+            address handler = getHandler(_fromProtocol);
+
+            debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, _onBehalfOf, _extraData[0]);
+            console.log("on-chain debtAmount:", debtAmount);
+        }
+
         address token0;
         try pool.token0() returns (address result) {
             token0 = result;
@@ -90,29 +134,21 @@ contract DebtSwap is Ownable, ReentrancyGuard {
             revert("Invalid flashloan pool address");
         }
 
-        uint256 debtAmount = _amount;
-        if (_amount == type(uint256).max) {
-            address handler = getHandler(_fromProtocol);
-
-            debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, msg.sender, _fromExtraData);
-        }
-
         uint256 amount0 = _fromDebtAsset == token0 ? debtAmount : 0;
         uint256 amount1 = _fromDebtAsset == token0 ? 0 : debtAmount;
 
         bytes memory data = abi.encode(
             FlashCallbackData({
-                flashloanPool: _flashloanPool,
                 fromProtocol: _fromProtocol,
                 toProtocol: _toProtocol,
                 fromAsset: _fromDebtAsset,
                 toAsset: _toDebtAsset,
                 amount: debtAmount,
                 srcAmount: _srcAmount,
-                onBehalfOf: msg.sender,
+                onBehalfOf: _onBehalfOf,
                 collateralAssets: _collateralAssets,
-                fromExtraData: _fromExtraData,
-                toExtraData: _toExtraData,
+                fromExtraData: _extraData[0],
+                toExtraData: _extraData[1],
                 paraswapParams: _paraswapParams
             })
         );
@@ -124,12 +160,16 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         FlashCallbackData memory decoded = abi.decode(data, (FlashCallbackData));
 
         // implement the same logic as CallbackValidation.verifyCallback()
-        require(msg.sender == address(decoded.flashloanPool), "Caller is not flashloan pool");
+        // require(msg.sender == address(decoded.flashloanPool), "Caller is not flashloan pool");
+
+        address safe = decoded.onBehalfOf;
 
         // suppose either of fee0 or fee1 is 0
-        uint flashloanFee = fee0 + fee1;
-
-        emit FlashLoanBorrowed(decoded.flashloanPool, decoded.fromAsset, decoded.amount, flashloanFee);
+        uint flashloanFeeOriginal = fee0 + fee1;
+        uint8 fromAssetDecimals = IERC20(decoded.fromAsset).decimals();
+        uint8 toAssetDecimals = IERC20(decoded.toAsset).decimals();
+        uint8 conversionFactor = (fromAssetDecimals > toAssetDecimals) ? (fromAssetDecimals - toAssetDecimals) : 0;
+        uint flashloanFee = flashloanFeeOriginal / (10 ** conversionFactor);
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 
@@ -147,7 +187,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
                         decoded.toAsset,
                         decoded.amount,
                         amountTotal,
-                        decoded.onBehalfOf,
+                        safe,
                         decoded.collateralAssets,
                         decoded.fromExtraData,
                         decoded.toExtraData
@@ -160,13 +200,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
             (bool successFrom, ) = fromHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchFrom,
-                    (
-                        decoded.fromAsset,
-                        decoded.amount,
-                        decoded.onBehalfOf,
-                        decoded.collateralAssets,
-                        decoded.fromExtraData
-                    )
+                    (decoded.fromAsset, decoded.amount, safe, decoded.collateralAssets, decoded.fromExtraData)
                 )
             );
             require(successFrom, "protocol switchFrom failed");
@@ -175,7 +209,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
             (bool successTo, ) = toHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchTo,
-                    (decoded.toAsset, amountTotal, decoded.onBehalfOf, decoded.collateralAssets, decoded.toExtraData)
+                    (decoded.toAsset, amountTotal, safe, decoded.collateralAssets, decoded.toExtraData)
                 )
             );
             require(successTo, "protocol switchTo failed");
@@ -192,25 +226,23 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         }
 
         // repay flashloan
-        IERC20 fromToken = IERC20(decoded.fromAsset);
-        fromToken.safeTransfer(address(decoded.flashloanPool), decoded.amount + flashloanFee);
+        IERC20(decoded.fromAsset).transfer(msg.sender, decoded.amount + flashloanFeeOriginal);
 
         if (protocolFee > 0) {
             IERC20(decoded.toAsset).safeTransfer(feeBeneficiary, protocolFeeAmount);
         }
 
         // repay remaining amount
-        uint256 remainingBalance = IERC20(decoded.toAsset).balanceOf(address(this));
+        IERC20 toToken = IERC20(decoded.toAsset);
+        uint256 remainingBalance = toToken.balanceOf(address(this));
 
         if (remainingBalance > 0) {
             address handler = getHandler(decoded.toProtocol);
 
             (bool success, ) = handler.delegatecall(
-                abi.encodeCall(
-                    IProtocolHandler.repay,
-                    (decoded.toAsset, remainingBalance, decoded.onBehalfOf, decoded.toExtraData)
-                )
+                abi.encodeCall(IProtocolHandler.repay, (decoded.toAsset, remainingBalance, safe, decoded.toExtraData))
             );
+
             require(success, "Repay remainingBalance failed");
         }
 
@@ -245,4 +277,19 @@ contract DebtSwap is Ownable, ReentrancyGuard {
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
         IERC20(token).safeTransfer(owner(), amount);
     }
+
+    /**
+     * @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
+     * {upgradeTo} and {upgradeToAndCall}.
+     *
+     * Normally, this function will use an xref:access.adoc[access control] modifier such as {Ownable-onlyOwner}.
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    // /**
+    //  * @dev Returns the current implementation address.
+    //  */
+    // function getImplementation() external view returns (address) {
+    //     return getImplementation();
+    // }
 }

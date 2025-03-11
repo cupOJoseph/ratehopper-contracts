@@ -5,7 +5,7 @@ import {IERC20} from "./dependencies/IERC20.sol";
 import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Types.sol";
 
@@ -39,7 +39,7 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         address debtAsset
     );
 
-    constructor(Protocol[] memory protocols, address[] memory handlers) {
+    constructor(Protocol[] memory protocols, address[] memory handlers) Ownable(msg.sender) {
         require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
 
         for (uint256 i = 0; i < protocols.length; i++) {

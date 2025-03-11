@@ -6,6 +6,7 @@ import "hardhat-gas-reporter";
 import dotenv from "dotenv";
 dotenv.config();
 require("hardhat-tracer");
+require('@openzeppelin/hardhat-upgrades');
 
 // const baseUrl = "https://base.llamarpc.com";
 const baseUrl = "https://mainnet.base.org";

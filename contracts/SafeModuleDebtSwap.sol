@@ -10,7 +10,7 @@ import "./interfaces/safe/ISafe.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "hardhat/console.sol";
 
@@ -55,7 +55,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(Protocol[] memory protocols, address[] memory handlers) {
+    constructor(Protocol[] memory protocols, address[] memory handlers) Ownable(msg.sender) {
         require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
 
         for (uint256 i = 0; i < protocols.length; i++) {
