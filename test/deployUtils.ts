@@ -1,6 +1,6 @@
 import hre from "hardhat";
 import { ethers } from "hardhat";
-import { AAVE_V3_DATA_PROVIDER_ADDRESS, AAVE_V3_POOL_ADDRESS, Protocols, WETH_ADDRESS } from "./constants";
+import { AAVE_V3_DATA_PROVIDER_ADDRESS, AAVE_V3_POOL_ADDRESS, Protocols } from "./constants";
 import { MORPHO_ADDRESS } from "./protocols/morpho";
 import { COMPTROLLER_ADDRESS } from "./protocols/moonwell";
 import { FLUID_VAULT_RESOLVER } from "./protocols/fluid";
@@ -79,6 +79,7 @@ export async function deploySafeContractFixture() {
     const { aaveV3Handler, compoundHandler, moonwellHandler, fluidHandler, morphoHandler } = await deployHandlers();
 
     const SafeModule = await hre.ethers.getContractFactory("SafeModuleDebtSwap");
+    const [owner, _, __, pauser] = await ethers.getSigners();
     const safeModule = await SafeModule.deploy(
         [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO, Protocols.MOONWELL, Protocols.FLUID],
         [
@@ -88,6 +89,7 @@ export async function deploySafeContractFixture() {
             moonwellHandler.getAddress(),
             fluidHandler.getAddress(),
         ],
+        pauser.address,
         await getGasOptions(),
     );
 

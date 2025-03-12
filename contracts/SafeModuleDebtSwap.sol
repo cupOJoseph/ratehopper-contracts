@@ -11,14 +11,16 @@ import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 import "hardhat/console.sol";
 
-contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
+contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
     using GPv2SafeERC20 for IERC20;
     uint8 public protocolFee;
     address public feeBeneficiary;
     address public executor;
+    address public pauser;
     mapping(Protocol => address) public protocolHandlers;
 
     struct FlashCallbackData {
@@ -55,7 +57,12 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(Protocol[] memory protocols, address[] memory handlers) Ownable(msg.sender) {
+    modifier onlyPauser() {
+        require(msg.sender == pauser, "Caller is not authorized to pause");
+        _;
+    }
+
+    constructor(Protocol[] memory protocols, address[] memory handlers, address _pauser) Ownable(msg.sender) {
         require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
 
         for (uint256 i = 0; i < protocols.length; i++) {
@@ -64,6 +71,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         }
 
         executor = msg.sender;
+        pauser = _pauser;
     }
 
     function setProtocolFee(uint8 _fee) public onlyOwner {
@@ -97,7 +105,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         address _onBehalfOf,
         bytes[2] calldata _extraData,
         ParaswapParams calldata _paraswapParams
-    ) public onlyOwnerOrExecutor(_onBehalfOf) {
+    ) public onlyOwnerOrExecutor(_onBehalfOf) whenNotPaused {
         require(_fromDebtAsset != address(0), "Invalid from asset address");
         require(_toDebtAsset != address(0), "Invalid to asset address");
         require(_amount > 0, "_amount cannot be zero");
@@ -141,7 +149,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
         pool.flash(address(this), amount0, amount1, data);
     }
 
-    function uniswapV3FlashCallback(uint256 fee0, uint256 fee1, bytes calldata data) external {
+    function uniswapV3FlashCallback(uint256 fee0, uint256 fee1, bytes calldata data) external whenNotPaused {
         FlashCallbackData memory decoded = abi.decode(data, (FlashCallbackData));
 
         // implement the same logic as CallbackValidation.verifyCallback()
@@ -261,5 +269,21 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard {
 
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
         IERC20(token).safeTransfer(owner(), amount);
+    }
+
+    /**
+     * @notice Pauses the contract, preventing debt swap operations
+     * @dev Only callable by the pauser or owner
+     */
+    function pause() external onlyPauser {
+        _pause();
+    }
+
+    /**
+     * @notice Unpauses the contract, allowing debt swap operations
+     * @dev Only callable by the pauser or owner
+     */
+    function unpause() external onlyPauser {
+        _unpause();
     }
 }

@@ -45,7 +45,7 @@ export class MoonwellHelper {
 
         const mToken = new ethers.Contract(mContractAddress, MErc20DelegatorAbi, this.signer);
         const exchangeRate = await mToken.exchangeRateStored();
-        const decimals = await getDecimals(mContractAddress);
+        const decimals = await getDecimals(tokenAddress);
         const rate = ethers.formatUnits(exchangeRate, decimals);
 
         const collateralAmount = collateralEntry ? collateralEntry[0] * BigInt(Number(rate).toFixed()) : 0;

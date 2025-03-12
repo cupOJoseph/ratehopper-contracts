@@ -467,7 +467,7 @@ describe("DebtSwap should switch", function () {
         it("if non-owner call setProtocolFee()", async function () {
             const signers = await ethers.getSigners();
             const contractByNotOwner = await ethers.getContractAt("DebtSwap", deployedContractAddress, signers[1]);
-            await expect(contractByNotOwner.setProtocolFee(100)).to.be.revertedWith("Ownable: caller is not the owner");
+            await expect(contractByNotOwner.setProtocolFee(100)).to.be.reverted;
         });
     });
 

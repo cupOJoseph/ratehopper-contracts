@@ -32,7 +32,7 @@ import {
     fluidVaultMap,
 } from "./protocols/fluid";
 
-describe.only("Create leveraged position by Safe", function () {
+describe("Create leveraged position by Safe", function () {
     let myContract: LeveragedPosition;
     let impersonatedSigner: HardhatEthersSigner;
 
