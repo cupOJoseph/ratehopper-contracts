@@ -113,6 +113,7 @@ const cometAddress = cometAddressMap.get(tokenAddress);
 // Set this as toExtraData when Compound is the destination protocol
 const compoundExtraData = compoundHelper.encodeExtraData(cometAddress);
 // This encodes: ethers.AbiCoder.defaultAbiCoder().encode(["address"], [cometAddress])
+// The Comet address is REQUIRED for all Compound operations (getDebtAmount, supply, borrow, repay)
 ```
 
 #### Morpho
@@ -130,7 +131,9 @@ const borrowShares = await morphoHelper.getBorrowShares(marketId);
 // Set this as fromExtraData when Morpho is the source protocol
 // Set this as toExtraData when Morpho is the destination protocol
 const morphoExtraData = morphoHelper.encodeExtraData(marketId, borrowShares);
-// This encodes the market parameters (loan token, collateral token, oracle, etc.) and borrow shares
+// This encodes: abi.encode(MarketParams, uint256)
+// The MarketParams structure contains loan token, collateral token, oracle, etc.
+// The borrowShares is required for repaying debt when Morpho is the source protocol
 ```
 
 #### Moonwell
@@ -220,6 +223,90 @@ await debtSwapContract.executeDebtSwap(
   fromExtraData,
   toExtraData,
   paraswapParams
+);
+```
+
+### Important Implementation Notes
+
+1. **Flash Loan Process**: The contract uses Uniswap V3 flash loans to temporarily borrow the debt asset, repay the source protocol, and then borrow from the destination protocol.
+
+2. **Protocol Fee**: The contract charges an optional protocol fee (configurable by the owner) which is taken from the destination debt amount.
+
+3. **Slippage Protection**: When swapping between different assets, you must provide a `srcAmount` parameter with slippage adjustment to ensure the transaction doesn't fail due to price movements. See the 'Understanding Amount Parameters' section below for details.
+
+4. **Collateral Handling**: The contract will automatically withdraw collateral from the source protocol and supply it to the destination protocol during the debt swap.
+
+5. **Error Handling**: The contract includes checks to ensure that operations like repaying debt and borrowing succeed, reverting the transaction if any step fails.
+
+### Understanding Amount Parameters
+
+```javascript
+await debtSwapContract.executeDebtSwap(
+  // ... other parameters
+  amount,                   // Amount to swap from source protocol
+  slippageAdjustedAmount,   // Maximum amount expected after swap with slippage
+  // ... remaining parameters
+);
+```
+
+#### Amount Parameter
+
+The `amount` parameter specifies how much debt to repay in the source protocol:
+
+- If set to a specific value (e.g., `ethers.parseUnits("100", 6)`), the contract will repay exactly that amount of debt
+- If set to `MaxUint256` (or `ethers.constants.MaxUint256`), the contract will repay the entire debt position
+
+```javascript
+// Example: Repay specific amount
+const amountToRepay = ethers.parseUnits("100", 6); // Repay 100 USDC
+
+// Example: Repay entire debt
+const amountToRepay = ethers.constants.MaxUint256;
+```
+
+#### SlippageAdjustedAmount Parameter
+
+The `slippageAdjustedAmount` (or `srcAmount` in the contract) is only relevant when swapping between different assets. It represents the maximum amount you expect to need after accounting for slippage:
+
+- When `fromAsset` and `toAsset` are the same, you can set this to `0`
+- When they differ, you must calculate this with slippage to protect the transaction
+
+```javascript
+// Example: Same asset (no swap needed)
+const slippageAdjustedAmount = 0;
+
+// Example: Different assets with slippage protection
+const expectedSwapAmount = await getExpectedSwapAmount(fromAsset, toAsset, amount);
+const slippageAdjustedAmount = (expectedSwapAmount * 102n) / 100n; // 2% slippage
+```
+
+#### Sample Usage with Paraswap
+
+```javascript
+// Get the expected swap amount from Paraswap
+const [srcAmount, paraswapData] = await getParaswapData(
+  fromTokenAddress,
+  toTokenAddress,
+  debtSwapContractAddress,
+  debtAmount
+);
+
+// Add 2% slippage protection
+const amountPlusSlippage = (BigInt(srcAmount) * 102n) / 100n;
+
+// Execute the debt swap with slippage protection
+await debtSwapContract.executeDebtSwap(
+  flashloanPool,
+  fromProtocol,
+  toProtocol,
+  fromTokenAddress,
+  toTokenAddress,
+  debtAmount,           // Amount to repay (can be MaxUint256 for full debt)
+  amountPlusSlippage,   // Maximum expected amount after swap with slippage
+  collateralAssets,
+  fromExtraData,
+  toExtraData,
+  paraswapData
 );
 ```
 
