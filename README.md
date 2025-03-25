@@ -46,6 +46,183 @@ The system consists of several key components:
 
 4. **LeveragedPosition.sol**: Facilitates creation of leveraged positions across protocols.
 
+## Sample Usage
+
+Below are examples of how to integrate with the RateHopper contracts for different protocols.
+
+### Common Integration Pattern
+
+```javascript
+// 1. Initialize protocol helpers
+const aaveV3Helper = new AaveV3Helper(signer);
+const compoundHelper = new CompoundHelper(signer);
+const morphoHelper = new MorphoHelper(signer);
+const moonwellHelper = new MoonwellHelper(signer);
+
+// 2. Set up a borrowing position in the source protocol
+// Example: Supply collateral and borrow from Aave V3
+await aaveV3Helper.supply(collateralTokenAddress);
+await aaveV3Helper.borrow(debtTokenAddress);
+
+// 3. Execute the debt swap
+await debtSwapContract.executeDebtSwap(
+  flashloanPool,            // Uniswap V3 pool address for flash loan
+  fromProtocol,             // Source protocol enum
+  toProtocol,               // Destination protocol enum
+  fromDebtAsset,            // Debt asset address on source protocol
+  toDebtAsset,              // Debt asset address on destination protocol
+  amount,                   // Amount to swap (MaxUint256 for full debt)
+  slippageAdjustedAmount,   // Source amount with slippage adjustment
+  collateralAssets,         // Array of collateral assets
+  fromExtraData,            // Protocol-specific data for source
+  toExtraData,              // Protocol-specific data for destination
+  paraswapParams            // Parameters for token swaps if needed
+);
+```
+
+### Protocol-Specific Integration Notes
+
+#### Aave V3
+
+```javascript
+// When switching from Aave V3 to another protocol
+// 1. Get and approve aToken for the collateral
+const aTokenAddress = await aaveV3Helper.getATokenAddress(collateralTokenAddress);
+await approve(aTokenAddress, debtSwapContractAddress, signer);
+
+// 2. Approve delegation for variable debt tokens when Aave is the destination
+await aaveV3Helper.approveDelegation(debtTokenAddress, debtSwapContractAddress);
+
+// 3. No extra data needed for Aave V3
+// Set this as fromExtraData when Aave is the source protocol
+// Set this as toExtraData when Aave is the destination protocol
+const aaveExtraData = "0x";
+```
+
+#### Compound V3
+
+```javascript
+// When using Compound V3
+// 1. Allow the DebtSwap contract to manage positions
+await compoundHelper.allow(tokenAddress, debtSwapContractAddress);
+
+// 2. Encode the Comet address as extra data (REQUIRED)
+const cometAddress = cometAddressMap.get(tokenAddress);
+
+// Set this as fromExtraData when Compound is the source protocol
+// Set this as toExtraData when Compound is the destination protocol
+const compoundExtraData = compoundHelper.encodeExtraData(cometAddress);
+// This encodes: ethers.AbiCoder.defaultAbiCoder().encode(["address"], [cometAddress])
+```
+
+#### Morpho
+
+```javascript
+// When using Morpho
+// 1. Set authorization for the DebtSwap contract
+const morphoContract = new ethers.Contract(MORPHO_ADDRESS, morphoAbi, signer);
+await morphoContract.setAuthorization(debtSwapContractAddress, true);
+
+// 2. Get borrow shares for the market
+const borrowShares = await morphoHelper.getBorrowShares(marketId);
+
+// 3. Encode market parameters and borrow shares as extra data (REQUIRED)
+// Set this as fromExtraData when Morpho is the source protocol
+// Set this as toExtraData when Morpho is the destination protocol
+const morphoExtraData = morphoHelper.encodeExtraData(marketId, borrowShares);
+// This encodes the market parameters (loan token, collateral token, oracle, etc.) and borrow shares
+```
+
+#### Moonwell
+
+```javascript
+// When using Moonwell
+// 1. For supplying collateral
+await moonwellHelper.supply(mTokenAddress);
+
+// 2. Enable collateral for borrowing
+await moonwellHelper.enableCollateral(mTokenAddress);
+
+// 3. For borrowing
+await moonwellHelper.borrow(mTokenAddress);
+
+// 4. No extra data needed for Moonwell
+// Set this as fromExtraData when Moonwell is the source protocol
+// Set this as toExtraData when Moonwell is the destination protocol
+const moonwellExtraData = "0x";
+```
+
+#### Fluid
+
+```javascript
+// When using Fluid (through Safe)
+// 1. Get the vault address for the token
+const vaultAddress = fluidVaultMap.get(tokenAddress);
+
+// 2. Supply collateral to the vault
+await fluidHelper.supply(vaultAddress);
+
+// 3. Get NFT ID for the position
+const nftId = await fluidHelper.getNftId(vaultAddress, userAddress);
+
+// 4. Borrow from the vault
+await fluidHelper.borrow(vaultAddress, tokenAddress, userAddress);
+```
+
+### Multiple Collaterals Example
+
+```javascript
+// When using multiple collateral assets
+const collateralArray = [
+  { asset: collateralToken1Address, amount: collateralAmount1 },
+  { asset: collateralToken2Address, amount: collateralAmount2 }
+];
+
+// Pass the collateral array to executeDebtSwap
+await debtSwapContract.executeDebtSwap(
+  // ... other parameters
+  collateralArray,
+  // ... remaining parameters
+);
+```
+
+### Cross-Protocol Debt Swap Example
+
+```javascript
+// Example: Switch debt from Aave V3 to Compound
+// 1. Set up position in Aave
+await aaveV3Helper.supply(collateralTokenAddress);
+await aaveV3Helper.borrow(debtTokenAddress);
+
+// 2. Prepare for the swap
+// Approve aToken transfer
+const aTokenAddress = await aaveV3Helper.getATokenAddress(collateralTokenAddress);
+await approve(aTokenAddress, debtSwapContractAddress, signer);
+
+// Allow Compound management
+await compoundHelper.allow(toDebtTokenAddress, debtSwapContractAddress);
+
+// Prepare extra data
+const fromExtraData = "0x"; // No extra data for Aave
+const toCometAddress = cometAddressMap.get(toDebtTokenAddress);
+const toExtraData = compoundHelper.encodeExtraData(toCometAddress);
+
+// 3. Execute the swap
+await debtSwapContract.executeDebtSwap(
+  flashloanPool,
+  Protocols.AAVE_V3,
+  Protocols.COMPOUND,
+  fromDebtTokenAddress,
+  toDebtTokenAddress,
+  MaxUint256, // Swap full debt
+  slippageAdjustedAmount,
+  [{ asset: collateralTokenAddress, amount: collateralAmount }],
+  fromExtraData,
+  toExtraData,
+  paraswapParams
+);
+```
+
 ## Key Functions
 
 ### DebtSwap Contract
