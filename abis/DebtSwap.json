@@ -1,0 +1,266 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "onBehalfOf",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum Protocol",
+        "name": "fromProtocol",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum Protocol",
+        "name": "toProtocol",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "fromAsset",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "toAsset",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "DebtSwapped",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_flashloanPool",
+        "type": "address"
+      },
+      {
+        "internalType": "enum Protocol",
+        "name": "_fromProtocol",
+        "type": "uint8"
+      },
+      {
+        "internalType": "enum Protocol",
+        "name": "_toProtocol",
+        "type": "uint8"
+      },
+      {
+        "internalType": "address",
+        "name": "_fromDebtAsset",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_toDebtAsset",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_srcAmount",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct CollateralAsset[]",
+        "name": "_collateralAssets",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "bytes",
+        "name": "_fromExtraData",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
+        "name": "_toExtraData",
+        "type": "bytes"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "router",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "tokenTransferProxy",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes",
+            "name": "swapData",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct DebtSwap.ParaswapParams",
+        "name": "_paraswapParams",
+        "type": "tuple"
+      }
+    ],
+    "name": "executeDebtSwap",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "protocolRegistry",
+    "outputs": [
+      {
+        "internalType": "contract ProtocolRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_registry",
+        "type": "address"
+      }
+    ],
+    "name": "setRegistry",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "asset",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "tokenTransferProxy",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "router",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes",
+        "name": "_txParams",
+        "type": "bytes"
+      }
+    ],
+    "name": "swapByParaswap",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "fee0",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "fee1",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
+      }
+    ],
+    "name": "uniswapV3FlashCallback",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
