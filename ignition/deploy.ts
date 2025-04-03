@@ -1,32 +1,70 @@
-import { DebtSwap } from "../typechain-types/contracts/DebtSwap";
 import hre from "hardhat";
-import DebtSwapModule from "./modules/debtSwap";
-import ProtocolRegistryModule from "./modules/protocolRegistry";
-import { AaveV3Module, CompoundModule, MorphoModule } from "./modules/handlers";
-import { Protocols } from "../test/constants";
+import { ethers } from "hardhat";
+import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+
+// Define constants directly in this file to avoid importing from test files
+const AAVE_V3_POOL_ADDRESS = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
+const AAVE_V3_DATA_PROVIDER_ADDRESS = "0xd82a47fdebB5bf5329b09441C3DaB4b5df2153Ad";
+const MORPHO_ADDRESS = "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb";
+
+// Define Protocol enum directly
+enum Protocol {
+    AAVE_V3,
+    COMPOUND,
+    MORPHO,
+    FLUID,
+    MOONWELL,
+}
+
+// Define handler modules directly
+const AaveV3Module = buildModule("AaveV3Handler", (m) => {
+    const aaveV3Handler = m.contract("AaveV3Handler", [AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS]);
+    return { aaveV3Handler };
+});
+
+const CompoundModule = buildModule("CompoundHandler", (m) => {
+    const compoundHandler = m.contract("CompoundHandler", []);
+    return { compoundHandler };
+});
+
+const MorphoModule = buildModule("MorphoHandler", (m) => {
+    const morphoHandler = m.contract("MorphoHandler", [MORPHO_ADDRESS]);
+    return { morphoHandler };
+});
 
 async function main() {
-    // const { aaveV3Handler } = await hre.ignition.deploy(AaveV3Module);
-    // console.log(`AaveV3Handler deployed to: ${await aaveV3Handler.getAddress()}`);
+    try {
+        // Deploy all handlers first
+        console.log("Deploying AaveV3Handler...");
+        const { aaveV3Handler } = await hre.ignition.deploy(AaveV3Module);
+        const aaveV3HandlerAddress = await aaveV3Handler.getAddress();
+        console.log(`AaveV3Handler deployed to: ${aaveV3HandlerAddress}`);
 
-    // const { compoundHandler } = await hre.ignition.deploy(CompoundModule);
-    // console.log(`CompoundHandler deployed to: ${await compoundHandler.getAddress()}`);
+        console.log("Deploying CompoundHandler...");
+        const { compoundHandler } = await hre.ignition.deploy(CompoundModule);
+        const compoundHandlerAddress = await compoundHandler.getAddress();
+        console.log(`CompoundHandler deployed to: ${compoundHandlerAddress}`);
 
-    // const { morphoHandler } = await hre.ignition.deploy(MorphoModule);
-    // console.log(`MorphoHandler deployed to: ${await morphoHandler.getAddress()}`);
+        console.log("Deploying MorphoHandler...");
+        const { morphoHandler } = await hre.ignition.deploy(MorphoModule);
+        const morphoHandlerAddress = await morphoHandler.getAddress();
+        console.log(`MorphoHandler deployed to: ${morphoHandlerAddress}`);
 
-    // const { protocolRegistry } = await hre.ignition.deploy(ProtocolRegistryModule);
-    // console.log(`ProtocolRegistry deployed to: ${await protocolRegistry.getAddress()}`);
-
-    const { debtSwap } = await hre.ignition.deploy(DebtSwapModule);
-    console.log(`DebtSwap deployed to: ${await debtSwap.getAddress()}`);
-
-    // await new Promise((resolve) => setTimeout(resolve, 15000));
-
-    // await protocolRegistry.setHandler(Protocols.AAVE_V3, await aaveV3Handler.getAddress());
-    // await protocolRegistry.setHandler(Protocols.COMPOUND, await compoundHandler.getAddress());
-    // await protocolRegistry.setHandler(Protocols.MORPHO, await morphoHandler.getAddress());
-    // await debtSwap.setRegistry("0x6BFDA05cD4438dF03dC3388c0CfD7EFD27Bc665C");
+        // Deploy DebtSwap directly using ethers
+        console.log("Deploying DebtSwap directly...");
+        const DebtSwapFactory = await ethers.getContractFactory("DebtSwap");
+        
+        // Prepare constructor arguments
+        const protocols = [Protocol.AAVE_V3, Protocol.COMPOUND, Protocol.MORPHO];
+        const handlers = [aaveV3HandlerAddress, compoundHandlerAddress, morphoHandlerAddress];
+        
+        const debtSwap = await DebtSwapFactory.deploy(protocols, handlers);
+        await debtSwap.waitForDeployment();
+        
+        console.log(`DebtSwap deployed to: ${await debtSwap.getAddress()}`);
+    } catch (error) {
+        console.error("Deployment error:", error);
+    }
 }
 
 main().catch(console.error);
