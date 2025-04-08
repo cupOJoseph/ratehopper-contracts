@@ -53,14 +53,14 @@ async function main() {
         // Deploy DebtSwap directly using ethers
         console.log("Deploying DebtSwap directly...");
         const DebtSwapFactory = await ethers.getContractFactory("DebtSwap");
-        
+
         // Prepare constructor arguments
         const protocols = [Protocol.AAVE_V3, Protocol.COMPOUND, Protocol.MORPHO];
         const handlers = [aaveV3HandlerAddress, compoundHandlerAddress, morphoHandlerAddress];
-        
+
         const debtSwap = await DebtSwapFactory.deploy(protocols, handlers);
         await debtSwap.waitForDeployment();
-        
+
         console.log(`DebtSwap deployed to: ${await debtSwap.getAddress()}`);
     } catch (error) {
         console.error("Deployment error:", error);

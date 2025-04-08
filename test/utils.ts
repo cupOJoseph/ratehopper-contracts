@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import { Protocols, WETH_ADDRESS } from "./constants";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { MaxUint256 } from "ethers";
+import { ethers, MaxUint256 } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import WETH_ABI from "../externalAbi/weth.json";
 

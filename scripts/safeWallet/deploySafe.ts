@@ -4,11 +4,12 @@ import { ethers } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
 import Safe, { PredictedSafeProps, SafeAccountConfig, SafeDeploymentConfig } from "@safe-global/protocol-kit";
-import { TEST_ADDRESS } from "../test/constants";
+import { TEST_ADDRESS } from "../../test/constants";
 
 async function main() {
     const safeAccountConfig: SafeAccountConfig = {
-        owners: [TEST_ADDRESS],
+        // owners: [TEST_ADDRESS],
+        owners: ["0x9E073c36F63BF1c611026fdA1fF6007A81932231"],
         threshold: 1,
     };
 
@@ -19,9 +20,10 @@ async function main() {
     const protocolKit = await Safe.init({
         // provider: "https://ethereum-sepolia-rpc.publicnode.com",
         // provider: sepolia.rpcUrls.default.http[0],
-        // provider: base.rpcUrls.default.http[0],
-        provider: hardhat.rpcUrls.default.http[0],
-        signer: process.env.PRIVATE_KEY,
+        provider: base.rpcUrls.default.http[0],
+        // provider: hardhat.rpcUrls.default.http[0],
+        // signer: process.env.PRIVATE_KEY,
+        signer: process.env.MY_SAFE_OWNER_KEY!,
         predictedSafe,
     });
 
