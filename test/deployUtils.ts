@@ -10,28 +10,25 @@ import {
 } from "./constants";
 import { MORPHO_ADDRESS } from "./protocols/morpho";
 import { COMPTROLLER_ADDRESS, mcbETH, mDAI, mUSDC } from "./protocols/moonwell";
+import { deployProtocolRegistry } from "./deployProtocolRegistry";
 import { FLUID_VAULT_RESOLVER } from "./protocols/fluid";
 
 async function deployHandlers() {
-    const gasOptions = await getGasOptions();
-
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
-    const aaveV3Handler = await AaveV3Handler.deploy(AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS, gasOptions);
+    const aaveV3Handler = await AaveV3Handler.deploy(AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS);
     console.log("AaveV3Handler deployed to:", await aaveV3Handler.getAddress());
 
+    const protocolRegistry = await deployProtocolRegistry();
+    const registryAddress = await protocolRegistry.getAddress();
+
     const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
-    const compoundHandler = await CompoundHandler.deploy(gasOptions);
+    const compoundHandler = await CompoundHandler.deploy(registryAddress);
+    await compoundHandler.waitForDeployment();
+    console.log("CompoundHandler deployed to:", await compoundHandler.getAddress());
 
     const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
-    const moonwellHandler = await MoonwellHandler.deploy(COMPTROLLER_ADDRESS, gasOptions);
+    const moonwellHandler = await MoonwellHandler.deploy(COMPTROLLER_ADDRESS, registryAddress);
     console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());
-
-    await moonwellHandler.setTokenMContract(cbETH_ADDRESS, mcbETH);
-    await moonwellHandler.setTokenMContract(USDC_ADDRESS, mUSDC);
-    await moonwellHandler.setTokenMContract(DAI_ADDRESS, mDAI);
-    console.log("MoonwellHandler token mContracts set");
-
-    console.log("mUSDC address:", await moonwellHandler.tokenToMContract(USDC_ADDRESS));
 
     const FluidHandler = await hre.ethers.getContractFactory("FluidSafeHandler");
     const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER);

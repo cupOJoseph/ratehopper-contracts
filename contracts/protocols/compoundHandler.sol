@@ -1,18 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.28;
 
-import "../interfaces/IProtocolHandler.sol";
+import {IProtocolHandler} from "../interfaces/IProtocolHandler.sol";
 import {IComet} from "../interfaces/compound/IComet.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
-import "hardhat/console.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ProtocolRegistry} from "../ProtocolRegistry.sol";
+import {CollateralAsset} from "../Types.sol";
 
-contract CompoundHandler is IProtocolHandler {
+contract CompoundHandler is IProtocolHandler, Ownable {
+    ProtocolRegistry public immutable REGISTRY;
+
+    constructor(address _registry) Ownable(msg.sender) {
+        REGISTRY = ProtocolRegistry(_registry);
+    }
+
+    function getCContract(address token) internal view returns (address) {
+        return REGISTRY.getCContract(token);
+    }
+
     function getDebtAmount(
         address asset,
         address onBehalfOf,
-        bytes calldata fromExtraData
+        bytes calldata /* extraData */
     ) public view returns (uint256) {
-        address cContract = abi.decode(fromExtraData, (address));
+        address cContract = getCContract(asset);
+        require(cContract != address(0), "Token not registered");
+
         IComet comet = IComet(cContract);
         return comet.borrowBalanceOf(onBehalfOf);
     }
@@ -36,9 +50,10 @@ contract CompoundHandler is IProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
-        bytes calldata extraData
+        bytes calldata /* extraData */
     ) public override {
-        address cContract = abi.decode(extraData, (address));
+        address cContract = getCContract(fromAsset);
+        require(cContract != address(0), "Token not registered");
 
         IComet fromComet = IComet(cContract);
 
@@ -57,9 +72,10 @@ contract CompoundHandler is IProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
-        bytes calldata extraData
+        bytes calldata /* extraData */
     ) public override {
-        address cContract = abi.decode(extraData, (address));
+        address cContract = getCContract(toAsset);
+        require(cContract != address(0), "Token not registered");
 
         IComet toComet = IComet(cContract);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
@@ -74,22 +90,41 @@ contract CompoundHandler is IProtocolHandler {
         toComet.withdrawFrom(onBehalfOf, address(this), toAsset, amount);
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
-        address cContract = abi.decode(extraData, (address));
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata /* extraData */
+    ) external override {
+        address cContract = getCContract(asset);
+        require(cContract != address(0), "Token not registered");
+
         IERC20(asset).approve(address(cContract), amount);
         // supply collateral
         IComet(cContract).supplyTo(onBehalfOf, asset, amount);
     }
 
-    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
-        address cContract = abi.decode(extraData, (address));
+    function borrow(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata /* extraData */
+    ) external override {
+        address cContract = getCContract(asset);
+        require(cContract != address(0), "Token not registered");
 
         IComet comet = IComet(cContract);
         comet.withdrawFrom(onBehalfOf, address(this), asset, amount);
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
-        address cContract = abi.decode(extraData, (address));
+    function repay(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        bytes calldata /* extraData */
+    ) external override {
+        address cContract = getCContract(asset);
+        require(cContract != address(0), "Token not registered");
 
         IERC20(asset).approve(address(cContract), amount);
         IComet toComet = IComet(cContract);

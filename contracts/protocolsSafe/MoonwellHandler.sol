@@ -4,48 +4,36 @@ pragma solidity =0.8.28;
 import "../interfaces/IProtocolHandler.sol";
 import "../interfaces/safe/ISafe.sol";
 import "../interfaces/moonwell/IMToken.sol";
-import "../interfaces/moonwell/Comptroller.sol";
+import {IComptroller} from "../interfaces/moonwell/Comptroller.sol";
 import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import "../Types.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "hardhat/console.sol";
+import {ProtocolRegistry} from "../ProtocolRegistry.sol";
 
 contract MoonwellHandler is IProtocolHandler, Ownable {
     using GPv2SafeERC20 for IERC20;
 
-    address public immutable comptroller;
+    address public immutable COMPTROLLER;
+    ProtocolRegistry public immutable REGISTRY;
 
-    // Mapping from underlying token address to corresponding Moonwell mToken contract address
-    mapping(address => address) public tokenToMContract;
-
-    constructor(address _comptroller) Ownable(msg.sender) {
-        comptroller = _comptroller;
+    constructor(address _comptroller, address _registry) Ownable(msg.sender) {
+        COMPTROLLER = _comptroller;
+        REGISTRY = ProtocolRegistry(_registry);
     }
 
-    error ZeroAddress();
     error TokenNotRegistered();
-    error TransferFailed();
-    error BorrowFailed();
 
-    function setTokenMContract(address token, address mContract) external onlyOwner {
-        if (token == address(0)) revert ZeroAddress();
-        if (mContract == address(0)) revert ZeroAddress();
-        tokenToMContract[token] = mContract;
-    }
-    
-    // Internal function to get the mContract address for a token
-    // This helps handle potential address format inconsistencies
     function getMContract(address token) internal view returns (address) {
-        address mContract = tokenToMContract[token];
-        return mContract;
+        return REGISTRY.getMContract(token);
     }
 
     function getDebtAmount(
         address asset,
         address onBehalfOf,
-        bytes calldata extraData
+        bytes calldata /* extraData */
     ) external view returns (uint256) {
         address mContract = getMContract(asset);
         if (mContract == address(0)) revert TokenNotRegistered();
@@ -60,8 +48,8 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
         uint256 amountTotal,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
-        bytes calldata fromExtraData,
-        bytes calldata toExtraData
+        bytes calldata /* fromExtraData */,
+        bytes calldata /* toExtraData */
     ) external override {
         address fromContract = getMContract(fromAsset);
         address toContract = getMContract(toAsset);
@@ -80,7 +68,7 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
             ISafe.Operation.Call
         );
 
-        if (!successBorrow) revert BorrowFailed();
+        require(successBorrow, "Borrow transaction failed");
 
         bytes memory transferData = abi.encodeCall(IERC20.transfer, (address(this), amountTotal));
         bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
@@ -89,7 +77,7 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
             transferData,
             ISafe.Operation.Call
         );
-        if (!successTransfer) revert TransferFailed();
+        require(successTransfer, "Transfer transaction failed");
     }
 
     function switchFrom(
@@ -97,11 +85,10 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
         uint256 amount,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
-        bytes calldata extraData
+        bytes calldata /* extraData */
     ) external override {
-        console.log("fromAsset:", fromAsset);
         address fromContract = getMContract(fromAsset);
-        console.log("fromContract:", fromContract);
+
         if (fromContract == address(0)) revert TokenNotRegistered();
 
         IERC20(fromAsset).approve(address(fromContract), amount);
@@ -110,7 +97,7 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
         for (uint256 i = 0; i < collateralAssets.length; i++) {
             address mTokenAddress = getMContract(collateralAssets[i].asset);
             if (mTokenAddress == address(0)) revert TokenNotRegistered();
-            
+
             bool successWithdraw = ISafe(onBehalfOf).execTransactionFromModule(
                 mTokenAddress,
                 0,
@@ -118,7 +105,7 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
                 ISafe.Operation.Call
             );
 
-            if (!successWithdraw) revert("Withdraw failed");
+            require(successWithdraw, "Redeem transaction failed");
 
             bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
                 collateralAssets[i].asset,
@@ -127,7 +114,7 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
                 ISafe.Operation.Call
             );
 
-            if (!successTransfer) revert TransferFailed();
+            require(successTransfer, "Transfer transaction failed");
         }
     }
 
@@ -136,7 +123,7 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
         uint256 amount,
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
-        bytes calldata extraData
+        bytes calldata /* extraData */
     ) external override {
         address toContract = getMContract(toAsset);
         if (toContract == address(0)) revert TokenNotRegistered();
@@ -155,7 +142,7 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
                 ISafe.Operation.Call
             );
 
-            if (!successApprove) revert("Approve transaction failed");
+            require(successApprove, "Approve transaction failed");
 
             bool successMint = ISafe(onBehalfOf).execTransactionFromModule(
                 collateralContract,
@@ -163,19 +150,19 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
                 abi.encodeCall(IMToken.mint, (currentBalance)),
                 ISafe.Operation.Call
             );
-            if (!successMint) revert("Mint transaction failed");
+            require(successMint, "Mint transaction failed");
 
             address[] memory collateralContracts = new address[](1);
             collateralContracts[0] = collateralContract;
 
             bool successEnterMarkets = ISafe(onBehalfOf).execTransactionFromModule(
-                comptroller,
+                COMPTROLLER,
                 0,
                 abi.encodeCall(IComptroller.enterMarkets, (collateralContracts)),
                 ISafe.Operation.Call
             );
 
-            if (!successEnterMarkets) revert("Enter markets transaction failed");
+            require(successEnterMarkets, "Enter markets transaction failed");
         }
 
         bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
@@ -185,7 +172,7 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
             ISafe.Operation.Call
         );
 
-        if (!successBorrow) revert BorrowFailed();
+        require(successBorrow, "Borrow transaction failed");
 
         bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
             toAsset,
@@ -194,10 +181,10 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
             ISafe.Operation.Call
         );
 
-        if (!successTransfer) revert TransferFailed();
+        require(successTransfer, "Transfer transaction failed");
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external {
         address mContract = getMContract(asset);
         if (mContract == address(0)) revert TokenNotRegistered();
 
@@ -225,18 +212,18 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
         collateralContracts[0] = mContract;
 
         bool successEnterMarkets = ISafe(onBehalfOf).execTransactionFromModule(
-            comptroller,
+            COMPTROLLER,
             0,
             abi.encodeCall(IComptroller.enterMarkets, (collateralContracts)),
             ISafe.Operation.Call
         );
 
-        require(successEnterMarkets, "moonwell enter markets failed");
+        require(successEnterMarkets, "Enter markets transaction failed");
     }
 
-    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
-        address mContract = tokenToMContract[asset];
-        require(mContract != address(0), "Token not registered");
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external {
+        address mContract = getMContract(asset);
+        if (mContract == address(0)) revert TokenNotRegistered();
 
         bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
             mContract,
@@ -257,9 +244,9 @@ contract MoonwellHandler is IProtocolHandler, Ownable {
         require(successTransfer, "Transfer transaction failed");
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override {
-        address mContract = tokenToMContract[asset];
-        require(mContract != address(0), "Token not registered");
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) public override {
+        address mContract = getMContract(asset);
+        if (mContract == address(0)) revert TokenNotRegistered();
 
         IERC20(asset).approve(address(mContract), amount);
         IMToken(mContract).repayBorrowBehalf(onBehalfOf, amount);

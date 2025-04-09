@@ -236,12 +236,12 @@ describe("Safe wallet should debtSwap", function () {
         });
     });
 
-    it("from Compound to Moonwell", async function () {
+    it.only("from Compound to Moonwell", async function () {
         await supplyAndBorrow(Protocols.COMPOUND);
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.COMPOUND, Protocols.MOONWELL);
     });
 
-    it.only("from Moonwell to Compound", async function () {
+    it("from Moonwell to Compound", async function () {
         await supplyAndBorrow(Protocols.MOONWELL);
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.MOONWELL, Protocols.COMPOUND);
     });
@@ -476,9 +476,6 @@ describe("Safe wallet should debtSwap", function () {
 
                 await safeWallet.executeTransaction(safeAllowTransaction);
                 console.log("Safe transaction: Compound allow");
-
-                const fromCometAddress = cometAddressMap.get(fromTokenAddress)!;
-                fromExtraData = fromHelper.encodeExtraData(fromCometAddress);
                 break;
             case Protocols.MORPHO:
                 await morphoAuthorizeTxBySafe();
@@ -535,9 +532,6 @@ describe("Safe wallet should debtSwap", function () {
 
                 await safeWallet.executeTransaction(safeAllowTransaction);
                 console.log("Safe transaction: Compound allow");
-
-                const toCometAddress = cometAddressMap.get(toTokenAddress)!;
-                toExtraData = toHelper.encodeExtraData(toCometAddress);
                 break;
             case Protocols.MORPHO:
                 // TODO: refactor this

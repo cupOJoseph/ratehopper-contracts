@@ -544,9 +544,6 @@ describe("DebtSwap should switch", function () {
                 break;
             case Protocols.COMPOUND:
                 await compoundHelper.allow(fromTokenAddress, deployedContractAddress);
-
-                const fromCometAddress = cometAddressMap.get(fromTokenAddress)!;
-                fromExtraData = compoundHelper.encodeExtraData(fromCometAddress);
                 break;
 
             case Protocols.MORPHO:
@@ -565,9 +562,6 @@ describe("DebtSwap should switch", function () {
 
             case Protocols.COMPOUND:
                 await compoundHelper.allow(toTokenAddress, deployedContractAddress);
-
-                const toCometAddress = cometAddressMap.get(toTokenAddress)!;
-                toExtraData = compoundHelper.encodeExtraData(toCometAddress);
                 break;
 
             case Protocols.MORPHO:
