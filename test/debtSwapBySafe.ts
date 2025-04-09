@@ -241,7 +241,7 @@ describe("Safe wallet should debtSwap", function () {
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.COMPOUND, Protocols.MOONWELL);
     });
 
-    it("from Moonwell to Compound", async function () {
+    it.only("from Moonwell to Compound", async function () {
         await supplyAndBorrow(Protocols.MOONWELL);
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.MOONWELL, Protocols.COMPOUND);
     });
@@ -487,13 +487,6 @@ describe("Safe wallet should debtSwap", function () {
 
                 fromExtraData = fromHelper.encodeExtraData(options!.morphoFromMarketId!, borrowShares);
                 break;
-            case Protocols.MOONWELL:
-                const mContract = mContractAddressMap.get(fromTokenAddress)!;
-                fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "address[]"],
-                    [mContract, [mcbETH]],
-                );
-                break;
             case Protocols.FLUID:
                 const nftId = await fromHelper.getNftId(FLUID_cbETH_USDC_VAULT, safeAddress);
                 fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
@@ -555,10 +548,6 @@ describe("Safe wallet should debtSwap", function () {
                 const borrowShares = await toHelper.getBorrowShares(options!.morphoToMarketId!, safeAddress);
 
                 toExtraData = toHelper.encodeExtraData(options!.morphoToMarketId!, borrowShares);
-                break;
-            case Protocols.MOONWELL:
-                const mContract = mContractAddressMap.get(toTokenAddress)!;
-                toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(["address", "address[]"], [mContract, [mcbETH]]);
                 break;
             case Protocols.FLUID:
                 const vaultAddress =

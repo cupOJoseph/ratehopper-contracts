@@ -1,8 +1,15 @@
 import hre from "hardhat";
 import { ethers } from "hardhat";
-import { AAVE_V3_DATA_PROVIDER_ADDRESS, AAVE_V3_POOL_ADDRESS, Protocols } from "./constants";
+import {
+    AAVE_V3_DATA_PROVIDER_ADDRESS,
+    AAVE_V3_POOL_ADDRESS,
+    cbETH_ADDRESS,
+    DAI_ADDRESS,
+    Protocols,
+    USDC_ADDRESS,
+} from "./constants";
 import { MORPHO_ADDRESS } from "./protocols/morpho";
-import { COMPTROLLER_ADDRESS } from "./protocols/moonwell";
+import { COMPTROLLER_ADDRESS, mcbETH, mDAI, mUSDC } from "./protocols/moonwell";
 import { FLUID_VAULT_RESOLVER } from "./protocols/fluid";
 
 async function deployHandlers() {
@@ -18,6 +25,13 @@ async function deployHandlers() {
     const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
     const moonwellHandler = await MoonwellHandler.deploy(COMPTROLLER_ADDRESS, gasOptions);
     console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());
+
+    await moonwellHandler.setTokenMContract(cbETH_ADDRESS, mcbETH);
+    await moonwellHandler.setTokenMContract(USDC_ADDRESS, mUSDC);
+    await moonwellHandler.setTokenMContract(DAI_ADDRESS, mDAI);
+    console.log("MoonwellHandler token mContracts set");
+
+    console.log("mUSDC address:", await moonwellHandler.tokenToMContract(USDC_ADDRESS));
 
     const FluidHandler = await hre.ethers.getContractFactory("FluidSafeHandler");
     const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER);
