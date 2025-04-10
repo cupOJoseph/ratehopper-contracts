@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 async function main() {
-    const ourContractAddress = "0xe551D6Cd14B3b193818513267f41119A04092575";
+    const ourContractAddress = "0x85C434815d00352BBab9a90b884D1c299aEf9969";
     const safeWallet = await Safe.init({
         provider: "https://base.llamarpc.com",
         signer: process.env.MY_SAFE_OWNER_KEY!,
@@ -12,7 +12,7 @@ async function main() {
 
     const enableModuleTx = await safeWallet.createEnableModuleTx(ourContractAddress);
     const safeTxHash = await safeWallet.executeTransaction(enableModuleTx);
-    console.log("Safe enable module transaction");
+    console.log("Safe enable module transaction:", safeTxHash);
 
     console.log("Modules:", await safeWallet.getModules());
 }

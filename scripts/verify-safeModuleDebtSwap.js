@@ -1,7 +1,7 @@
 const hre = require("hardhat");
 
 async function main() {
-    const contractAddress = "0xA75b7691FF816122804e0Ed09a24590243CF7617";
+    const contractAddress = "0x85C434815d00352BBab9a90b884D1c299aEf9969";
 
     // Define the constructor arguments
     const protocols = [0, 1, 2, 3, 4];
@@ -9,7 +9,7 @@ async function main() {
         "0x3ea412D1d7D7414693f2355D107dbF40440Ff040", // AaveV3Handler
         "0x7410abF1e92187A1ded8d615A866541cF92dE74B", // CompoundHandler
         "0x18c2fB450f34e3089a6E5a9E501aA2692cE5d63e", // MorphoHandler
-        "0x252BcD8D00f13d930dFa936b24a99720002d46f3", // FluidSafeHandler
+        "0xB6e7cDF6Cc57308a1a996704D85C351aBc317f1A", // FluidSafeHandler
         "0xCAaC42dCab2F28095D02F07A4fF9Db7b508F93fB", // MoonwellHandler
     ];
     const pauserAddress = "0x9E073c36F63BF1c611026fdA1fF6007A81932231";

@@ -103,7 +103,7 @@ contract FluidSafeHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) public override {
-        (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
+        (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
         IERC20(collateralAssets[0].asset).transfer(onBehalfOf, collateralAssets[0].amount);
 
@@ -118,17 +118,23 @@ contract FluidSafeHandler is IProtocolHandler {
         (bool successSupply, bytes memory returnData) = ISafe(onBehalfOf).execTransactionFromModuleReturnData(
             vaultAddress,
             0,
-            abi.encodeCall(IFluidVault.operate, (0, int256(collateralAssets[0].amount), 0, onBehalfOf)),
+            abi.encodeCall(IFluidVault.operate, (nftId, int256(collateralAssets[0].amount), 0, onBehalfOf)),
             ISafe.Operation.Call
         );
         require(successSupply, "Fluid supply failed");
 
-        (uint256 nftId, , ) = abi.decode(returnData, (uint256, int256, int256));
+        // If nftId is 0, extract new ID from return data, otherwise use the provided ID
+        uint256 positionNftId;
+        if (nftId == 0) {
+            (positionNftId, , ) = abi.decode(returnData, (uint256, int256, int256));
+        } else {
+            positionNftId = nftId;
+        }
 
         bool successBorrow = ISafe(onBehalfOf).execTransactionFromModule(
             vaultAddress,
             0,
-            abi.encodeCall(IFluidVault.operate, (nftId, 0, int256(amount), address(this))),
+            abi.encodeCall(IFluidVault.operate, (positionNftId, 0, int256(amount), address(this))),
             ISafe.Operation.Call
         );
         require(successBorrow, "Fluid borrow failed");

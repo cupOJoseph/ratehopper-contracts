@@ -66,6 +66,7 @@ export class FluidHelper {
 
     async getNftId(vaultAddress: string, userAddress: string): Promise<bigint> {
         const position = await this.getPosition(vaultAddress, userAddress);
+        if (!position) return BigInt(0);
         const nftId = position[0];
         console.log("nftId:", nftId + " on vault: " + vaultAddress);
         return nftId;

@@ -20,10 +20,7 @@ const ProtocolRegistryModule = buildModule("ProtocolRegistry", (m) => {
     return { protocolRegistry };
 });
 
-const FluidSafeHandlerModule = buildModule("FluidSafeHandler", (m) => {
-    const fluidSafeHandler = m.contract("FluidSafeHandler", [FLUID_VAULT_RESOLVER]);
-    return { fluidSafeHandler };
-});
+// FluidSafeHandler is deployed directly with ethers
 
 const MoonwellHandlerModule = buildModule("MoonwellHandler", (m) => {
     return {};
@@ -50,7 +47,11 @@ async function main() {
         await registry.batchSetTokenCContracts(cTokens, cContracts);
         console.log("Compound token mappings set in ProtocolRegistry");
 
-        const { fluidSafeHandler } = await hre.ignition.deploy(FluidSafeHandlerModule);
+        // Deploy FluidSafeHandler directly with ethers instead of Ignition to avoid reconciliation errors
+        console.log("Deploying FluidSafeHandler...");
+        const FluidSafeHandlerFactory = await ethers.getContractFactory("FluidSafeHandler");
+        const fluidSafeHandler = await FluidSafeHandlerFactory.deploy(FLUID_VAULT_RESOLVER);
+        await fluidSafeHandler.waitForDeployment();
         const fluidSafeHandlerAddress = await fluidSafeHandler.getAddress();
         console.log(`FluidSafeHandler deployed to: ${fluidSafeHandlerAddress}`);
 

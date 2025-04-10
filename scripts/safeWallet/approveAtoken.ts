@@ -6,7 +6,7 @@ import { ethers } from "ethers";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 
 const safeAddress = "0x169EeC0c73a76a520e4cFd8Bb982c5237C3f4977";
-const safeModuleAddress = "0xe551d6cd14b3b193818513267f41119a04092575";
+const safeModuleAddress = "0x85C434815d00352BBab9a90b884D1c299aEf9969";
 
 // Aave: aBascbETH Token
 const aTokenAddress = "0xcf3D55c10DB69f28fD1A75Bd73f3D8A2d9c595ad";
