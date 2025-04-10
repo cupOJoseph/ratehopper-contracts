@@ -58,9 +58,7 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         feeBeneficiary = _feeBeneficiary;
     }
 
-    function getHandler(Protocol protocol) public view returns (address) {
-        return protocolHandlers[protocol];
-    }
+
 
     function createLeveragedPosition(
         address _flashloanPool,
@@ -122,7 +120,7 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
 
         uint256 amountInMax = decoded.srcAmount + 1;
 
-        address handler = getHandler(decoded.protocol);
+        address handler = protocolHandlers[decoded.protocol];
 
         (bool successSupply, ) = handler.delegatecall(
             abi.encodeCall(

@@ -35,20 +35,20 @@ const MorphoModule = buildModule("MorphoHandler", (m) => {
 async function main() {
     try {
         // Deploy all handlers first
-        console.log("Deploying AaveV3Handler...");
-        const { aaveV3Handler } = await hre.ignition.deploy(AaveV3Module);
-        const aaveV3HandlerAddress = await aaveV3Handler.getAddress();
-        console.log(`AaveV3Handler deployed to: ${aaveV3HandlerAddress}`);
+        // console.log("Deploying AaveV3Handler...");
+        // const { aaveV3Handler } = await hre.ignition.deploy(AaveV3Module);
+        // const aaveV3HandlerAddress = await aaveV3Handler.getAddress();
+        // console.log(`AaveV3Handler deployed to: ${aaveV3HandlerAddress}`);
 
-        console.log("Deploying CompoundHandler...");
-        const { compoundHandler } = await hre.ignition.deploy(CompoundModule);
-        const compoundHandlerAddress = await compoundHandler.getAddress();
-        console.log(`CompoundHandler deployed to: ${compoundHandlerAddress}`);
+        // console.log("Deploying CompoundHandler...");
+        // const { compoundHandler } = await hre.ignition.deploy(CompoundModule);
+        // const compoundHandlerAddress = await compoundHandler.getAddress();
+        // console.log(`CompoundHandler deployed to: ${compoundHandlerAddress}`);
 
-        console.log("Deploying MorphoHandler...");
-        const { morphoHandler } = await hre.ignition.deploy(MorphoModule);
-        const morphoHandlerAddress = await morphoHandler.getAddress();
-        console.log(`MorphoHandler deployed to: ${morphoHandlerAddress}`);
+        // console.log("Deploying MorphoHandler...");
+        // const { morphoHandler } = await hre.ignition.deploy(MorphoModule);
+        // const morphoHandlerAddress = await morphoHandler.getAddress();
+        // console.log(`MorphoHandler deployed to: ${morphoHandlerAddress}`);
 
         // Deploy DebtSwap directly using ethers
         console.log("Deploying DebtSwap directly...");
@@ -56,7 +56,12 @@ async function main() {
 
         // Prepare constructor arguments
         const protocols = [Protocol.AAVE_V3, Protocol.COMPOUND, Protocol.MORPHO];
-        const handlers = [aaveV3HandlerAddress, compoundHandlerAddress, morphoHandlerAddress];
+        // const handlers = [aaveV3HandlerAddress, compoundHandlerAddress, morphoHandlerAddress];
+        const handlers = [
+            "0x3ea412D1d7D7414693f2355D107dbF40440Ff040",
+            "0x7410abF1e92187A1ded8d615A866541cF92dE74B",
+            "0x18c2fB450f34e3089a6E5a9E501aA2692cE5d63e",
+        ];
 
         const debtSwap = await DebtSwapFactory.deploy(protocols, handlers);
         await debtSwap.waitForDeployment();

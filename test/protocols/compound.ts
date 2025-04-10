@@ -4,6 +4,7 @@ import { Contract, MaxUint256 } from "ethers";
 import cometAbi from "../../externalAbi/compound/comet.json";
 import { approve, defaultProvider, formatAmount } from "../utils";
 import {
+    AERO_ADDRESS,
     cbETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
     TEST_ADDRESS,
@@ -17,11 +18,13 @@ import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 export const USDC_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
 export const USDbC_COMET_ADDRESS = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
 export const WETH_COMET_ADDRESS = "0x46e6b214b524310239732D51387075E0e70970bf";
+export const AERO_COMET_ADDRESS = "0x784efeB622244d2348d4F2522f8860B96fbEcE89";
 
 export const cometAddressMap = new Map<string, string>([
     [USDC_ADDRESS, USDC_COMET_ADDRESS],
     [USDbC_ADDRESS, USDbC_COMET_ADDRESS],
     [WETH_ADDRESS, WETH_COMET_ADDRESS],
+    [AERO_ADDRESS, AERO_COMET_ADDRESS],
 ]);
 
 export class CompoundHelper {

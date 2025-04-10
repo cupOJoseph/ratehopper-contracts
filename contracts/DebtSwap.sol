@@ -61,10 +61,6 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         feeBeneficiary = _feeBeneficiary;
     }
 
-    function getHandler(Protocol protocol) public view returns (address) {
-        return protocolHandlers[protocol];
-    }
-
     function executeDebtSwap(
         address _flashloanPool,
         Protocol _fromProtocol,
@@ -92,7 +88,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
 
         uint256 debtAmount = _amount;
         if (_amount == type(uint256).max) {
-            address handler = getHandler(_fromProtocol);
+            address handler = protocolHandlers[_fromProtocol];
 
             debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, msg.sender, _fromExtraData);
         }
@@ -137,7 +133,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         uint256 amountTotal = amountInMax + flashloanFee + protocolFeeAmount;
 
         if (decoded.fromProtocol == decoded.toProtocol) {
-            address handler = getHandler(decoded.fromProtocol);
+            address handler = protocolHandlers[decoded.fromProtocol];
 
             (bool success, ) = handler.delegatecall(
                 abi.encodeCall(
@@ -156,7 +152,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
             );
             require(success, "protocol switchIn failed");
         } else {
-            address fromHandler = getHandler(decoded.fromProtocol);
+            address fromHandler = protocolHandlers[decoded.fromProtocol];
             (bool successFrom, ) = fromHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchFrom,
@@ -171,7 +167,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
             );
             require(successFrom, "protocol switchFrom failed");
 
-            address toHandler = getHandler(decoded.toProtocol);
+            address toHandler = protocolHandlers[decoded.toProtocol];
             (bool successTo, ) = toHandler.delegatecall(
                 abi.encodeCall(
                     IProtocolHandler.switchTo,
@@ -203,7 +199,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         uint256 remainingBalance = IERC20(decoded.toAsset).balanceOf(address(this));
 
         if (remainingBalance > 0) {
-            address handler = getHandler(decoded.toProtocol);
+            address handler = protocolHandlers[decoded.toProtocol];
 
             (bool success, ) = handler.delegatecall(
                 abi.encodeCall(
