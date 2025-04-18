@@ -236,7 +236,7 @@ describe("Safe wallet should debtSwap", function () {
         });
     });
 
-    it.only("from Compound to Moonwell", async function () {
+    it("from Compound to Moonwell", async function () {
         await supplyAndBorrow(Protocols.COMPOUND);
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.COMPOUND, Protocols.MOONWELL);
     });
