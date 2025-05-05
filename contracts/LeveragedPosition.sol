@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.28;
 
+import "./dependencies/uniswapV3/CallbackValidation.sol";
+import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 import {IERC20} from "./dependencies/IERC20.sol";
 import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
@@ -15,6 +17,7 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
     uint8 public protocolFee;
     address public feeBeneficiary;
+    address public uniswapV3Factory;
     mapping(Protocol => address) public protocolHandlers;
 
     struct FlashCallbackData {
@@ -39,8 +42,9 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         address debtAsset
     );
 
-    constructor(Protocol[] memory protocols, address[] memory handlers) Ownable(msg.sender) {
+    constructor(address _uniswapV3Factory, Protocol[] memory protocols, address[] memory handlers) Ownable(msg.sender) {
         require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
+        uniswapV3Factory = _uniswapV3Factory;
 
         for (uint256 i = 0; i < protocols.length; i++) {
             require(handlers[i] != address(0), "Invalid handler address");
@@ -57,8 +61,6 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         require(_feeBeneficiary != address(0), "_feeBeneficiary cannot be zero address");
         feeBeneficiary = _feeBeneficiary;
     }
-
-
 
     function createLeveragedPosition(
         address _flashloanPool,
@@ -110,10 +112,13 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
 
     function uniswapV3FlashCallback(uint256 fee0, uint256 fee1, bytes calldata data) external {
         FlashCallbackData memory decoded = abi.decode(data, (FlashCallbackData));
-        uint256 flashloanBorrowAmount = decoded.targetCollateralAmount - decoded.principleCollateralAmount;
 
-        // implement the same logic as CallbackValidation.verifyCallback()
-        require(msg.sender == address(decoded.flashloanPool));
+        // verify callback
+        IUniswapV3Pool pool = IUniswapV3Pool(msg.sender);
+        PoolAddress.PoolKey memory poolKey = PoolAddress.getPoolKey(pool.token0(), pool.token1(), pool.fee());
+        CallbackValidation.verifyCallback(uniswapV3Factory, poolKey);
+
+        uint256 flashloanBorrowAmount = decoded.targetCollateralAmount - decoded.principleCollateralAmount;
 
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
@@ -147,7 +152,7 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
 
         // repay flashloan
         IERC20 collateralToken = IERC20(decoded.collateralAsset);
-        collateralToken.safeTransfer(address(decoded.flashloanPool), flashloanBorrowAmount + totalFee);
+        collateralToken.safeTransfer(msg.sender, flashloanBorrowAmount + totalFee);
 
         // transfer dust amount back to user
         uint256 remainingCollateralBalance = IERC20(decoded.collateralAsset).balanceOf(address(this));

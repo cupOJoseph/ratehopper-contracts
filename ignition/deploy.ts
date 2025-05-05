@@ -55,6 +55,8 @@ async function main() {
         const DebtSwapFactory = await ethers.getContractFactory("DebtSwap");
 
         // Prepare constructor arguments
+        const UNISWAP_V3_FACTORY_ADRESS = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
+
         const protocols = [Protocol.AAVE_V3, Protocol.COMPOUND, Protocol.MORPHO];
         // const handlers = [aaveV3HandlerAddress, compoundHandlerAddress, morphoHandlerAddress];
         const handlers = [
@@ -63,7 +65,7 @@ async function main() {
             "0x18c2fB450f34e3089a6E5a9E501aA2692cE5d63e",
         ];
 
-        const debtSwap = await DebtSwapFactory.deploy(protocols, handlers);
+        const debtSwap = await DebtSwapFactory.deploy(UNISWAP_V3_FACTORY_ADRESS, protocols, handlers);
         await debtSwap.waitForDeployment();
 
         console.log(`DebtSwap deployed to: ${await debtSwap.getAddress()}`);

@@ -6,6 +6,7 @@ import {
     cbETH_ADDRESS,
     DAI_ADDRESS,
     Protocols,
+    UNISWAP_V3_FACTORY_ADRESS,
     USDC_ADDRESS,
 } from "./constants";
 import { MORPHO_ADDRESS } from "./protocols/morpho";
@@ -54,6 +55,7 @@ export async function deployDebtSwapContractFixture() {
     const { aaveV3Handler, compoundHandler, moonwellHandler, fluidHandler, morphoHandler } = await deployHandlers();
     const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
     const debtSwap = await DebtSwap.deploy(
+        UNISWAP_V3_FACTORY_ADRESS,
         [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO],
         [aaveV3Handler.getAddress(), compoundHandler.getAddress(), morphoHandler.getAddress()],
         await getGasOptions(),
@@ -71,6 +73,7 @@ export async function deployLeveragedPositionContractFixture() {
 
     const LeveragedPosition = await hre.ethers.getContractFactory("LeveragedPosition");
     const leveragedPosition = await LeveragedPosition.deploy(
+        UNISWAP_V3_FACTORY_ADRESS,
         [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO, Protocols.MOONWELL, Protocols.FLUID],
         [
             aaveV3Handler.getAddress(),
@@ -92,6 +95,7 @@ export async function deploySafeContractFixture() {
     const SafeModule = await hre.ethers.getContractFactory("SafeModuleDebtSwap");
     const [owner, _, __, pauser] = await ethers.getSigners();
     const safeModule = await SafeModule.deploy(
+        UNISWAP_V3_FACTORY_ADRESS,
         [Protocols.AAVE_V3, Protocols.COMPOUND, Protocols.MORPHO, Protocols.MOONWELL, Protocols.FLUID],
         [
             aaveV3Handler.getAddress(),

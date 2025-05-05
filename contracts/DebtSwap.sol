@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
+import "./dependencies/uniswapV3/CallbackValidation.sol";
 pragma solidity =0.8.28;
 
 import {IERC20} from "./dependencies/IERC20.sol";
+import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
-import {IFlashLoanSimpleReceiver} from "@aave/core-v3/contracts/flashloan/interfaces/IFlashLoanSimpleReceiver.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -14,10 +15,10 @@ contract DebtSwap is Ownable, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
     uint8 public protocolFee;
     address public feeBeneficiary;
+    address public uniswapV3Factory;
     mapping(Protocol => address) public protocolHandlers;
 
     struct FlashCallbackData {
-        address flashloanPool;
         Protocol fromProtocol;
         Protocol toProtocol;
         address fromAsset;
@@ -40,10 +41,9 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         uint256 amount
     );
 
-    event FlashLoanBorrowed(address indexed pool, address indexed asset, uint256 amount, uint256 fee);
-
-    constructor(Protocol[] memory protocols, address[] memory handlers) Ownable(msg.sender) {
+    constructor(address _uniswapV3Factory, Protocol[] memory protocols, address[] memory handlers) Ownable(msg.sender) {
         require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
+        uniswapV3Factory = _uniswapV3Factory;
 
         for (uint256 i = 0; i < protocols.length; i++) {
             require(handlers[i] != address(0), "Invalid handler address");
@@ -98,7 +98,6 @@ contract DebtSwap is Ownable, ReentrancyGuard {
 
         bytes memory data = abi.encode(
             FlashCallbackData({
-                flashloanPool: _flashloanPool,
                 fromProtocol: _fromProtocol,
                 toProtocol: _toProtocol,
                 fromAsset: _fromDebtAsset,
@@ -119,13 +118,19 @@ contract DebtSwap is Ownable, ReentrancyGuard {
     function uniswapV3FlashCallback(uint256 fee0, uint256 fee1, bytes calldata data) external {
         FlashCallbackData memory decoded = abi.decode(data, (FlashCallbackData));
 
-        // implement the same logic as CallbackValidation.verifyCallback()
-        require(msg.sender == address(decoded.flashloanPool), "Caller is not flashloan pool");
+        // verify callback
+        IUniswapV3Pool pool = IUniswapV3Pool(msg.sender);
+        PoolAddress.PoolKey memory poolKey = PoolAddress.getPoolKey(pool.token0(), pool.token1(), pool.fee());
+        CallbackValidation.verifyCallback(uniswapV3Factory, poolKey);
 
         // suppose either of fee0 or fee1 is 0
-        uint flashloanFee = fee0 + fee1;
+        uint flashloanFeeOriginal = fee0 + fee1;
 
-        emit FlashLoanBorrowed(decoded.flashloanPool, decoded.fromAsset, decoded.amount, flashloanFee);
+        // convert flashloan fee if fromAsset and toAsset have different decimals
+        uint8 fromAssetDecimals = IERC20(decoded.fromAsset).decimals();
+        uint8 toAssetDecimals = IERC20(decoded.toAsset).decimals();
+        uint8 conversionFactor = (fromAssetDecimals > toAssetDecimals) ? (fromAssetDecimals - toAssetDecimals) : 0;
+        uint flashloanFee = flashloanFeeOriginal / (10 ** conversionFactor);
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 
@@ -189,7 +194,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
 
         // repay flashloan
         IERC20 fromToken = IERC20(decoded.fromAsset);
-        fromToken.safeTransfer(address(decoded.flashloanPool), decoded.amount + flashloanFee);
+        fromToken.safeTransfer(address(msg.sender), decoded.amount + flashloanFee);
 
         if (protocolFee > 0) {
             IERC20(decoded.toAsset).safeTransfer(feeBeneficiary, protocolFeeAmount);

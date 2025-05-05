@@ -6,6 +6,7 @@ import { getCTokenMappingArrays, getMTokenMappingArrays } from "../contractAddre
 const PAUSER_ADDRESS = "0x9E073c36F63BF1c611026fdA1fF6007A81932231";
 const FLUID_VAULT_RESOLVER = "0x79B3102173EB84E6BCa182C7440AfCa5A41aBcF8";
 const COMPTROLLER_ADDRESS = "0xfbb21d0380bee3312b33c4353c8936a0f13ef26c";
+const UNISWAP_V3_FACTORY_ADRESS = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
 
 enum Protocol {
     AAVE_V3,
@@ -80,7 +81,12 @@ async function main() {
             moonwellHandlerAddress,
         ];
 
-        const safeModuleDebtSwap = await SafeModuleDebtSwapFactory.deploy(protocols, handlers, PAUSER_ADDRESS);
+        const safeModuleDebtSwap = await SafeModuleDebtSwapFactory.deploy(
+            UNISWAP_V3_FACTORY_ADRESS,
+            protocols,
+            handlers,
+            PAUSER_ADDRESS,
+        );
         await safeModuleDebtSwap.waitForDeployment();
         console.log(`SafeModuleDebtSwap deployed to: ${await safeModuleDebtSwap.getAddress()}`);
     } catch (error) {
