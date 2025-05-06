@@ -165,13 +165,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         address safe = decoded.onBehalfOf;
 
         // suppose either of fee0 or fee1 is 0
-        uint flashloanFeeOriginal = fee0 + fee1;
-
-        // convert flashloan fee if fromAsset and toAsset have different decimals
-        uint8 fromAssetDecimals = IERC20(decoded.fromAsset).decimals();
-        uint8 toAssetDecimals = IERC20(decoded.toAsset).decimals();
-        uint8 conversionFactor = (fromAssetDecimals > toAssetDecimals) ? (fromAssetDecimals - toAssetDecimals) : 0;
-        uint flashloanFee = flashloanFeeOriginal / (10 ** conversionFactor);
+        uint flashloanFee = fee0 + fee1;
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 

@@ -4,14 +4,13 @@ pragma solidity =0.8.28;
 import {IProtocolHandler} from "../interfaces/IProtocolHandler.sol";
 import {IComet} from "../interfaces/compound/IComet.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ProtocolRegistry} from "../ProtocolRegistry.sol";
 import {CollateralAsset} from "../Types.sol";
 
-contract CompoundHandler is IProtocolHandler, Ownable {
+contract CompoundHandler is IProtocolHandler {
     ProtocolRegistry public immutable REGISTRY;
 
-    constructor(address _registry) Ownable(msg.sender) {
+    constructor(address _registry) {
         REGISTRY = ProtocolRegistry(_registry);
     }
 

@@ -12,8 +12,6 @@ import "../interfaces/fluid/IFluidVaultResolver.sol";
 import "../interfaces/IProtocolHandler.sol";
 import {Structs} from "../dependencies/fluid/structs.sol";
 
-import "hardhat/console.sol";
-
 contract FluidSafeHandler is IProtocolHandler {
     using GPv2SafeERC20 for IERC20;
 

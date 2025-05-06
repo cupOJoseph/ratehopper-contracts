@@ -8,18 +8,15 @@ import {IComptroller} from "../interfaces/moonwell/Comptroller.sol";
 import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import "../Types.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-
-import "hardhat/console.sol";
 import {ProtocolRegistry} from "../ProtocolRegistry.sol";
 
-contract MoonwellHandler is IProtocolHandler, Ownable {
+contract MoonwellHandler is IProtocolHandler {
     using GPv2SafeERC20 for IERC20;
 
     address public immutable COMPTROLLER;
     ProtocolRegistry public immutable REGISTRY;
 
-    constructor(address _comptroller, address _registry) Ownable(msg.sender) {
+    constructor(address _comptroller, address _registry) {
         COMPTROLLER = _comptroller;
         REGISTRY = ProtocolRegistry(_registry);
     }

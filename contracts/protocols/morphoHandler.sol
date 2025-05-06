@@ -4,7 +4,6 @@ pragma solidity =0.8.28;
 import "../interfaces/IProtocolHandler.sol";
 import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
-import "hardhat/console.sol";
 import {DataTypes} from "../interfaces/aaveV3/DataTypes.sol";
 import "../interfaces/morpho/IMorpho.sol";
 import {MarketParamsLib} from "../dependencies/morpho/MarketParamsLib.sol";
@@ -60,6 +59,7 @@ contract MorphoHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) public override {
+        // only one collateral asset is supported on Morpho
         require(collateralAssets[0].amount > 0, "Invalid collateral amount");
 
         (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(extraData, (MarketParams, uint256));
@@ -78,6 +78,7 @@ contract MorphoHandler is IProtocolHandler {
     ) public override {
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
 
+        // only one collateral asset is supported on Morpho
         uint256 currentBalance = IERC20(collateralAssets[0].asset).balanceOf(address(this));
 
         IERC20(marketParams.collateralToken).approve(address(morpho), currentBalance);

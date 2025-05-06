@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-import "./dependencies/uniswapV3/CallbackValidation.sol";
 pragma solidity =0.8.28;
+import "./dependencies/uniswapV3/CallbackValidation.sol";
 
 import {IERC20} from "./dependencies/IERC20.sol";
 import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
@@ -124,13 +124,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         CallbackValidation.verifyCallback(uniswapV3Factory, poolKey);
 
         // suppose either of fee0 or fee1 is 0
-        uint flashloanFeeOriginal = fee0 + fee1;
-
-        // convert flashloan fee if fromAsset and toAsset have different decimals
-        uint8 fromAssetDecimals = IERC20(decoded.fromAsset).decimals();
-        uint8 toAssetDecimals = IERC20(decoded.toAsset).decimals();
-        uint8 conversionFactor = (fromAssetDecimals > toAssetDecimals) ? (fromAssetDecimals - toAssetDecimals) : 0;
-        uint flashloanFee = flashloanFeeOriginal / (10 ** conversionFactor);
+        uint flashloanFee = fee0 + fee1;
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 

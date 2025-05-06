@@ -113,10 +113,15 @@ export async function deploySafeContractFixture() {
     return safeModule;
 }
 
-async function getGasOptions() {
+export async function getGasOptions() {
     const feeData = await ethers.provider.getFeeData();
-    const gasPrice = feeData.gasPrice!;
+    // Fallbacks in case values are undefined
+    const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas ?? ethers.parseUnits("1", "gwei");
+    const baseFeePerGas = feeData.maxFeePerGas ?? feeData.gasPrice ?? ethers.parseUnits("1", "gwei");
+    // Add a buffer (e.g. +20%) to avoid being too close to the base fee
+    const maxFeePerGas = (baseFeePerGas * 12n) / 10n + maxPriorityFeePerGas;
     return {
-        maxFeePerGas: gasPrice * BigInt(5),
+        maxFeePerGas,
+        maxPriorityFeePerGas,
     };
 }

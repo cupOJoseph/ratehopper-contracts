@@ -5,7 +5,6 @@ import "../interfaces/IProtocolHandler.sol";
 import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import {IPoolV3} from "../interfaces/aaveV3/IPoolV3.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
-import "hardhat/console.sol";
 import {DataTypes} from "../interfaces/aaveV3/DataTypes.sol";
 import {IAaveProtocolDataProvider} from "../interfaces/aaveV3/IAaveProtocolDataProvider.sol";
 

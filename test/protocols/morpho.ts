@@ -131,9 +131,9 @@ export class MorphoHelper {
         return await this.morpho.market(marketId);
     }
 
-    async borrow(marketId: string) {
+    async borrow(marketId: string, decimals = 6) {
         const marketParams = marketParamsMap.get(marketId)!;
-        const amount = ethers.parseUnits("1", 6);
+        const amount = ethers.parseUnits("1", decimals);
         const tx = await this.morpho.borrow(marketParams, amount, 0, TEST_ADDRESS, TEST_ADDRESS);
         await tx.wait();
         console.log("borrowed", amount);
