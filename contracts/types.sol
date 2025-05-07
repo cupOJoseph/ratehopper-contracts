@@ -15,7 +15,6 @@ struct CollateralAsset {
 }
 
 struct ParaswapParams {
-    address router;
-    address tokenTransferProxy;
+    uint256 srcAmount;
     bytes swapData;
 }

@@ -410,25 +410,14 @@ describe("Safe wallet should debtSwap", function () {
         const dstDebtBefore: bigint = await toHelper.getDebtAmount(toDebtAmountParameter, safeAddress);
 
         // get paraswap data
-        let srcAmount = BigInt(0);
-
         let paraswapData = {
-            router: zeroAddress,
-            tokenTransferProxy: zeroAddress,
+            srcAmount: BigInt(0),
             swapData: "0x",
         };
 
         if (fromTokenAddress != toTokenAddress) {
-            [srcAmount, paraswapData] = await getParaswapData(
-                fromTokenAddress,
-                toTokenAddress,
-                safeModuleAddress,
-                srcDebtBefore,
-            );
+            paraswapData = await getParaswapData(fromTokenAddress, toTokenAddress, safeModuleAddress, srcDebtBefore);
         }
-
-        // add 2% slippage(must be set by user)
-        const amountPlusSlippage = (BigInt(srcAmount) * 1020n) / 1000n;
 
         let fromExtraData = "0x";
         let toExtraData = "0x";
@@ -567,7 +556,6 @@ describe("Safe wallet should debtSwap", function () {
             fromTokenAddress,
             toTokenAddress,
             MaxUint256,
-            amountPlusSlippage,
             [{ asset: collateralTokenAddress, amount: collateralAmount }],
             safeAddress,
             [fromExtraData, toExtraData],

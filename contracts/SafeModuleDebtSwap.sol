@@ -24,6 +24,8 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
     address public executor;
     address public pauser;
     address public uniswapV3Factory;
+    address public paraswapTokenTransferProxy;
+    address public paraswapRouter;
     mapping(Protocol => address) public protocolHandlers;
 
     struct FlashCallbackData {
@@ -32,7 +34,6 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         address fromAsset;
         address toAsset;
         uint256 amount;
-        uint256 srcAmount;
         CollateralAsset[] collateralAssets;
         address onBehalfOf;
         bytes fromExtraData;
@@ -98,6 +99,13 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         executor = _executor;
     }
 
+    function setParaswapAddresses(address _paraswapTokenTransferProxy, address _paraswapRouter) external onlyOwner {
+        require(_paraswapTokenTransferProxy != address(0), "paraswapTokenTransferProxy cannot be zero address");
+        require(_paraswapRouter != address(0), "paraswapRouter cannot be zero address");
+        paraswapTokenTransferProxy = _paraswapTokenTransferProxy;
+        paraswapRouter = _paraswapRouter;
+    }
+
     function executeDebtSwap(
         address _flashloanPool,
         Protocol _fromProtocol,
@@ -105,7 +113,6 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         address _fromDebtAsset,
         address _toDebtAsset,
         uint256 _amount,
-        uint256 _srcAmount,
         CollateralAsset[] calldata _collateralAssets,
         address _onBehalfOf,
         bytes[2] calldata _extraData,
@@ -141,7 +148,6 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
                 fromAsset: _fromDebtAsset,
                 toAsset: _toDebtAsset,
                 amount: debtAmount,
-                srcAmount: _srcAmount,
                 onBehalfOf: _onBehalfOf,
                 collateralAssets: _collateralAssets,
                 fromExtraData: _extraData[0],
@@ -181,7 +187,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 
-        uint256 amountInMax = decoded.srcAmount == 0 ? decoded.amount : decoded.srcAmount;
+        uint256 amountInMax = decoded.paraswapParams.srcAmount == 0 ? decoded.amount : decoded.paraswapParams.srcAmount;
         uint256 amountTotal = amountInMax + flashloanFee + protocolFeeAmount;
 
         if (decoded.fromProtocol == decoded.toProtocol) {
@@ -227,8 +233,6 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
             swapByParaswap(
                 decoded.toAsset,
                 amountTotal,
-                decoded.paraswapParams.tokenTransferProxy,
-                decoded.paraswapParams.router,
                 decoded.paraswapParams.swapData
             );
         }
@@ -236,7 +240,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         // repay flashloan
         IERC20(decoded.fromAsset).transfer(msg.sender, decoded.amount + flashloanFeeOriginal);
 
-        if (protocolFee > 0) {
+        if (protocolFee > 0 && feeBeneficiary != address(0)) {
             IERC20(decoded.toAsset).safeTransfer(feeBeneficiary, protocolFeeAmount);
         }
 
@@ -273,12 +277,10 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
     function swapByParaswap(
         address asset,
         uint256 amount,
-        address tokenTransferProxy,
-        address router,
         bytes memory _txParams
     ) internal {
-        TransferHelper.safeApprove(asset, tokenTransferProxy, amount);
-        (bool success, ) = router.call(_txParams);
+        TransferHelper.safeApprove(asset, paraswapTokenTransferProxy, amount);
+        (bool success, ) = paraswapRouter.call(_txParams);
         require(success, "Token swap by paraSwap failed");
     }
 

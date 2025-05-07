@@ -41,7 +41,6 @@ import { deployDebtSwapContractFixture, getGasOptions } from "./deployUtils";
 describe("DebtSwap should switch", function () {
     let myContract: DebtSwap;
     let impersonatedSigner: HardhatEthersSigner;
-
     let deployedContractAddress: string;
     let aaveV3Helper: AaveV3Helper;
     let compoundHelper: CompoundHelper;
@@ -610,16 +609,13 @@ describe("DebtSwap should switch", function () {
             : [{ asset: collateralTokenAddress, amount: collateralAmount }];
 
         // get paraswap data
-        let srcAmount = BigInt(0);
-
         let paraswapData = {
-            router: zeroAddress,
-            tokenTransferProxy: zeroAddress,
+            srcAmount: BigInt(0),
             swapData: "0x",
         };
 
         if (fromTokenAddress !== toTokenAddress) {
-            [srcAmount, paraswapData] = await getParaswapData(
+            paraswapData = await getParaswapData(
                 fromTokenAddress,
                 toTokenAddress,
                 deployedContractAddress,
@@ -628,13 +624,8 @@ describe("DebtSwap should switch", function () {
             );
         }
 
-        // add 2% slippage(must be set by user)
-        const amountPlusSlippage = (BigInt(srcAmount) * 1020n) / 1000n;
-
         // simulate waiting for user's confirmation
         await time.increaseTo((await time.latest()) + 60);
-
-        const gasOptions = await getGasOptions();
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
@@ -643,12 +634,10 @@ describe("DebtSwap should switch", function () {
             fromTokenAddress,
             toTokenAddress,
             debtAmount,
-            amountPlusSlippage,
             collateralArray,
             fromExtraData,
             toExtraData,
             paraswapData,
-            // gasOptions,
         );
         await tx.wait();
 

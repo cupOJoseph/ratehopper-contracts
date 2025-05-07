@@ -108,15 +108,7 @@ describe("Create leveraged position", function () {
 
         const diffAmount = parsedTargetAmount - ethers.parseUnits(principleAmount.toString(), collateralDecimals);
 
-        const [srcAmount, paraswapData] = await getParaswapData(
-            collateralAddress,
-            debtAsset,
-            deployedContractAddress,
-            diffAmount,
-        );
-
-        // add 2% slippage(must be set by user)
-        const amountPlusSlippage = (BigInt(srcAmount) * 1200n) / 1000n;
+        const paraswapData = await getParaswapData(collateralAddress, debtAsset, deployedContractAddress, diffAmount);
 
         await myContract.createLeveragedPosition(
             flashloanPool,
@@ -125,7 +117,6 @@ describe("Create leveraged position", function () {
             ethers.parseUnits(principleAmount.toString(), collateralDecimals),
             parsedTargetAmount,
             debtAsset,
-            amountPlusSlippage,
             extraData,
             paraswapData,
         );

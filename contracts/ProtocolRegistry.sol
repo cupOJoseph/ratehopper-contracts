@@ -22,7 +22,6 @@ contract ProtocolRegistry is Ownable {
 
     function setTokenMContract(address token, address mContract) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
-        if (mContract == address(0)) revert ZeroAddress();
         tokenToMContract[token] = mContract;
     }
 
@@ -32,7 +31,6 @@ contract ProtocolRegistry is Ownable {
 
     function setTokenCContract(address token, address cContract) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
-        if (cContract == address(0)) revert ZeroAddress();
         tokenToCContract[token] = cContract;
     }
 

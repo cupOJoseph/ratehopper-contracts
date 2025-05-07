@@ -102,14 +102,13 @@ export async function getParaswapData(
 
         console.log("selected dex:", response.data.priceRoute.bestRoute[0].swaps[0].swapExchanges[0].exchange);
 
-        return [
-            response.data.priceRoute.srcAmount,
-            {
-                router: response.data.txParams.to,
-                tokenTransferProxy: response.data.priceRoute.tokenTransferProxy,
-                swapData: response.data.txParams.data,
-            },
-        ];
+        // add 2% slippage(must be set by user)
+        const amountPlusSlippage = (BigInt(response.data.priceRoute.srcAmount) * 1020n) / 1000n;
+
+        return {
+            srcAmount: amountPlusSlippage,
+            swapData: response.data.txParams.data,
+        };
     } catch (error) {
         console.error("Error fetching data from ParaSwap API:", error);
         throw new Error("Failed to fetch ParaSwap data");

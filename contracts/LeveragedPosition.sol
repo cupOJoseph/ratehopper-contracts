@@ -11,13 +11,13 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Types.sol";
 
-import "hardhat/console.sol";
-
 contract LeveragedPosition is Ownable, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
     uint8 public protocolFee;
     address public feeBeneficiary;
     address public uniswapV3Factory;
+    address public paraswapTokenTransferProxy;
+    address public paraswapRouter;
     mapping(Protocol => address) public protocolHandlers;
 
     struct FlashCallbackData {
@@ -27,7 +27,6 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         address debtAsset;
         uint256 principleCollateralAmount;
         uint256 targetCollateralAmount;
-        uint256 srcAmount;
         address onBehalfOf;
         bytes extraData;
         ParaswapParams paraswapParams;
@@ -62,6 +61,14 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         feeBeneficiary = _feeBeneficiary;
     }
 
+    function setParaswapAddresses(address _paraswapTokenTransferProxy, address _paraswapRouter) external onlyOwner {
+        require(_paraswapTokenTransferProxy != address(0), "paraswapTokenTransferProxy cannot be zero address");
+        require(_paraswapRouter != address(0), "paraswapRouter cannot be zero address");
+        paraswapTokenTransferProxy = _paraswapTokenTransferProxy;
+        paraswapRouter = _paraswapRouter;
+    }
+
+
     function createLeveragedPosition(
         address _flashloanPool,
         Protocol _protocol,
@@ -69,7 +76,6 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         uint256 _principleCollateralAmount,
         uint256 _targetCollateralAmount,
         address _debtAsset,
-        uint256 _srcAmount,
         bytes calldata _extraData,
         ParaswapParams calldata _paraswapParams
     ) public nonReentrant {
@@ -100,7 +106,6 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
                 debtAsset: _debtAsset,
                 principleCollateralAmount: _principleCollateralAmount,
                 targetCollateralAmount: _targetCollateralAmount,
-                srcAmount: _srcAmount,
                 onBehalfOf: msg.sender,
                 extraData: _extraData,
                 paraswapParams: _paraswapParams
@@ -123,7 +128,7 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         // suppose either of fee0 or fee1 is 0
         uint totalFee = fee0 + fee1;
 
-        uint256 amountInMax = decoded.srcAmount + 1;
+        uint256 amountInMax = decoded.paraswapParams.srcAmount + 1;
 
         address handler = protocolHandlers[decoded.protocol];
 
@@ -145,8 +150,6 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
 
         swapByParaswap(
             decoded.debtAsset,
-            decoded.paraswapParams.tokenTransferProxy,
-            decoded.paraswapParams.router,
             decoded.paraswapParams.swapData
         );
 
@@ -179,9 +182,9 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         );
     }
 
-    function swapByParaswap(address asset, address tokenTransferProxy, address router, bytes memory _txParams) public {
-        IERC20(asset).approve(tokenTransferProxy, type(uint256).max);
-        (bool success, bytes memory returnData) = router.call(_txParams);
+    function swapByParaswap(address asset, bytes memory _txParams) public {
+        IERC20(asset).approve(paraswapTokenTransferProxy, type(uint256).max);
+        (bool success, bytes memory returnData) = paraswapRouter.call(_txParams);
         require(success, "Token swap failed");
     }
 }

@@ -18,10 +18,7 @@ export async function deployProtocolRegistry() {
     console.log("mUSDC address:", await registry.getMContract(USDC_ADDRESS));
 
     // Add Compound mappings using batch function
-    await registry.batchSetTokenCContracts(
-        [USDC_ADDRESS, USDbC_ADDRESS, WETH_ADDRESS],
-        [USDC_COMET_ADDRESS, USDbC_COMET_ADDRESS, WETH_COMET_ADDRESS],
-    );
+    await registry.batchSetTokenCContracts([USDC_ADDRESS, WETH_ADDRESS], [USDC_COMET_ADDRESS, WETH_COMET_ADDRESS]);
     console.log("Compound token mappings set in ProtocolRegistry");
     console.log("USDC Comet address:", await registry.getCContract(USDC_ADDRESS));
 

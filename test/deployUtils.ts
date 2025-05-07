@@ -5,6 +5,8 @@ import {
     AAVE_V3_POOL_ADDRESS,
     cbETH_ADDRESS,
     DAI_ADDRESS,
+    PARASWAP_ROUTER_ADDRESS,
+    PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS,
     Protocols,
     UNISWAP_V3_FACTORY_ADRESS,
     USDC_ADDRESS,
@@ -62,6 +64,8 @@ export async function deployDebtSwapContractFixture() {
     );
     console.log("DebtSwap deployed to:", await debtSwap.getAddress());
 
+    debtSwap.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+
     return debtSwap;
 }
 
@@ -86,6 +90,8 @@ export async function deployLeveragedPositionContractFixture() {
     );
 
     console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
+
+    leveragedPosition.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
     return leveragedPosition;
 }
 
@@ -109,6 +115,8 @@ export async function deploySafeContractFixture() {
     );
 
     console.log("SafeModule deployed to:", await safeModule.getAddress());
+
+    safeModule.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
 
     return safeModule;
 }
