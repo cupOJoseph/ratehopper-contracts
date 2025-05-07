@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.28;
+pragma solidity ^0.8.28;
 
 import {IERC20} from "./dependencies/IERC20.sol";
 import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
@@ -13,7 +13,6 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import "hardhat/console.sol";
 
 contract SafeModuleDebtSwapUpgradeable is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using GPv2SafeERC20 for IERC20;
@@ -122,7 +121,6 @@ contract SafeModuleDebtSwapUpgradeable is Initializable, OwnableUpgradeable, UUP
             address handler = protocolHandlers[_fromProtocol];
 
             debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, _onBehalfOf, _extraData[0]);
-            console.log("on-chain debtAmount:", debtAmount);
         }
 
         address token0;

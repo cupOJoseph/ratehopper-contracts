@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.28;
+pragma solidity ^0.8.28;
 
 import "../interfaces/IProtocolHandler.sol";
 import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
@@ -7,6 +7,7 @@ import {IPoolV3} from "../interfaces/aaveV3/IPoolV3.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import {DataTypes} from "../interfaces/aaveV3/DataTypes.sol";
 import {IAaveProtocolDataProvider} from "../interfaces/aaveV3/IAaveProtocolDataProvider.sol";
+import "../dependencies/TransferHelper.sol";
 
 contract AaveV3Handler is IProtocolHandler {
     using GPv2SafeERC20 for IERC20;
@@ -72,14 +73,14 @@ contract AaveV3Handler is IProtocolHandler {
         for (uint256 i = 0; i < collateralAssets.length; i++) {
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
 
-            IERC20(collateralAssets[i].asset).approve(address(aaveV3Pool), currentBalance);
+            TransferHelper.safeApprove(collateralAssets[i].asset, address(aaveV3Pool), currentBalance);
             aaveV3Pool.supply(collateralAssets[i].asset, currentBalance, onBehalfOf, 0);
         }
         aaveV3Pool.borrow(toAsset, amount, 2, 0, onBehalfOf);
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
-        IERC20(asset).approve(address(aaveV3Pool), amount);
+        TransferHelper.safeApprove(asset, address(aaveV3Pool), amount);
         aaveV3Pool.supply(asset, amount, onBehalfOf, 0);
     }
 
@@ -88,7 +89,7 @@ contract AaveV3Handler is IProtocolHandler {
     }
 
     function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public {
-        IERC20(asset).approve(address(aaveV3Pool), amount);
+        TransferHelper.safeApprove(asset, address(aaveV3Pool), amount);
         aaveV3Pool.repay(asset, amount, 2, onBehalfOf);
     }
 }

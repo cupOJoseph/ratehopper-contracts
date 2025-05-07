@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.28;
+pragma solidity ^0.8.28;
 
 import "./dependencies/uniswapV3/CallbackValidation.sol";
 import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";

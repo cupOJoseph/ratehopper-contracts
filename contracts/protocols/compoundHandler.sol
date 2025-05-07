@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.28;
+pragma solidity ^0.8.28;
 
 import {IProtocolHandler} from "../interfaces/IProtocolHandler.sol";
 import {IComet} from "../interfaces/compound/IComet.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import {ProtocolRegistry} from "../ProtocolRegistry.sol";
 import {CollateralAsset} from "../Types.sol";
+import "../dependencies/TransferHelper.sol";
 
 contract CompoundHandler is IProtocolHandler {
     ProtocolRegistry public immutable REGISTRY;
@@ -56,7 +57,7 @@ contract CompoundHandler is IProtocolHandler {
 
         IComet fromComet = IComet(cContract);
 
-        IERC20(fromAsset).approve(address(cContract), type(uint256).max);
+        TransferHelper.safeApprove(fromAsset, address(cContract), amount);
         fromComet.supplyTo(onBehalfOf, fromAsset, amount);
 
         // withdraw collateral
@@ -79,7 +80,7 @@ contract CompoundHandler is IProtocolHandler {
         IComet toComet = IComet(cContract);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
-            IERC20(collateralAssets[i].asset).approve(address(cContract), currentBalance);
+            TransferHelper.safeApprove(collateralAssets[i].asset, address(cContract), currentBalance);
 
             // supply collateral
             toComet.supplyTo(onBehalfOf, collateralAssets[i].asset, currentBalance);
@@ -98,7 +99,7 @@ contract CompoundHandler is IProtocolHandler {
         address cContract = getCContract(asset);
         require(cContract != address(0), "Token not registered");
 
-        IERC20(asset).approve(address(cContract), amount);
+        TransferHelper.safeApprove(asset, address(cContract), amount);
         // supply collateral
         IComet(cContract).supplyTo(onBehalfOf, asset, amount);
     }
@@ -125,7 +126,7 @@ contract CompoundHandler is IProtocolHandler {
         address cContract = getCContract(asset);
         require(cContract != address(0), "Token not registered");
 
-        IERC20(asset).approve(address(cContract), amount);
+        TransferHelper.safeApprove(asset, address(cContract), amount);
         IComet toComet = IComet(cContract);
         toComet.supplyTo(onBehalfOf, asset, amount);
     }

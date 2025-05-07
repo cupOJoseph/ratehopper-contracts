@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.28;
+pragma solidity ^0.8.28;
 import "./dependencies/uniswapV3/CallbackValidation.sol";
 
 import {IERC20} from "./dependencies/IERC20.sol";
-import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 import {GPv2SafeERC20} from "./dependencies/GPv2SafeERC20.sol";
+import {PoolAddress} from "./dependencies/uniswapV3/PoolAddress.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./Types.sol";
+import "./dependencies/TransferHelper.sol";
 
 contract DebtSwap is Ownable, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
@@ -245,7 +246,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         address router,
         bytes memory _txParams
     ) internal {
-        IERC20(asset).approve(tokenTransferProxy, amount);
+        TransferHelper.safeApprove(asset, tokenTransferProxy, amount);
         (bool success, ) = router.call(_txParams);
         require(success, "Token swap by paraSwap failed");
     }

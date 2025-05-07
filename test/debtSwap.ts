@@ -120,7 +120,9 @@ describe("DebtSwap should switch", function () {
         });
     });
 
-    describe("In Compound", function () {
+    // compound USDbC is no longer supported
+    // https://www.tally.xyz/gov/compound/proposal/428?govId=eip155:1:0x309a862bbC1A00e45506cB8A802D1ff10004c8C0
+    describe.skip("In Compound", function () {
         it("from USDbC to USDC, cbETH Collateral", async function () {
             await compoundHelper.supply(USDbC_COMET_ADDRESS, cbETH_ADDRESS);
             await compoundHelper.borrow(USDbC_ADDRESS);
@@ -293,7 +295,7 @@ describe("DebtSwap should switch", function () {
             await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.COMPOUND, Protocols.AAVE_V3);
         });
 
-        it("USDC debt on Aave to USDbC on Compound", async function () {
+        it.skip("USDC debt on Aave to USDbC on Compound", async function () {
             await aaveV3Helper.supply(cbETH_ADDRESS);
             await aaveV3Helper.borrow(USDC_ADDRESS);
 
@@ -407,7 +409,7 @@ describe("DebtSwap should switch", function () {
             await executeDebtSwap(
                 USDC_hyUSD_POOL,
                 USDC_ADDRESS,
-                USDbC_ADDRESS,
+                USDC_ADDRESS,
                 Protocols.AAVE_V3,
                 Protocols.COMPOUND,
                 cbETH_ADDRESS,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.28;
+pragma solidity ^0.8.28;
 
 import "../interfaces/IProtocolHandler.sol";
 import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
@@ -7,6 +7,7 @@ import {IERC20} from "../dependencies/IERC20.sol";
 import {DataTypes} from "../interfaces/aaveV3/DataTypes.sol";
 import "../interfaces/morpho/IMorpho.sol";
 import {MarketParamsLib} from "../dependencies/morpho/MarketParamsLib.sol";
+import "../dependencies/TransferHelper.sol";
 
 contract MorphoHandler is IProtocolHandler {
     using MarketParamsLib for MarketParams;
@@ -64,7 +65,7 @@ contract MorphoHandler is IProtocolHandler {
 
         (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(extraData, (MarketParams, uint256));
 
-        IERC20(fromAsset).approve(address(morpho), type(uint256).max);
+        TransferHelper.safeApprove(fromAsset, address(morpho), amount);
         morpho.repay(marketParams, 0, borrowShares, onBehalfOf, "");
         morpho.withdrawCollateral(marketParams, collateralAssets[0].amount, onBehalfOf, address(this));
     }
@@ -81,7 +82,7 @@ contract MorphoHandler is IProtocolHandler {
         // only one collateral asset is supported on Morpho
         uint256 currentBalance = IERC20(collateralAssets[0].asset).balanceOf(address(this));
 
-        IERC20(marketParams.collateralToken).approve(address(morpho), currentBalance);
+        TransferHelper.safeApprove(marketParams.collateralToken, address(morpho), currentBalance);
         morpho.supplyCollateral(marketParams, currentBalance, onBehalfOf, "");
 
         morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
@@ -90,7 +91,7 @@ contract MorphoHandler is IProtocolHandler {
     function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override {
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
 
-        IERC20(asset).approve(address(morpho), amount);
+        TransferHelper.safeApprove(asset, address(morpho), amount);
         morpho.supplyCollateral(marketParams, amount, onBehalfOf, "");
     }
 
@@ -103,7 +104,7 @@ contract MorphoHandler is IProtocolHandler {
     function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public {
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
 
-        IERC20(asset).approve(address(morpho), amount);
+        TransferHelper.safeApprove(asset, address(morpho), amount);
         morpho.repay(marketParams, amount, 0, onBehalfOf, "");
     }
 }
