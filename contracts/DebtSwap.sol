@@ -124,7 +124,20 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         CallbackValidation.verifyCallback(uniswapV3Factory, poolKey);
 
         // suppose either of fee0 or fee1 is 0
-        uint flashloanFee = fee0 + fee1;
+        uint flashloanFeeOriginal = fee0 + fee1;
+
+        // need this flashloanFee conversion to calculate amountTotal correctly when fromAsset and toAsset have different decimals
+        uint8 fromAssetDecimals = IERC20(decoded.fromAsset).decimals();
+        uint8 toAssetDecimals = IERC20(decoded.toAsset).decimals();
+        int8 decimalDifference = int8(fromAssetDecimals) - int8(toAssetDecimals);
+        uint flashloanFee;
+        if (decimalDifference > 0) {
+            flashloanFee = flashloanFeeOriginal / (10 ** uint8(decimalDifference));
+        } else if (decimalDifference < 0) {
+            flashloanFee = flashloanFeeOriginal * (10 ** uint8(-decimalDifference));
+        } else {
+            flashloanFee = flashloanFeeOriginal;
+        }
 
         uint256 protocolFeeAmount = (decoded.amount * protocolFee) / 10000;
 
@@ -188,7 +201,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
 
         // repay flashloan
         IERC20 fromToken = IERC20(decoded.fromAsset);
-        fromToken.safeTransfer(address(msg.sender), decoded.amount + flashloanFee);
+        fromToken.safeTransfer(address(msg.sender), decoded.amount + flashloanFeeOriginal);
 
         if (protocolFee > 0) {
             IERC20(decoded.toAsset).safeTransfer(feeBeneficiary, protocolFeeAmount);

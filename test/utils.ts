@@ -57,12 +57,19 @@ export async function wrapETH(amountIn: string, signer: HardhatEthersSigner) {
     console.log("Wrapped ETH to WETH:", amount);
 }
 
-export async function getParaswapData(destToken: string, srcToken: string, contractAddress: string, amount: bigint) {
+export async function getParaswapData(
+    destToken: string,
+    srcToken: string,
+    contractAddress: string,
+    amount: bigint,
+    // 0.01% fee by default
+    flashloanFee = 1n,
+) {
     const url = "https://api.paraswap.io/swap";
 
-    // suppose flashloan fee is 0.01%, must be fetched dynamically
+    // suppose flashloan fee is 0.05%, must be fetched dynamically
     // use the Ceiling Division formula
-    const amountPlusFee = amount + (amount * 1n + 9999n) / 10000n;
+    const amountPlusFee = amount + (amount * flashloanFee + 9999n) / 10000n;
 
     // deal with debt amount is slightly increased after getting quote from Dex aggregator
     const amountPlusBuffer = (BigInt(amountPlusFee) * 100001n) / 100000n;
