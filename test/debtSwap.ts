@@ -22,6 +22,7 @@ import {
     ETH_USDC_POOL,
     TEST_FEE_BENEFICIARY_ADDRESS,
     MAI_ADDRESS,
+    MAI_USDC_POOL,
 } from "./constants";
 
 import { AaveV3Helper } from "./protocols/aaveV3";
@@ -35,7 +36,7 @@ import {
 import { MORPHO_ADDRESS, MorphoHelper, morphoMarket1Id, morphoMarket2Id, morphoMarket3Id } from "./protocols/morpho";
 import { MaxUint256 } from "ethers";
 import { zeroAddress } from "viem";
-import { deployDebtSwapContractFixture } from "./deployUtils";
+import { deployDebtSwapContractFixture, getGasOptions } from "./deployUtils";
 
 describe("DebtSwap should switch", function () {
     let myContract: DebtSwap;
@@ -238,6 +239,24 @@ describe("DebtSwap should switch", function () {
                 {
                     morphoFromMarketId: morphoMarket1Id,
                     morphoToMarketId: morphoMarket3Id,
+                },
+            );
+        });
+        it("from market 3(MAI, 18 decimals) to market 1", async function () {
+            await morphoHelper.supply(cbETH_ADDRESS, morphoMarket3Id);
+            await morphoHelper.borrow(morphoMarket3Id, 18);
+
+            await executeDebtSwap(
+                MAI_USDC_POOL,
+                MAI_ADDRESS,
+                USDC_ADDRESS,
+                Protocols.MORPHO,
+                Protocols.MORPHO,
+                cbETH_ADDRESS,
+                {
+                    morphoFromMarketId: morphoMarket3Id,
+                    morphoToMarketId: morphoMarket1Id,
+                    flashloanFee: 5n,
                 },
             );
         });
@@ -483,7 +502,8 @@ describe("DebtSwap should switch", function () {
             morphoToMarketId?: string;
             useMaxAmount?: boolean;
             anotherCollateralTokenAddress?: string;
-        } = { useMaxAmount: true },
+            flashloanFee?: bigint;
+        } = { useMaxAmount: true, flashloanFee: 1n },
     ) {
         const FromHelper = protocolHelperMap.get(fromProtocol)!;
         const fromHelper = new FromHelper(impersonatedSigner);
@@ -494,8 +514,10 @@ describe("DebtSwap should switch", function () {
             fromProtocol === Protocols.MORPHO ? options!.morphoFromMarketId! : fromTokenAddress;
         const beforeFromProtocolDebt: bigint = await fromHelper.getDebtAmount(fromDebtAmountParameter);
 
-        // suppose tiny debt amount is increased before executing tx
-        const debtAmount = options.useMaxAmount ? MaxUint256 : beforeFromProtocolDebt + 1n;
+        // Add 0.001% of initial amount (rounded up)
+        const debtAmount = options.useMaxAmount
+            ? MaxUint256
+            : beforeFromProtocolDebt + (beforeFromProtocolDebt * 1n + 9_999n) / 1_000_000n;
 
         const toDebtAmountParameter = toProtocol === Protocols.MORPHO ? options!.morphoToMarketId! : toTokenAddress;
         const beforeToProtocolDebt: bigint = await toHelper.getDebtAmount(toDebtAmountParameter);
@@ -600,6 +622,7 @@ describe("DebtSwap should switch", function () {
                 toTokenAddress,
                 deployedContractAddress,
                 beforeFromProtocolDebt,
+                options.flashloanFee,
             );
         }
 
@@ -608,6 +631,8 @@ describe("DebtSwap should switch", function () {
 
         // simulate waiting for user's confirmation
         await time.increaseTo((await time.latest()) + 60);
+
+        const gasOptions = await getGasOptions();
 
         const tx = await myContract.executeDebtSwap(
             flashloanPool,
@@ -621,6 +646,7 @@ describe("DebtSwap should switch", function () {
             fromExtraData,
             toExtraData,
             paraswapData,
+            // gasOptions,
         );
         await tx.wait();
 
