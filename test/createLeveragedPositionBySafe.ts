@@ -108,15 +108,7 @@ describe("Create leveraged position by Safe", function () {
 
         const diffAmount = parsedTargetAmount - ethers.parseUnits(principleAmount.toString(), collateralDecimals);
 
-        const [srcAmount, paraswapData] = await getParaswapData(
-            collateralAddress,
-            debtAddress,
-            deployedContractAddress,
-            diffAmount,
-        );
-
-        // add 2% slippage(must be set by user)
-        const amountPlusSlippage = (BigInt(srcAmount) * 1200n) / 1000n;
+        const paraswapData = await getParaswapData(collateralAddress, debtAddress, deployedContractAddress, diffAmount);
 
         // send collateral token to safe
         const tx = await collateralContract.transfer(
@@ -145,7 +137,6 @@ describe("Create leveraged position by Safe", function () {
                 ethers.parseUnits(principleAmount.toString(), collateralDecimals),
                 parsedTargetAmount,
                 debtAddress,
-                amountPlusSlippage,
                 extraData,
                 paraswapData,
             ]),

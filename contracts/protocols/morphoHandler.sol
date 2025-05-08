@@ -64,6 +64,7 @@ contract MorphoHandler is IProtocolHandler {
         require(collateralAssets[0].amount > 0, "Invalid collateral amount");
 
         (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(extraData, (MarketParams, uint256));
+        require(marketParams.loanToken == fromAsset, "fromAsset mismatch with marketParams in extraData");
 
         TransferHelper.safeApprove(fromAsset, address(morpho), amount);
         morpho.repay(marketParams, 0, borrowShares, onBehalfOf, "");
@@ -78,6 +79,7 @@ contract MorphoHandler is IProtocolHandler {
         bytes calldata extraData
     ) public override {
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
+        require(marketParams.loanToken == toAsset, "toAsset mismatch with marketParams in extraData");
 
         // only one collateral asset is supported on Morpho
         uint256 currentBalance = IERC20(collateralAssets[0].asset).balanceOf(address(this));

@@ -1,7 +1,8 @@
 import { ethers } from "hardhat";
 import { mcbETH, mUSDC, mDAI, COMPTROLLER_ADDRESS } from "./protocols/moonwell";
-import { cbETH_ADDRESS, USDC_ADDRESS, DAI_ADDRESS, WETH_ADDRESS, USDbC_ADDRESS } from "./constants";
+import { cbETH_ADDRESS, USDC_ADDRESS, DAI_ADDRESS, WETH_ADDRESS, USDbC_ADDRESS, cbBTC_ADDRESS } from "./constants";
 import { USDC_COMET_ADDRESS, USDbC_COMET_ADDRESS, WETH_COMET_ADDRESS } from "./protocols/compound";
+import { mcbBTC } from "../contractAddresses";
 
 export async function deployProtocolRegistry() {
     const ProtocolRegistry = await ethers.getContractFactory("ProtocolRegistry");
@@ -12,7 +13,10 @@ export async function deployProtocolRegistry() {
     const registry = await ethers.getContractAt("ProtocolRegistry", await protocolRegistry.getAddress());
 
     // Set Moonwell token mappings using batch function
-    await registry.batchSetTokenMContracts([cbETH_ADDRESS, USDC_ADDRESS, DAI_ADDRESS], [mcbETH, mUSDC, mDAI]);
+    await registry.batchSetTokenMContracts(
+        [cbETH_ADDRESS, cbBTC_ADDRESS, USDC_ADDRESS, DAI_ADDRESS],
+        [mcbETH, mcbBTC, mUSDC, mDAI],
+    );
 
     console.log("Moonwell token mappings set in ProtocolRegistry");
     console.log("mUSDC address:", await registry.getMContract(USDC_ADDRESS));
