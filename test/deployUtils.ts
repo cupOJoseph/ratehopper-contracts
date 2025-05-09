@@ -16,6 +16,15 @@ import { COMPTROLLER_ADDRESS, mcbETH, mDAI, mUSDC } from "./protocols/moonwell";
 import { deployProtocolRegistry } from "./deployProtocolRegistry";
 import { FLUID_VAULT_RESOLVER } from "./protocols/fluid";
 
+async function deployMaliciousContract() {
+    const [_, maliciousAddress] = await ethers.getSigners();
+    const MaliciousContract = await hre.ethers.getContractFactory("MaliciousContract");
+    const maliciousContract = await MaliciousContract.deploy(maliciousAddress.address);
+    await maliciousContract.waitForDeployment();
+    console.log("MaliciousContract deployed to:", await maliciousContract.getAddress());
+    return maliciousContract;
+}
+
 async function deployHandlers() {
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
     const aaveV3Handler = await AaveV3Handler.deploy(AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS);
@@ -48,6 +57,25 @@ async function deployHandlers() {
         fluidHandler,
         morphoHandler,
     };
+}
+
+// We define a fixture to reuse the same setup in every test.
+// We use loadFixture to run this setup once, snapshot that state,
+// and reset Hardhat Network to that snapshot in every test.
+export async function deployDebtSwapContractWithMaliciousHandlerFixture() {
+    const maliciousContract = await deployMaliciousContract();
+    const DebtSwap = await hre.ethers.getContractFactory("DebtSwap");
+    const debtSwapMalicious = await DebtSwap.deploy(
+        UNISWAP_V3_FACTORY_ADRESS,
+        [Protocols.AAVE_V3],
+        [maliciousContract.getAddress()],
+        await getGasOptions(),
+    );
+    console.log("DebtSwapMalicious deployed to:", await debtSwapMalicious.getAddress());
+
+    debtSwapMalicious.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+
+    return debtSwapMalicious;
 }
 
 // We define a fixture to reuse the same setup in every test.

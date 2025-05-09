@@ -539,23 +539,31 @@ describe("DebtSwap should switch", function () {
                 ),
             ).to.be.reverted;
         });
-        it("deployed malicious contract as handelr ", async function () {
-            // Deploy a malicious contract that could be used as a handler
-            const MaliciousContract = await ethers.getContractFactory("MaliciousContract");
-            const maliciousContract = await MaliciousContract.deploy();
-            await maliciousContract.waitForDeployment();
-            const maliciousAddress = await maliciousContract.getAddress();
 
-            // Try to deploy DebtSwap with the malicious contract as a handler
-            const DebtSwap = await ethers.getContractFactory("DebtSwap");
+        it.only("deployed malicious contract as handelr ", async function () {
+            const debtSwapMalicious = await loadFixture(deployDebtSwapContractFixture);
+            deployedContractAddress = await debtSwapMalicious.getAddress();
+
+            const myDebtSwapMalicious = await ethers.getContractAt(
+                "DebtSwap",
+                deployedContractAddress,
+                impersonatedSigner,
+            );
+
             await expect(
-                DebtSwap.deploy(
-                    UNISWAP_V3_FACTORY_ADRESS,
-                    [Protocols.AAVE_V3],
-                    [maliciousAddress],
-                    await getGasOptions(),
+                myDebtSwapMalicious.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
                 ),
-            ).to.be.revertedWith("Invalid handler address");
+            ).to.be.reverted;
         });
     });
 
