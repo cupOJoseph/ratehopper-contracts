@@ -7,6 +7,10 @@ const AAVE_V3_POOL_ADDRESS = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
 const AAVE_V3_DATA_PROVIDER_ADDRESS = "0xd82a47fdebB5bf5329b09441C3DaB4b5df2153Ad";
 const MORPHO_ADDRESS = "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb";
 
+// paraswap
+export const PARASWAP_ROUTER_ADDRESS = "0x59C7C832e96D2568bea6db468C1aAdcbbDa08A52";
+export const PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS = "0x93aAAe79a53759cD164340E4C8766E4Db5331cD7";
+
 // Define Protocol enum directly
 enum Protocol {
     AAVE_V3,
@@ -69,6 +73,8 @@ async function main() {
         await debtSwap.waitForDeployment();
 
         console.log(`DebtSwap deployed to: ${await debtSwap.getAddress()}`);
+
+        debtSwap.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
     } catch (error) {
         console.error("Deployment error:", error);
     }

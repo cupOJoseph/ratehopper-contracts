@@ -5,7 +5,7 @@ import { ethers } from "hardhat";
 import "dotenv/config";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { aave, DebtSwap } from "../typechain-types";
+import { DebtSwap } from "../typechain-types";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
 
 import { approve, formatAmount, getParaswapData, protocolHelperMap, wrapETH } from "./utils";
@@ -23,6 +23,7 @@ import {
     TEST_FEE_BENEFICIARY_ADDRESS,
     MAI_ADDRESS,
     MAI_USDC_POOL,
+    UNISWAP_V3_FACTORY_ADRESS,
 } from "./constants";
 
 import { AaveV3Helper } from "./protocols/aaveV3";
@@ -291,7 +292,7 @@ describe("DebtSwap should switch", function () {
             await compoundHelper.supply(USDC_COMET_ADDRESS, cbETH_ADDRESS);
             await compoundHelper.borrow(USDC_ADDRESS);
 
-            await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.COMPOUND, Protocols.AAVE_V3);
+            await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDbC_ADDRESS, Protocols.COMPOUND, Protocols.AAVE_V3);
         });
 
         it.skip("USDC debt on Aave to USDbC on Compound", async function () {
@@ -489,6 +490,73 @@ describe("DebtSwap should switch", function () {
             const contractByNotOwner = await ethers.getContractAt("DebtSwap", deployedContractAddress, signers[1]);
             await expect(contractByNotOwner.setProtocolFee(100)).to.be.reverted;
         });
+
+        it("Call uniswapV3FlashCallback() directly with invalid callback data", async function () {
+            const signers = await ethers.getSigners();
+            const contractByNotOwner = await ethers.getContractAt("DebtSwap", deployedContractAddress, signers[1]);
+            await expect(contractByNotOwner.uniswapV3FlashCallback(100, 100, "0x")).to.be.reverted;
+        });
+
+        it("call non-existing handler", async function () {
+            await aaveV3Helper.supply(cbETH_ADDRESS);
+            await aaveV3Helper.borrow(USDC_ADDRESS);
+
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    9,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("call with invalid paraswap data", async function () {
+            await aaveV3Helper.supply(cbETH_ADDRESS);
+            await aaveV3Helper.borrow(USDC_ADDRESS);
+
+            await expect(
+                executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    USDC_ADDRESS,
+                    USDbC_ADDRESS,
+                    Protocols.AAVE_V3,
+                    Protocols.COMPOUND,
+                    cbETH_ADDRESS,
+                    {
+                        dummyParaswapData: {
+                            srcAmount: 0n,
+                            swapData:
+                                "0x2298207a0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000d9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000055d6e0000000000000000000000000000000000000000000000000000000000054fca0000000000000000000000000000000000000000000000000000000000054fd400000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000022000000000000000000000000000000000000000000000000000000000000002e0000000000000000000000000000000000000000000000000000000000000034000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000038000000000000000000000000000000000000000000000000000000000681dc1b6cb3922b608b5411ba764134f07fb76d70000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000007a8d53466144e1f75de2e70ec908e18f771b49fb0000000000000000000000000000000000000000000000000000000000000084c31b8d7a00000000000000000000000059c7c832e96d2568bea6db468c1aadcbbda08a520000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffab036000000000000000000000000fffd8963efd1fc6a506488495d951d5263988d2500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000084000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                        },
+                    },
+                ),
+            ).to.be.reverted;
+        });
+        it("deployed malicious contract as handelr ", async function () {
+            // Deploy a malicious contract that could be used as a handler
+            const MaliciousContract = await ethers.getContractFactory("MaliciousContract");
+            const maliciousContract = await MaliciousContract.deploy();
+            await maliciousContract.waitForDeployment();
+            const maliciousAddress = await maliciousContract.getAddress();
+
+            // Try to deploy DebtSwap with the malicious contract as a handler
+            const DebtSwap = await ethers.getContractFactory("DebtSwap");
+            await expect(
+                DebtSwap.deploy(
+                    UNISWAP_V3_FACTORY_ADRESS,
+                    [Protocols.AAVE_V3],
+                    [maliciousAddress],
+                    await getGasOptions(),
+                ),
+            ).to.be.revertedWith("Invalid handler address");
+        });
     });
 
     async function executeDebtSwap(
@@ -504,6 +572,7 @@ describe("DebtSwap should switch", function () {
             useMaxAmount?: boolean;
             anotherCollateralTokenAddress?: string;
             flashloanFee?: bigint;
+            dummyParaswapData?: { srcAmount: bigint; swapData: string };
         } = { useMaxAmount: true, flashloanFee: 1n },
     ) {
         const FromHelper = protocolHelperMap.get(fromProtocol)!;
@@ -637,7 +706,7 @@ describe("DebtSwap should switch", function () {
             collateralArray,
             fromExtraData,
             toExtraData,
-            paraswapData,
+            options.dummyParaswapData ? options.dummyParaswapData : paraswapData,
         );
         await tx.wait();
 
