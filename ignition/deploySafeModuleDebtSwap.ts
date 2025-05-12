@@ -2,11 +2,11 @@ import hre from "hardhat";
 import { ethers } from "hardhat";
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 import { getCTokenMappingArrays, getMTokenMappingArrays } from "../contractAddresses";
+import { PARASWAP_ROUTER_ADDRESS, PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, UNISWAP_V3_FACTORY_ADRESS } from "./constants";
 
 const PAUSER_ADDRESS = "0x9E073c36F63BF1c611026fdA1fF6007A81932231";
 const FLUID_VAULT_RESOLVER = "0x79B3102173EB84E6BCa182C7440AfCa5A41aBcF8";
 const COMPTROLLER_ADDRESS = "0xfbb21d0380bee3312b33c4353c8936a0f13ef26c";
-const UNISWAP_V3_FACTORY_ADRESS = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
 
 enum Protocol {
     AAVE_V3,
@@ -19,16 +19,6 @@ enum Protocol {
 const ProtocolRegistryModule = buildModule("ProtocolRegistry", (m) => {
     const protocolRegistry = m.contract("ProtocolRegistry", []);
     return { protocolRegistry };
-});
-
-// FluidSafeHandler is deployed directly with ethers
-
-const MoonwellHandlerModule = buildModule("MoonwellHandler", (m) => {
-    return {};
-});
-
-const CompoundHandlerModule = buildModule("CompoundHandler", (m) => {
-    return {};
 });
 
 async function main() {
@@ -89,6 +79,8 @@ async function main() {
         );
         await safeModuleDebtSwap.waitForDeployment();
         console.log(`SafeModuleDebtSwap deployed to: ${await safeModuleDebtSwap.getAddress()}`);
+
+        safeModuleDebtSwap.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
     } catch (error) {
         console.error("Deployment error:", error);
     }

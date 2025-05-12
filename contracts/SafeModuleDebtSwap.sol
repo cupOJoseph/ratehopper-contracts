@@ -133,17 +133,17 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         IUniswapV3Pool pool = IUniswapV3Pool(_flashloanPool);
         uint256 debtAmount = _amount;
 
-        if (_amount == type(uint256).max) {
-            address handler = protocolHandlers[_fromProtocol];
-
-            debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, _onBehalfOf, _extraData[0]);
-        }
-
         address token0;
         try pool.token0() returns (address result) {
             token0 = result;
         } catch {
             revert("Invalid flashloan pool address");
+        }
+
+        if (_amount == type(uint256).max) {
+            address handler = protocolHandlers[_fromProtocol];
+
+            debtAmount = IProtocolHandler(handler).getDebtAmount(_fromDebtAsset, _onBehalfOf, _extraData[0]);
         }
 
         uint256 amount0 = _fromDebtAsset == token0 ? debtAmount : 0;

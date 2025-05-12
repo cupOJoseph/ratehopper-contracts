@@ -1,15 +1,12 @@
 import hre from "hardhat";
 import { ethers } from "hardhat";
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+import { PARASWAP_ROUTER_ADDRESS, PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, UNISWAP_V3_FACTORY_ADRESS } from "./constants";
 
 // Define constants directly in this file to avoid importing from test files
 const AAVE_V3_POOL_ADDRESS = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
 const AAVE_V3_DATA_PROVIDER_ADDRESS = "0xd82a47fdebB5bf5329b09441C3DaB4b5df2153Ad";
 const MORPHO_ADDRESS = "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb";
-
-// paraswap
-export const PARASWAP_ROUTER_ADDRESS = "0x59C7C832e96D2568bea6db468C1aAdcbbDa08A52";
-export const PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS = "0x93aAAe79a53759cD164340E4C8766E4Db5331cD7";
 
 // Define Protocol enum directly
 enum Protocol {
@@ -57,9 +54,6 @@ async function main() {
         // Deploy DebtSwap directly using ethers
         console.log("Deploying DebtSwap directly...");
         const DebtSwapFactory = await ethers.getContractFactory("DebtSwap");
-
-        // Prepare constructor arguments
-        const UNISWAP_V3_FACTORY_ADRESS = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
 
         const protocols = [Protocol.AAVE_V3, Protocol.COMPOUND, Protocol.MORPHO];
         // const handlers = [aaveV3HandlerAddress, compoundHandlerAddress, morphoHandlerAddress];

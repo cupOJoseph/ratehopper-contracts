@@ -23,7 +23,6 @@ import {
     TEST_FEE_BENEFICIARY_ADDRESS,
     MAI_ADDRESS,
     MAI_USDC_POOL,
-    UNISWAP_V3_FACTORY_ADRESS,
 } from "./constants";
 
 import { AaveV3Helper } from "./protocols/aaveV3";
