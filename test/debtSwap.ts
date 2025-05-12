@@ -470,6 +470,25 @@ describe("DebtSwap should switch", function () {
     });
 
     describe("should revert", function () {
+        it("when specified debt amount is greater than actual debt amount", async function () {
+            await aaveV3Helper.supply(cbETH_ADDRESS);
+            await aaveV3Helper.borrow(USDC_ADDRESS);
+
+            await expect(
+                executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    USDC_ADDRESS,
+                    USDbC_ADDRESS,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    cbETH_ADDRESS,
+                    {
+                        useMaxAmount: false,
+                        invalidDebtAmount: true,
+                    },
+                ),
+            ).to.be.reverted;
+        });
         it("if flashloan pool is not uniswap v3 pool", async function () {
             await aaveV3Helper.supply(cbETH_ADDRESS);
             await aaveV3Helper.borrow(USDC_ADDRESS);
@@ -540,7 +559,7 @@ describe("DebtSwap should switch", function () {
             ).to.be.reverted;
         });
 
-        it.only("deployed malicious contract as handelr ", async function () {
+        it("deployed malicious contract as handelr ", async function () {
             const debtSwapMalicious = await loadFixture(deployDebtSwapContractFixture);
             deployedContractAddress = await debtSwapMalicious.getAddress();
 
@@ -567,6 +586,26 @@ describe("DebtSwap should switch", function () {
         });
     });
 
+    describe("Fuzz testing", function () {
+        it("randomize debt amount", async function () {
+            await aaveV3Helper.supply(cbETH_ADDRESS);
+            await aaveV3Helper.borrow(USDC_ADDRESS);
+
+            await executeDebtSwap(
+                USDC_hyUSD_POOL,
+                USDC_ADDRESS,
+                USDbC_ADDRESS,
+                Protocols.AAVE_V3,
+                Protocols.AAVE_V3,
+                cbETH_ADDRESS,
+                {
+                    useMaxAmount: false,
+                    randomizeDebtAmount: true,
+                },
+            );
+        });
+    });
+
     async function executeDebtSwap(
         flashloanPool: string,
         fromTokenAddress: string,
@@ -581,6 +620,8 @@ describe("DebtSwap should switch", function () {
             anotherCollateralTokenAddress?: string;
             flashloanFee?: bigint;
             dummyParaswapData?: { srcAmount: bigint; swapData: string };
+            randomizeDebtAmount?: boolean;
+            invalidDebtAmount?: boolean;
         } = { useMaxAmount: true, flashloanFee: 1n },
     ) {
         const FromHelper = protocolHelperMap.get(fromProtocol)!;
@@ -591,11 +632,17 @@ describe("DebtSwap should switch", function () {
         const fromDebtAmountParameter =
             fromProtocol === Protocols.MORPHO ? options!.morphoFromMarketId! : fromTokenAddress;
         const beforeFromProtocolDebt: bigint = await fromHelper.getDebtAmount(fromDebtAmountParameter);
+        let actualSwitchDebtAmount = beforeFromProtocolDebt;
+        if (options.randomizeDebtAmount) {
+            actualSwitchDebtAmount = BigInt(Math.floor(Math.random() * Number(beforeFromProtocolDebt)));
+        } else if (options.invalidDebtAmount) {
+            actualSwitchDebtAmount = beforeFromProtocolDebt * 2n;
+        }
 
         // Add 0.001% of initial amount (rounded up)
         const debtAmount = options.useMaxAmount
             ? MaxUint256
-            : beforeFromProtocolDebt + (beforeFromProtocolDebt * 1n + 9_999n) / 1_000_000n;
+            : actualSwitchDebtAmount + (actualSwitchDebtAmount * 1n + 9_999n) / 1_000_000n;
 
         const toDebtAmountParameter = toProtocol === Protocols.MORPHO ? options!.morphoToMarketId! : toTokenAddress;
         const beforeToProtocolDebt: bigint = await toHelper.getDebtAmount(toDebtAmountParameter);
@@ -727,7 +774,6 @@ describe("DebtSwap should switch", function () {
             " -> ",
             formatAmount(afterFromProtocolDebt),
         );
-        expect(afterFromProtocolDebt).to.be.lt(beforeFromProtocolDebt);
 
         console.log(
             `To Protocol ${Protocols[toProtocol]}, asset: ${toTokenAddress} Debt Amount:`,
@@ -735,7 +781,11 @@ describe("DebtSwap should switch", function () {
             " -> ",
             formatAmount(afterToProtocolDebt),
         );
-        expect(afterToProtocolDebt).to.be.gt(beforeToProtocolDebt);
+
+        if (!options.randomizeDebtAmount) {
+            expect(afterFromProtocolDebt).to.be.lt(beforeFromProtocolDebt);
+            expect(afterToProtocolDebt).to.be.gt(beforeToProtocolDebt);
+        }
 
         // check token balance in user's wallet is as expected
         const fromTokenBalanceAfter = await fromTokenContract.balanceOf(TEST_ADDRESS);

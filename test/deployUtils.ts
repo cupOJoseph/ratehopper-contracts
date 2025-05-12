@@ -27,27 +27,31 @@ async function deployMaliciousContract() {
 
 async function deployHandlers() {
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
-    const aaveV3Handler = await AaveV3Handler.deploy(AAVE_V3_POOL_ADDRESS, AAVE_V3_DATA_PROVIDER_ADDRESS);
+    const aaveV3Handler = await AaveV3Handler.deploy(
+        AAVE_V3_POOL_ADDRESS,
+        AAVE_V3_DATA_PROVIDER_ADDRESS,
+        await getGasOptions(),
+    );
     console.log("AaveV3Handler deployed to:", await aaveV3Handler.getAddress());
 
     const protocolRegistry = await deployProtocolRegistry();
     const registryAddress = await protocolRegistry.getAddress();
 
     const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
-    const compoundHandler = await CompoundHandler.deploy(registryAddress);
+    const compoundHandler = await CompoundHandler.deploy(registryAddress, await getGasOptions());
     await compoundHandler.waitForDeployment();
     console.log("CompoundHandler deployed to:", await compoundHandler.getAddress());
 
     const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
-    const moonwellHandler = await MoonwellHandler.deploy(COMPTROLLER_ADDRESS, registryAddress);
+    const moonwellHandler = await MoonwellHandler.deploy(COMPTROLLER_ADDRESS, registryAddress, await getGasOptions());
     console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());
 
     const FluidHandler = await hre.ethers.getContractFactory("FluidSafeHandler");
-    const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER);
+    const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER, await getGasOptions());
     console.log("FluidHandler deployed to:", await fluidHandler.getAddress());
 
     const MorphoHandler = await hre.ethers.getContractFactory("MorphoHandler");
-    const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS);
+    const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS, await getGasOptions());
     console.log("MorphoHandler deployed to:", await morphoHandler.getAddress());
 
     return {
