@@ -36,18 +36,22 @@ The system consists of several key components:
 
 2. **Protocol Handlers**: Individual handlers for each supported lending protocol:
 
-    - `AaveV3Handler.sol`: Handles interactions with Aave V3 protocol
-    - `CompoundHandler.sol`: Handles interactions with Compound protocol
-    - `MorphoHandler.sol`: Handles interactions with Morpho protocol
-    - `MoonwellHandler.sol`: Handles interactions with Moonwell protocol
-    - `FluidSafeHandler.sol`: Handles interactions with Fluid protocol through Safe
+    - In `contracts/protocols/` directory:
+        - `AaveV3Handler.sol`: Handles interactions with Aave V3 protocol
+        - `CompoundHandler.sol`: Handles interactions with Compound protocol
+        - `MorphoHandler.sol`: Handles interactions with Morpho protocol
+
+    - In `contracts/protocolsSafe/` directory:
+        - `MoonwellHandler.sol`: Handles interactions with Moonwell protocol
+        - `FluidSafeHandler.sol`: Handles interactions with Fluid protocol through Safe
 
 3. **Safe Modules**: Modules for Gnosis Safe integration:
 
     - `SafeModuleDebtSwap.sol`: Enables debt swaps through Gnosis Safe
-    - `SafeModuleDebtSwapUpgradeable.sol`: Upgradeable version of the Safe module
 
 4. **LeveragedPosition.sol**: Facilitates creation of leveraged positions across protocols.
+
+5. **ProtocolRegistry.sol**: Stores mappings between tokens and their corresponding protocol-specific contracts, allowing protocol handlers to access these mappings even when called via delegatecall.
 
 ## Sample Usage
 
@@ -75,11 +79,10 @@ await debtSwapContract.executeDebtSwap(
     fromDebtAsset, // Debt asset address on source protocol
     toDebtAsset, // Debt asset address on destination protocol
     amount, // Amount to swap (MaxUint256 for full debt)
-    slippageAdjustedAmount, // Source amount with slippage adjustment
     collateralAssets, // Array of collateral assets
     fromExtraData, // Protocol-specific data for source
     toExtraData, // Protocol-specific data for destination
-    paraswapParams, // Parameters for token swaps if needed
+    paraswapParams // Parameters for token swaps if needed
 );
 ```
 
@@ -195,11 +198,10 @@ await debtSwapContract.executeDebtSwap(
     fromDebtTokenAddress,
     toDebtTokenAddress,
     MaxUint256, // Swap full debt
-    slippageAdjustedAmount,
     [{ asset: collateralTokenAddress, amount: collateralAmount }],
     fromExtraData,
     toExtraData,
-    paraswapParams,
+    paraswapParams
 );
 ```
 
@@ -209,7 +211,7 @@ await debtSwapContract.executeDebtSwap(
 
 2. **Protocol Fee**: The contract charges an optional protocol fee (configurable by the owner) which is taken from the destination debt amount.
 
-3. **Slippage Protection**: When swapping between different assets, you must provide a `srcAmount` parameter with slippage adjustment to ensure the transaction doesn't fail due to price movements. See the 'Understanding Amount Parameters' section below for details.
+3. **Slippage Protection**: When swapping between different assets, you must include a `srcAmount` field in the `ParaswapParams` struct with appropriate slippage adjustment to ensure the transaction doesn't fail due to price movements. See the 'Understanding Amount Parameters' section below for details.
 
 4. **Collateral Handling**: The contract will automatically withdraw collateral from the source protocol and supply it to the destination protocol during the debt swap.
 
@@ -221,7 +223,6 @@ await debtSwapContract.executeDebtSwap(
 await debtSwapContract.executeDebtSwap(
     // ... other parameters
     amount, // Amount to swap from source protocol
-    slippageAdjustedAmount, // Maximum amount expected after swap with slippage
     // ... remaining parameters
 );
 ```
@@ -241,20 +242,35 @@ const amountToRepay = ethers.parseUnits("100", 6); // Repay 100 USDC
 const amountToRepay = ethers.constants.MaxUint256;
 ```
 
-#### SlippageAdjustedAmount Parameter
+#### Paraswap Parameters
 
-The `slippageAdjustedAmount` (or `srcAmount` in the contract) is only relevant when swapping between different assets. It represents the maximum amount you expect to need after accounting for slippage:
+The `paraswapParams` object is used when swapping between different assets and contains:
 
-- When `fromAsset` and `toAsset` are the same, you can set this to `0`
-- When they differ, you must calculate this with slippage to protect the transaction
+- `srcAmount`: The amount to swap with slippage adjustment (set to 0 if not swapping assets)
+- `swapData`: The encoded swap data from the Paraswap API
 
 ```javascript
-// Example: Same asset (no swap needed)
-const slippageAdjustedAmount = 0;
+// Example: Creating Paraswap Parameters for token swap
+const debtAmount = ethers.parseUnits("100", 6); // 100 USDC
+const slippage = 0.01; // 1% slippage tolerance
 
-// Example: Different assets with slippage protection
-const expectedSwapAmount = await getExpectedSwapAmount(fromAsset, toAsset, amount);
-const slippageAdjustedAmount = (expectedSwapAmount * 102n) / 100n; // 2% slippage
+// Calculate amount with slippage adjustment
+const slippageAdjustedAmount = debtAmount * (1 + slippage);
+
+// Get the swap data from Paraswap API
+const [srcAmount, paraswapData] = await getParaswapData(
+    fromTokenAddress,
+    toTokenAddress,
+    debtSwapContractAddress,
+    debtAmount,
+    slippageAdjustedAmount
+);
+
+// Create the paraswap parameters object
+const paraswapParams = {
+    srcAmount: srcAmount,
+    swapData: paraswapData
+};
 ```
 
 #### Sample Usage with Paraswap
@@ -266,24 +282,24 @@ const [srcAmount, paraswapData] = await getParaswapData(
     toTokenAddress,
     debtSwapContractAddress,
     debtAmount,
+    slippageAdjustedAmount
 );
-
-// Add 2% slippage protection
-const amountPlusSlippage = (BigInt(srcAmount) * 102n) / 100n;
 
 // Execute the debt swap with slippage protection
 await debtSwapContract.executeDebtSwap(
     flashloanPool,
     fromProtocol,
     toProtocol,
-    fromTokenAddress,
-    toTokenAddress,
-    debtAmount, // Amount to repay (can be MaxUint256 for full debt)
-    amountPlusSlippage, // Maximum expected amount after swap with slippage
+    fromDebtAsset,
+    toDebtAsset,
+    amount,
     collateralAssets,
     fromExtraData,
     toExtraData,
-    paraswapData,
+    {
+        srcAmount,
+        swapData
+    }
 );
 ```
 
@@ -322,7 +338,6 @@ function executeDebtSwap(
     address _fromDebtAsset,       // Debt asset address on source protocol
     address _toDebtAsset,         // Debt asset address on destination protocol
     uint256 _amount,              // Amount to swap (use type(uint256).max for full debt)
-    uint256 _srcAmount,           // Source amount for swap (0 for automatic calculation)
     CollateralAsset[] calldata _collateralAssets,  // Array of collateral assets
     bytes calldata _fromExtraData,  // Extra data for source protocol
     bytes calldata _toExtraData,    // Extra data for destination protocol
@@ -343,9 +358,8 @@ struct CollateralAsset {
 
 ```solidity
 struct ParaswapParams {
-    address router;             // Paraswap router address
-    address tokenTransferProxy; // Paraswap token transfer proxy
-    bytes swapData;             // Encoded swap data
+    uint256 srcAmount;    // Source amount with slippage adjustment (for token swaps)
+    bytes swapData;      // Encoded swap data from Paraswap API
 }
 ```
 
