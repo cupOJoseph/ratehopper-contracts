@@ -1,20 +1,13 @@
-import { ethers, MaxUint256 } from "ethers";
+import { ethers } from "ethers";
 
 import dotenv from "dotenv";
 import {
-    cbETH_ADDRESS,
-    DEFAULT_SUPPLY_AMOUNT,
     Protocols,
     USDbC_ADDRESS,
-    USDC_ADDRESS,
-    USDC_hyUSD_POOL,
     WETH_ADDRESS,
 } from "../test/constants";
 dotenv.config();
-// import * as debtSwapJson from "../artifacts/contracts/DebtSwap.sol/DebtSwap.json";
-import debtSwapJson from "../abis/debtSwap.json";
-import { AaveV3Helper } from "../test/protocols/aaveV3";
-import { DebtSwap } from "../typechain-types";
+import debtSwapJson from "../abis/DebtSwap.json";
 
 async function main() {
     const provider = new ethers.JsonRpcProvider("https://base.llamarpc.com");
