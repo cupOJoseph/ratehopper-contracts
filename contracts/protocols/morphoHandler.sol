@@ -8,11 +8,13 @@ import {DataTypes} from "../interfaces/aaveV3/DataTypes.sol";
 import "../interfaces/morpho/IMorpho.sol";
 import {MarketParamsLib} from "../dependencies/morpho/MarketParamsLib.sol";
 import "../dependencies/TransferHelper.sol";
+import {SharesMathLib} from "../dependencies/morpho/SharesMathLib.sol";
 
 contract MorphoHandler is IProtocolHandler {
     using MarketParamsLib for MarketParams;
 
     using GPv2SafeERC20 for IERC20;
+    using SharesMathLib for uint256;
     IMorpho public immutable morpho;
 
     constructor(address _MORPHO_ADDRESS) {
@@ -24,19 +26,10 @@ contract MorphoHandler is IProtocolHandler {
         address onBehalfOf,
         bytes calldata fromExtraData
     ) public view returns (uint256) {
-        (MarketParams memory marketParams, ) = abi.decode(fromExtraData, (MarketParams, uint256));
-
+        (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(fromExtraData, (MarketParams, uint256));
         Id marketId = marketParams.id();
-
-        Position memory p = morpho.position(marketId, onBehalfOf);
         Market memory m = morpho.market(marketId);
-        uint256 totalBorrowAssets = m.totalBorrowAssets + 1;
-        uint256 totalBorrowShares = m.totalBorrowShares + 1000000;
-
-        uint256 result1 = p.borrowShares * totalBorrowAssets;
-        uint256 result2 = totalBorrowShares - 1;
-
-        return (result1 / result2) + 1;
+        return borrowShares.toAssetsUp(m.totalBorrowAssets, m.totalBorrowShares) + 1;
     }
 
     function switchIn(

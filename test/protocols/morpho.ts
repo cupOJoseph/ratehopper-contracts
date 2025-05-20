@@ -29,6 +29,7 @@ export const morphoMarket3Id = "0xf761e909ee2f87f118e36b7efb42c5915752a6d39263ee
 export const morphoMarket4Id = "0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836";
 export const morphoMarket5Id = "0xb5d424e4af49244b074790f1f2dc9c20df948ce291fc6bcc6b59149ecf91196d";
 export const morphoMarket6Id = "0x3b3769cfca57be2eaed03fcc5299c25691b77781a1e124e7a8d520eb9a7eabb5";
+export const morphoMarket7Id = "0x8793cf302b8ffd655ab97bd1c695dbd967807e8367a65cb2f4edaf1380ba1bda";
 
 const market1Params = {
     collateralToken: cbETH_ADDRESS,
@@ -75,6 +76,14 @@ const market6Params = {
     loanToken: WETH_ADDRESS,
     irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
     oracle: "0xD09048c8B568Dbf5f189302beA26c9edABFC4858",
+    lltv: 860000000000000000n,
+};
+
+const market7Params = {
+    collateralToken: WETH_ADDRESS,
+    loanToken: USDC_ADDRESS,
+    irm: "0x46415998764C29aB2a25CbeA6254146D50D22687",
+    oracle: "",
     lltv: 860000000000000000n,
 };
 

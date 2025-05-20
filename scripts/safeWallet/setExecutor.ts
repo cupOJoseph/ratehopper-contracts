@@ -1,10 +1,9 @@
-import Safe from "@safe-global/protocol-kit";
 import dotenv from "dotenv";
 import { ethers } from "ethers";
 dotenv.config();
 
 async function main() {
-    const ourContractAddress = "0x85C434815d00352BBab9a90b884D1c299aEf9969";
+    const ourContractAddress = "0x3f52cd8e0566e28c0c6caa106bccd9d28d6460a6";
     const provider = new ethers.JsonRpcProvider("https://base.llamarpc.com");
     const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, provider);
 

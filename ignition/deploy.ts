@@ -46,10 +46,10 @@ async function main() {
         // const compoundHandlerAddress = await compoundHandler.getAddress();
         // console.log(`CompoundHandler deployed to: ${compoundHandlerAddress}`);
 
-        // console.log("Deploying MorphoHandler...");
-        // const { morphoHandler } = await hre.ignition.deploy(MorphoModule);
-        // const morphoHandlerAddress = await morphoHandler.getAddress();
-        // console.log(`MorphoHandler deployed to: ${morphoHandlerAddress}`);
+        console.log("Deploying MorphoHandler...");
+        const { morphoHandler } = await hre.ignition.deploy(MorphoModule);
+        const morphoHandlerAddress = await morphoHandler.getAddress();
+        console.log(`MorphoHandler deployed to: ${morphoHandlerAddress}`);
 
         // Deploy DebtSwap directly using ethers
         console.log("Deploying DebtSwap directly...");
@@ -60,7 +60,7 @@ async function main() {
         const handlers = [
             "0x3ea412D1d7D7414693f2355D107dbF40440Ff040",
             "0x7410abF1e92187A1ded8d615A866541cF92dE74B",
-            "0x18c2fB450f34e3089a6E5a9E501aA2692cE5d63e",
+            morphoHandlerAddress,
         ];
 
         const debtSwap = await DebtSwapFactory.deploy(UNISWAP_V3_FACTORY_ADRESS, protocols, handlers);
