@@ -53,6 +53,11 @@ The system consists of several key components:
 
 5. **ProtocolRegistry.sol**: Stores mappings between tokens and their corresponding protocol-specific contracts, allowing protocol handlers to access these mappings even when called via delegatecall.
 
+6. **Morpho Libraries**: Supporting libraries for the Morpho protocol:
+
+    - `MathLib.sol`: Provides fixed-point arithmetic operations for the Morpho protocol
+    - `SharesMathLib.sol`: Handles share-to-asset conversion with virtual shares to protect against share price manipulations
+
 ## Sample Usage
 
 Below are examples of how to integrate with the RateHopper contracts for different protocols.
@@ -129,6 +134,7 @@ const morphoExtraData = morphoHelper.encodeExtraData(marketId, borrowShares);
 // This encodes: abi.encode(MarketParams, uint256)
 // The MarketParams structure contains loan token, collateral token, oracle, etc.
 // The borrowShares is required for repaying debt when Morpho is the source protocol
+// Note: The contract now uses SharesMathLib for accurate conversion between shares and assets
 ```
 
 #### Moonwell
