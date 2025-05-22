@@ -55,6 +55,8 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
     event ProtocolFeeSet(uint8 oldFee, uint8 newFee);
 
     modifier onlyOwnerOrExecutor(address onBehalfOf) {
+        require(onBehalfOf != address(0), "onBehalfOf cannot be zero address");
+        
         if (msg.sender == executor) {
             _;
             return;
@@ -245,7 +247,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         }
 
         // repay flashloan
-        IERC20(decoded.fromAsset).transfer(msg.sender, decoded.amount + flashloanFeeOriginal);
+        IERC20(decoded.fromAsset).safeTransfer(msg.sender, decoded.amount + flashloanFeeOriginal);
 
         if (protocolFee > 0 && feeBeneficiary != address(0)) {
             IERC20(decoded.toAsset).safeTransfer(feeBeneficiary, protocolFeeAmount);
