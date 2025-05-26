@@ -23,7 +23,6 @@ import {
     USDC_hyUSD_POOL,
 } from "./constants";
 
-import { MaxUint256 } from "ethers";
 import { AaveV3Helper } from "./protocols/aaveV3";
 import { cometAddressMap, CompoundHelper } from "./protocols/compound";
 import {
@@ -35,7 +34,6 @@ import {
     morphoMarket6Id,
 } from "./protocols/morpho";
 import { deployLeveragedPositionContractFixture } from "./deployUtils";
-import { mcbETH, mContractAddressMap } from "./protocols/moonwell";
 
 describe("Create leveraged position", function () {
     let myContract: LeveragedPosition;

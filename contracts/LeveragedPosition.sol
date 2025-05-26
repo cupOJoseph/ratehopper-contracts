@@ -150,6 +150,7 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
 
         swapByParaswap(
             decoded.debtAsset,
+            amountInMax,
             decoded.paraswapParams.swapData
         );
 
@@ -182,9 +183,12 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         );
     }
 
-    function swapByParaswap(address asset, bytes memory _txParams) public {
-        IERC20(asset).approve(paraswapTokenTransferProxy, type(uint256).max);
+    function swapByParaswap(address asset, uint256 amount, bytes memory _txParams) internal {
+        IERC20(asset).approve(paraswapTokenTransferProxy, amount);
         (bool success, bytes memory returnData) = paraswapRouter.call(_txParams);
         require(success, "Token swap failed");
+
+        //remove approval
+        IERC20(asset).approve(paraswapTokenTransferProxy, 0);
     }
 }

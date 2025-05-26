@@ -291,6 +291,9 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         TransferHelper.safeApprove(asset, paraswapTokenTransferProxy, amount);
         (bool success, ) = paraswapRouter.call(_txParams);
         require(success, "Token swap by paraSwap failed");
+
+        //remove approval
+        IERC20(asset).approve(paraswapTokenTransferProxy, 0);
     }
 
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
