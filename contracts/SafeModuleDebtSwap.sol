@@ -57,13 +57,8 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
     modifier onlyOwnerOrExecutor(address onBehalfOf) {
         require(onBehalfOf != address(0), "onBehalfOf cannot be zero address");
         
-        if (msg.sender == executor) {
-            _;
-            return;
-        }
-
-        // Check if caller is any owner of the Safe
-        require(ISafe(onBehalfOf).isOwner(msg.sender), "Caller is not authorized");
+        // Check if caller is any owner of the Safe or executor
+        require(msg.sender == executor || ISafe(onBehalfOf).isOwner(msg.sender), "Caller is not authorized");
         _;
     }
 
