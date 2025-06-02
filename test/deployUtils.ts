@@ -25,6 +25,20 @@ async function deployMaliciousContract() {
     return maliciousContract;
 }
 
+export async function deployMaliciousUniswapV3Pool(targetHandler: string) {
+    const MaliciousUniswapV3Pool = await hre.ethers.getContractFactory("MaliciousUniswapV3Pool");
+    const maliciousPool = await MaliciousUniswapV3Pool.deploy(
+        USDC_ADDRESS, // token0
+        DAI_ADDRESS, // token1
+        3000, // fee (0.3%)
+        targetHandler, // target handler address
+        await getGasOptions(),
+    );
+    await maliciousPool.waitForDeployment();
+    console.log("MaliciousUniswapV3Pool deployed to:", await maliciousPool.getAddress());
+    return maliciousPool;
+}
+
 export async function deployHandlers() {
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
     const aaveV3Handler = await AaveV3Handler.deploy(
