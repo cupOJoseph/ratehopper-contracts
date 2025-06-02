@@ -25,11 +25,12 @@ async function deployMaliciousContract() {
     return maliciousContract;
 }
 
-async function deployHandlers() {
+export async function deployHandlers() {
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
     const aaveV3Handler = await AaveV3Handler.deploy(
         AAVE_V3_POOL_ADDRESS,
         AAVE_V3_DATA_PROVIDER_ADDRESS,
+        UNISWAP_V3_FACTORY_ADRESS,
         await getGasOptions(),
     );
     console.log("AaveV3Handler deployed to:", await aaveV3Handler.getAddress());
