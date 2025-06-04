@@ -23,21 +23,18 @@ describe("Handler contracts should", function () {
             .reverted;
     });
 
-    describe.only("Malicious contract security tests", function () {
+    describe("Malicious contract security tests", function () {
         let maliciousPool: any;
 
         beforeEach(async function () {
-            // Deploy malicious pool targeting the handler
             maliciousPool = await deployMaliciousUniswapV3Pool(await aaveV3Handler.getAddress());
         });
 
         it("should revert malicious pool attempting borrow", async function () {
-            // Verify the malicious pool implements the correct interface
             expect(await maliciousPool.token0()).to.equal(USDC_ADDRESS);
             expect(await maliciousPool.fee()).to.equal(3000);
             expect(await maliciousPool.targetHandler()).to.equal(await aaveV3Handler.getAddress());
 
-            // But all attack attempts should still fail due to CallbackValidation
             await expect(maliciousPool.attemptMaliciousBorrow(USDC_ADDRESS, 1000, TEST_ADDRESS)).to.be.reverted;
         });
     });

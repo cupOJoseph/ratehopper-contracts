@@ -131,6 +131,7 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         uint256 amountInMax = decoded.paraswapParams.srcAmount + 1;
 
         address handler = protocolHandlers[decoded.protocol];
+        require(handler != address(0), "Invalid protocol handler");
 
         (bool successSupply, ) = handler.delegatecall(
             abi.encodeCall(
