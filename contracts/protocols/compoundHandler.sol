@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IProtocolHandler} from "../interfaces/IProtocolHandler.sol";
 import {IComet} from "../interfaces/compound/IComet.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import {ProtocolRegistry} from "../ProtocolRegistry.sol";
 import {CollateralAsset} from "../Types.sol";
 import "../dependencies/TransferHelper.sol";
+import "./BaseProtocolHandler.sol";
 
-contract CompoundHandler is IProtocolHandler {
+contract CompoundHandler is BaseProtocolHandler {
     ProtocolRegistry public immutable REGISTRY;
-
-    constructor(address _registry) {
+    
+    constructor(address _registry, address _uniswapV3Factory) BaseProtocolHandler(_uniswapV3Factory) {
         REGISTRY = ProtocolRegistry(_registry);
     }
 
@@ -40,7 +40,7 @@ contract CompoundHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
-    ) external override {
+    ) external override onlyUniswapV3Pool {
         switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
         switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
@@ -51,7 +51,7 @@ contract CompoundHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) public override {
+    ) public override onlyUniswapV3Pool {
         address cContract = getCContract(fromAsset);
         require(cContract != address(0), "Token not registered");
 
@@ -60,9 +60,8 @@ contract CompoundHandler is IProtocolHandler {
         TransferHelper.safeApprove(fromAsset, address(cContract), amount);
         fromComet.supplyTo(onBehalfOf, fromAsset, amount);
 
-        // withdraw collateral
+        _validateCollateralAssets(collateralAssets);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
-            require(collateralAssets[i].amount > 0, "Invalid collateral amount");
             fromComet.withdrawFrom(onBehalfOf, address(this), collateralAssets[i].asset, collateralAssets[i].amount);
         }
     }
@@ -73,11 +72,13 @@ contract CompoundHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) public override {
+    ) public override onlyUniswapV3Pool {
         address cContract = getCContract(toAsset);
         require(cContract != address(0), "Token not registered");
 
         IComet toComet = IComet(cContract);
+        
+        _validateCollateralAssets(collateralAssets);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
             TransferHelper.safeApprove(collateralAssets[i].asset, address(cContract), currentBalance);
@@ -95,7 +96,7 @@ contract CompoundHandler is IProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         bytes calldata /* extraData */
-    ) external override {
+    ) external override onlyUniswapV3Pool {
         address cContract = getCContract(asset);
         require(cContract != address(0), "Token not registered");
 
@@ -109,7 +110,7 @@ contract CompoundHandler is IProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         bytes calldata /* extraData */
-    ) external override {
+    ) external override onlyUniswapV3Pool {
         address cContract = getCContract(asset);
         require(cContract != address(0), "Token not registered");
 
@@ -122,7 +123,7 @@ contract CompoundHandler is IProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         bytes calldata /* extraData */
-    ) external override {
+    ) external override onlyUniswapV3Pool {
         address cContract = getCContract(asset);
         require(cContract != address(0), "Token not registered");
 

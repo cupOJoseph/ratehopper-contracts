@@ -53,20 +53,28 @@ export async function deployHandlers() {
     const registryAddress = await protocolRegistry.getAddress();
 
     const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
-    const compoundHandler = await CompoundHandler.deploy(registryAddress, await getGasOptions());
+    const compoundHandler = await CompoundHandler.deploy(
+        registryAddress,
+        UNISWAP_V3_FACTORY_ADRESS,
+        await getGasOptions(),
+    );
     await compoundHandler.waitForDeployment();
     console.log("CompoundHandler deployed to:", await compoundHandler.getAddress());
 
     const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
-    const moonwellHandler = await MoonwellHandler.deploy(COMPTROLLER_ADDRESS, registryAddress, await getGasOptions());
+    const moonwellHandler = await MoonwellHandler.deploy(
+        COMPTROLLER_ADDRESS,
+        registryAddress,
+        UNISWAP_V3_FACTORY_ADRESS,
+    );
     console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());
 
     const FluidHandler = await hre.ethers.getContractFactory("FluidSafeHandler");
-    const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER, await getGasOptions());
+    const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER, UNISWAP_V3_FACTORY_ADRESS);
     console.log("FluidHandler deployed to:", await fluidHandler.getAddress());
 
     const MorphoHandler = await hre.ethers.getContractFactory("MorphoHandler");
-    const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS, await getGasOptions());
+    const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS, UNISWAP_V3_FACTORY_ADRESS, await getGasOptions());
     console.log("MorphoHandler deployed to:", await morphoHandler.getAddress());
 
     return {

@@ -1,37 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IProtocolHandler.sol";
 import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import {IPoolV3} from "../interfaces/aaveV3/IPoolV3.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import {DataTypes} from "../interfaces/aaveV3/DataTypes.sol";
 import {IAaveProtocolDataProvider} from "../interfaces/aaveV3/IAaveProtocolDataProvider.sol";
 import "../dependencies/TransferHelper.sol";
-import {PoolAddress} from "../dependencies/uniswapV3/PoolAddress.sol";
-import "../dependencies/uniswapV3/CallbackValidation.sol";
-import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import "./BaseProtocolHandler.sol";
 
-contract AaveV3Handler is IProtocolHandler {
+contract AaveV3Handler is BaseProtocolHandler {
     using GPv2SafeERC20 for IERC20;
 
     IPoolV3 public immutable aaveV3Pool;
     IAaveProtocolDataProvider public immutable dataProvider;
-    address public immutable uniswapV3Factory;
     
-    modifier onlyUniswapV3Pool() {
-        // verify msg.sender is Uniswap V3 pool
-        IUniswapV3Pool pool = IUniswapV3Pool(msg.sender);
-        PoolAddress.PoolKey memory poolKey = PoolAddress.getPoolKey(pool.token0(), pool.token1(), pool.fee());
-        // require statement is defined in verifyCallback()
-        CallbackValidation.verifyCallback(uniswapV3Factory, poolKey);
-        _;
-    }
-
-    constructor(address _AAVE_V3_POOL_ADDRESS, address _AAVE_V3_DATA_PROVIDER_ADDRESS, address _UNISWAP_V3_FACTORY_ADDRESS) {
+    constructor(address _AAVE_V3_POOL_ADDRESS, address _AAVE_V3_DATA_PROVIDER_ADDRESS, address _UNISWAP_V3_FACTORY_ADDRESS) 
+        BaseProtocolHandler(_UNISWAP_V3_FACTORY_ADDRESS) 
+    {
         aaveV3Pool = IPoolV3(_AAVE_V3_POOL_ADDRESS);
         dataProvider = IAaveProtocolDataProvider(_AAVE_V3_DATA_PROVIDER_ADDRESS);
-        uniswapV3Factory = _UNISWAP_V3_FACTORY_ADDRESS;
     }
 
     function getDebtAmount(
@@ -66,13 +54,12 @@ contract AaveV3Handler is IProtocolHandler {
     ) external override onlyUniswapV3Pool {
         repay(address(fromAsset), amount, onBehalfOf, extraData);
 
+        _validateCollateralAssets(collateralAssets);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
-            require(collateralAssets[i].amount > 0, "Invalid collateral amount");
-
             DataTypes.ReserveData memory reserveData = aaveV3Pool.getReserveData(collateralAssets[i].asset);
+            require(reserveData.aTokenAddress != address(0), "Asset not supported by Aave");
 
             IERC20(reserveData.aTokenAddress).safeTransferFrom(onBehalfOf, address(this), collateralAssets[i].amount);
-
             aaveV3Pool.withdraw(collateralAssets[i].asset, collateralAssets[i].amount, address(this));
         }
     }
@@ -84,12 +71,20 @@ contract AaveV3Handler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external override onlyUniswapV3Pool {
+        _validateCollateralAssets(collateralAssets);
+        
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            // Validate asset is supported by Aave
+            DataTypes.ReserveData memory reserveData = aaveV3Pool.getReserveData(collateralAssets[i].asset);
+            require(reserveData.aTokenAddress != address(0), "Asset not supported by Aave");
+            
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
+            require(currentBalance >= collateralAssets[i].amount, "Insufficient contract balance");
 
             TransferHelper.safeApprove(collateralAssets[i].asset, address(aaveV3Pool), currentBalance);
             aaveV3Pool.supply(collateralAssets[i].asset, currentBalance, onBehalfOf, 0);
         }
+        
         aaveV3Pool.borrow(toAsset, amount, 2, 0, onBehalfOf);
     }
 

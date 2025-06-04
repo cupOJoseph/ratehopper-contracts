@@ -11,13 +11,14 @@ import "../interfaces/fluid/IFluidVault.sol";
 import "../interfaces/fluid/IFluidVaultResolver.sol";
 import "../interfaces/IProtocolHandler.sol";
 import {Structs} from "../dependencies/fluid/structs.sol";
+import "../protocols/BaseProtocolHandler.sol";
 
-contract FluidSafeHandler is IProtocolHandler {
+contract FluidSafeHandler is BaseProtocolHandler {
     using GPv2SafeERC20 for IERC20;
 
     address public immutable FLUID_VAULT_RESOLVER;
 
-    constructor(address _fluidVaultResolver) {
+    constructor(address _fluidVaultResolver, address _UNISWAP_V3_FACTORY) BaseProtocolHandler(_UNISWAP_V3_FACTORY) {
         FLUID_VAULT_RESOLVER = _fluidVaultResolver;
     }
 
@@ -51,7 +52,7 @@ contract FluidSafeHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
-    ) external override {
+    ) external override onlyUniswapV3Pool {
         switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
         switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
@@ -62,7 +63,9 @@ contract FluidSafeHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
-    ) public override {
+    ) public override onlyUniswapV3Pool {
+        _validateCollateralAssets(collateralAssets);
+
         (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
         IERC20(fromAsset).transfer(onBehalfOf, amount);
@@ -100,7 +103,9 @@ contract FluidSafeHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
-    ) public override {
+    ) public override onlyUniswapV3Pool {
+        _validateCollateralAssets(collateralAssets);
+
         (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
         IERC20(collateralAssets[0].asset).transfer(onBehalfOf, collateralAssets[0].amount);
@@ -138,7 +143,7 @@ contract FluidSafeHandler is IProtocolHandler {
         require(successBorrow, "Fluid borrow failed");
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override {
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override onlyUniswapV3Pool {
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
 
         IERC20(asset).transfer(onBehalfOf, amount);
@@ -173,7 +178,7 @@ contract FluidSafeHandler is IProtocolHandler {
         require(successRepay, "Repay failed");
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external onlyUniswapV3Pool {
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
         IERC20(asset).transfer(onBehalfOf, amount);
 
@@ -194,7 +199,7 @@ contract FluidSafeHandler is IProtocolHandler {
         require(successSupply, "Fluid supply failed");
     }
 
-    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external onlyUniswapV3Pool {
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
 
         IFluidVaultResolver resolver = IFluidVaultResolver(FLUID_VAULT_RESOLVER);

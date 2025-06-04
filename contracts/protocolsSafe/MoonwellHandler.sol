@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IProtocolHandler.sol";
 import "../interfaces/safe/ISafe.sol";
 import "../interfaces/moonwell/IMToken.sol";
 import {IComptroller} from "../interfaces/moonwell/Comptroller.sol";
@@ -9,14 +8,15 @@ import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import "../Types.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import {ProtocolRegistry} from "../ProtocolRegistry.sol";
+import "../protocols/BaseProtocolHandler.sol";
 
-contract MoonwellHandler is IProtocolHandler {
+contract MoonwellHandler is BaseProtocolHandler {
     using GPv2SafeERC20 for IERC20;
 
     address public immutable COMPTROLLER;
     ProtocolRegistry public immutable REGISTRY;
 
-    constructor(address _comptroller, address _registry) {
+    constructor(address _comptroller, address _registry, address _UNISWAP_V3_FACTORY) BaseProtocolHandler(_UNISWAP_V3_FACTORY) {
         COMPTROLLER = _comptroller;
         REGISTRY = ProtocolRegistry(_registry);
     }
@@ -47,7 +47,9 @@ contract MoonwellHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* fromExtraData */,
         bytes calldata /* toExtraData */
-    ) external override {
+    ) external override onlyUniswapV3Pool {
+        _validateCollateralAssets(collateralAssets);
+
         address fromContract = getMContract(fromAsset);
         address toContract = getMContract(toAsset);
 
@@ -83,7 +85,9 @@ contract MoonwellHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) external override {
+    ) external override onlyUniswapV3Pool {
+        _validateCollateralAssets(collateralAssets);
+
         address fromContract = getMContract(fromAsset);
 
         if (fromContract == address(0)) revert TokenNotRegistered();
@@ -121,7 +125,9 @@ contract MoonwellHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) external override {
+    ) external override onlyUniswapV3Pool {
+        _validateCollateralAssets(collateralAssets);
+
         address toContract = getMContract(toAsset);
         if (toContract == address(0)) revert TokenNotRegistered();
 
@@ -181,7 +187,7 @@ contract MoonwellHandler is IProtocolHandler {
         require(successTransfer, "Transfer transaction failed");
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external {
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external onlyUniswapV3Pool {
         address mContract = getMContract(asset);
         if (mContract == address(0)) revert TokenNotRegistered();
 
@@ -218,7 +224,7 @@ contract MoonwellHandler is IProtocolHandler {
         require(successEnterMarkets, "Enter markets transaction failed");
     }
 
-    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external {
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external onlyUniswapV3Pool {
         address mContract = getMContract(asset);
         if (mContract == address(0)) revert TokenNotRegistered();
 
@@ -241,7 +247,7 @@ contract MoonwellHandler is IProtocolHandler {
         require(successTransfer, "Transfer transaction failed");
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) public override {
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) public override onlyUniswapV3Pool {
         address mContract = getMContract(asset);
         if (mContract == address(0)) revert TokenNotRegistered();
 
