@@ -3,10 +3,12 @@ import { mcbETH, mUSDC, mDAI, COMPTROLLER_ADDRESS } from "./protocols/moonwell";
 import { cbETH_ADDRESS, USDC_ADDRESS, DAI_ADDRESS, WETH_ADDRESS, USDbC_ADDRESS, cbBTC_ADDRESS } from "./constants";
 import { USDC_COMET_ADDRESS, USDbC_COMET_ADDRESS, WETH_COMET_ADDRESS } from "./protocols/compound";
 import { mcbBTC } from "../contractAddresses";
+import { getGasOptions } from "./deployUtils";
 
 export async function deployProtocolRegistry() {
     const ProtocolRegistry = await ethers.getContractFactory("ProtocolRegistry");
-    const protocolRegistry = await ProtocolRegistry.deploy();
+    const gasOptions = await getGasOptions();
+    const protocolRegistry = await ProtocolRegistry.deploy(gasOptions);
 
     console.log("ProtocolRegistry deployed to:", await protocolRegistry.getAddress());
 

@@ -8,18 +8,21 @@ import {DataTypes} from "../interfaces/aaveV3/DataTypes.sol";
 import {IAaveProtocolDataProvider} from "../interfaces/aaveV3/IAaveProtocolDataProvider.sol";
 import "../dependencies/TransferHelper.sol";
 import "./BaseProtocolHandler.sol";
+import "../ProtocolRegistry.sol";
 
 contract AaveV3Handler is BaseProtocolHandler {
     using GPv2SafeERC20 for IERC20;
 
     IPoolV3 public immutable aaveV3Pool;
     IAaveProtocolDataProvider public immutable dataProvider;
+    ProtocolRegistry public immutable registry;
     
-    constructor(address _AAVE_V3_POOL_ADDRESS, address _AAVE_V3_DATA_PROVIDER_ADDRESS, address _UNISWAP_V3_FACTORY_ADDRESS) 
+    constructor(address _AAVE_V3_POOL_ADDRESS, address _AAVE_V3_DATA_PROVIDER_ADDRESS, address _UNISWAP_V3_FACTORY_ADDRESS, address _REGISTRY_ADDRESS) 
         BaseProtocolHandler(_UNISWAP_V3_FACTORY_ADDRESS) 
     {
         aaveV3Pool = IPoolV3(_AAVE_V3_POOL_ADDRESS);
         dataProvider = IAaveProtocolDataProvider(_AAVE_V3_DATA_PROVIDER_ADDRESS);
+        registry = ProtocolRegistry(_REGISTRY_ADDRESS);
     }
 
     function getDebtAmount(
@@ -52,13 +55,17 @@ contract AaveV3Handler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) external override onlyUniswapV3Pool {
+        _validateCollateralAssets(collateralAssets);
+        require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
+
         repay(address(fromAsset), amount, onBehalfOf, extraData);
 
-        _validateCollateralAssets(collateralAssets);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
+
             DataTypes.ReserveData memory reserveData = aaveV3Pool.getReserveData(collateralAssets[i].asset);
             require(reserveData.aTokenAddress != address(0), "Asset not supported by Aave");
-
+      
             IERC20(reserveData.aTokenAddress).safeTransferFrom(onBehalfOf, address(this), collateralAssets[i].amount);
             aaveV3Pool.withdraw(collateralAssets[i].asset, collateralAssets[i].amount, address(this));
         }
@@ -73,13 +80,18 @@ contract AaveV3Handler is BaseProtocolHandler {
     ) external override onlyUniswapV3Pool {
         _validateCollateralAssets(collateralAssets);
         
+        require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
+        
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
+
             // Validate asset is supported by Aave
             DataTypes.ReserveData memory reserveData = aaveV3Pool.getReserveData(collateralAssets[i].asset);
             require(reserveData.aTokenAddress != address(0), "Asset not supported by Aave");
             
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
             require(currentBalance >= collateralAssets[i].amount, "Insufficient contract balance");
+        
 
             TransferHelper.safeApprove(collateralAssets[i].asset, address(aaveV3Pool), currentBalance);
             aaveV3Pool.supply(collateralAssets[i].asset, currentBalance, onBehalfOf, 0);

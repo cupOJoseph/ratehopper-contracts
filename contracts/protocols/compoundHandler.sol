@@ -9,14 +9,14 @@ import "../dependencies/TransferHelper.sol";
 import "./BaseProtocolHandler.sol";
 
 contract CompoundHandler is BaseProtocolHandler {
-    ProtocolRegistry public immutable REGISTRY;
+    ProtocolRegistry public immutable registry;
     
     constructor(address _registry, address _uniswapV3Factory) BaseProtocolHandler(_uniswapV3Factory) {
-        REGISTRY = ProtocolRegistry(_registry);
+        registry = ProtocolRegistry(_registry);
     }
 
     function getCContract(address token) internal view returns (address) {
-        return REGISTRY.getCContract(token);
+        return registry.getCContract(token);
     }
 
     function getDebtAmount(
@@ -51,7 +51,9 @@ contract CompoundHandler is BaseProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) public override onlyUniswapV3Pool {
+    ) public override onlyUniswapV3Pool {       
+        require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
+ 
         address cContract = getCContract(fromAsset);
         require(cContract != address(0), "Token not registered");
 
@@ -62,6 +64,7 @@ contract CompoundHandler is BaseProtocolHandler {
 
         _validateCollateralAssets(collateralAssets);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
             fromComet.withdrawFrom(onBehalfOf, address(this), collateralAssets[i].asset, collateralAssets[i].amount);
         }
     }
@@ -72,7 +75,9 @@ contract CompoundHandler is BaseProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) public override onlyUniswapV3Pool {
+    ) public override onlyUniswapV3Pool {        
+        require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
+        
         address cContract = getCContract(toAsset);
         require(cContract != address(0), "Token not registered");
 
@@ -80,6 +85,7 @@ contract CompoundHandler is BaseProtocolHandler {
         
         _validateCollateralAssets(collateralAssets);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
             TransferHelper.safeApprove(collateralAssets[i].asset, address(cContract), currentBalance);
 
@@ -97,6 +103,8 @@ contract CompoundHandler is BaseProtocolHandler {
         address onBehalfOf,
         bytes calldata /* extraData */
     ) external override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         address cContract = getCContract(asset);
         require(cContract != address(0), "Token not registered");
 
@@ -111,6 +119,8 @@ contract CompoundHandler is BaseProtocolHandler {
         address onBehalfOf,
         bytes calldata /* extraData */
     ) external override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         address cContract = getCContract(asset);
         require(cContract != address(0), "Token not registered");
 
@@ -124,6 +134,8 @@ contract CompoundHandler is BaseProtocolHandler {
         address onBehalfOf,
         bytes calldata /* extraData */
     ) external override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         address cContract = getCContract(asset);
         require(cContract != address(0), "Token not registered");
 

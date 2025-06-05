@@ -9,6 +9,7 @@ import {MarketParamsLib} from "../dependencies/morpho/MarketParamsLib.sol";
 import "../dependencies/TransferHelper.sol";
 import {SharesMathLib} from "../dependencies/morpho/SharesMathLib.sol";
 import "./BaseProtocolHandler.sol";
+import "../ProtocolRegistry.sol";
 
 contract MorphoHandler is BaseProtocolHandler {
     using MarketParamsLib for MarketParams;
@@ -16,9 +17,11 @@ contract MorphoHandler is BaseProtocolHandler {
     using SharesMathLib for uint256;
     
     IMorpho public immutable morpho;
+    ProtocolRegistry public immutable registry;
 
-    constructor(address _MORPHO_ADDRESS, address _UNISWAP_V3_FACTORY) BaseProtocolHandler(_UNISWAP_V3_FACTORY) {
+    constructor(address _MORPHO_ADDRESS, address _UNISWAP_V3_FACTORY, address _REGISTRY_ADDRESS) BaseProtocolHandler(_UNISWAP_V3_FACTORY) {
         morpho = IMorpho(_MORPHO_ADDRESS);
+        registry = ProtocolRegistry(_REGISTRY_ADDRESS);
     }
 
     function getDebtAmount(
@@ -53,11 +56,13 @@ contract MorphoHandler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) public override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
+        require(registry.isWhitelisted(collateralAssets[0].asset), "Collateral asset is not whitelisted");
+        
         // Morpho only supports one collateral asset
         require(collateralAssets.length == 1, "Morpho supports only one collateral asset");
         require(collateralAssets[0].amount > 0, "Invalid collateral amount");
-        require(collateralAssets[0].asset != address(0), "Invalid collateral asset address");
-
+  
         (MarketParams memory marketParams, uint256 borrowShares) = abi.decode(extraData, (MarketParams, uint256));
         require(marketParams.loanToken == fromAsset, "fromAsset mismatch with marketParams in extraData");
 
@@ -73,13 +78,16 @@ contract MorphoHandler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) public override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
+        require(registry.isWhitelisted(collateralAssets[0].asset), "Collateral asset is not whitelisted");
+        
+        // Morpho only supports one collateral asset
+        require(collateralAssets.length == 1, "Morpho supports only one collateral asset");
+        require(collateralAssets[0].amount > 0, "Invalid collateral amount");
+        
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
         require(marketParams.loanToken == toAsset, "toAsset mismatch with marketParams in extraData");
 
-        // Morpho only supports one collateral asset
-        require(collateralAssets.length == 1, "Morpho supports only one collateral asset");
-        require(collateralAssets[0].asset != address(0), "Invalid collateral asset address");
-        
         uint256 currentBalance = IERC20(collateralAssets[0].asset).balanceOf(address(this));
         require(currentBalance > 0, "No collateral balance available");
 
@@ -90,6 +98,8 @@ contract MorphoHandler is BaseProtocolHandler {
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
 
         TransferHelper.safeApprove(asset, address(morpho), amount);
@@ -97,12 +107,16 @@ contract MorphoHandler is BaseProtocolHandler {
     }
 
     function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
 
         morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
     }
 
     function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public onlyUniswapV3Pool {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
 
         TransferHelper.safeApprove(asset, address(morpho), amount);

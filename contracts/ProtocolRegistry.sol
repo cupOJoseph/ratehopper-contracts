@@ -17,8 +17,17 @@ contract ProtocolRegistry is Ownable {
     // Mapping from underlying token address to corresponding Compound cToken contract address
     mapping(address => address) public tokenToCContract;
 
+    // Mapping to track whitelisted tokens
+    mapping(address => bool) public whitelistedTokens;
+
     error ZeroAddress();
     error ArrayLengthMismatch();
+    
+    /// @notice Event emitted when a token is added to the whitelist
+    event TokenWhitelisted(address indexed token, address indexed owner);
+    
+    /// @notice Event emitted when a token is removed from the whitelist
+    event TokenRemovedFromWhitelist(address indexed token, address indexed owner);
 
     function setTokenMContract(address token, address mContract) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
@@ -56,5 +65,57 @@ contract ProtocolRegistry is Ownable {
             if (cContracts[i] == address(0)) revert ZeroAddress();
             tokenToCContract[tokens[i]] = cContracts[i];
         }
+    }
+
+    /**
+     * @dev Add a token to the whitelist
+     * @param token The token address to whitelist
+     */
+    function addToWhitelist(address token) external onlyOwner {
+        if (token == address(0)) revert ZeroAddress();
+        require(!whitelistedTokens[token], "Token already whitelisted");
+        
+        whitelistedTokens[token] = true;
+        emit TokenWhitelisted(token, msg.sender);
+    }
+
+    /**
+     * @dev Remove a token from the whitelist
+     * @param token The token address to remove from whitelist
+     */
+    function removeFromWhitelist(address token) external onlyOwner {
+        if (token == address(0)) revert ZeroAddress();
+        require(whitelistedTokens[token], "Token not whitelisted");
+        
+        whitelistedTokens[token] = false;
+        emit TokenRemovedFromWhitelist(token, msg.sender);
+    }
+
+    /**
+     * @dev Add multiple tokens to the whitelist in batch
+     * @param tokens Array of token addresses to whitelist
+     */
+    function addToWhitelistBatch(address[] calldata tokens) external onlyOwner {
+        require(tokens.length > 0, "Empty tokens array");
+        require(tokens.length <= 100, "Too many tokens in batch");
+        
+        for (uint256 i = 0; i < tokens.length; i++) {
+            address token = tokens[i];
+            if (token == address(0)) revert ZeroAddress();
+            
+            if (!whitelistedTokens[token]) {
+                whitelistedTokens[token] = true;
+                emit TokenWhitelisted(token, msg.sender);
+            }
+        }
+    }
+
+    /**
+     * @dev Check if a token is whitelisted
+     * @param token The token address to check
+     * @return bool True if token is whitelisted, false otherwise
+     */
+    function isWhitelisted(address token) external view returns (bool) {
+        return whitelistedTokens[token];
     }
 }

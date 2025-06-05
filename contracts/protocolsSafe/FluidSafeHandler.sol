@@ -12,14 +12,17 @@ import "../interfaces/fluid/IFluidVaultResolver.sol";
 import "../interfaces/IProtocolHandler.sol";
 import {Structs} from "../dependencies/fluid/structs.sol";
 import "../protocols/BaseProtocolHandler.sol";
+import "../ProtocolRegistry.sol";
 
 contract FluidSafeHandler is BaseProtocolHandler {
     using GPv2SafeERC20 for IERC20;
 
     address public immutable FLUID_VAULT_RESOLVER;
+    ProtocolRegistry public immutable registry;
 
-    constructor(address _fluidVaultResolver, address _UNISWAP_V3_FACTORY) BaseProtocolHandler(_UNISWAP_V3_FACTORY) {
+    constructor(address _fluidVaultResolver, address _UNISWAP_V3_FACTORY, address _REGISTRY_ADDRESS) BaseProtocolHandler(_UNISWAP_V3_FACTORY) {
         FLUID_VAULT_RESOLVER = _fluidVaultResolver;
+        registry = ProtocolRegistry(_REGISTRY_ADDRESS);
     }
 
     function getDebtAmount(
@@ -52,7 +55,7 @@ contract FluidSafeHandler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool {        
         switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
         switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
@@ -64,7 +67,11 @@ contract FluidSafeHandler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) public override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
         _validateCollateralAssets(collateralAssets);
+        for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
+        }
 
         (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
@@ -104,7 +111,11 @@ contract FluidSafeHandler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
     ) public override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
         _validateCollateralAssets(collateralAssets);
+        for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
+        }
 
         (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
@@ -144,6 +155,8 @@ contract FluidSafeHandler is BaseProtocolHandler {
     }
 
     function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
 
         IERC20(asset).transfer(onBehalfOf, amount);
@@ -179,6 +192,8 @@ contract FluidSafeHandler is BaseProtocolHandler {
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external onlyUniswapV3Pool {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
         IERC20(asset).transfer(onBehalfOf, amount);
 
@@ -200,6 +215,8 @@ contract FluidSafeHandler is BaseProtocolHandler {
     }
 
     function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external onlyUniswapV3Pool {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
 
         IFluidVaultResolver resolver = IFluidVaultResolver(FLUID_VAULT_RESOLVER);
