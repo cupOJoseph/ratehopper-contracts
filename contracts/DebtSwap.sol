@@ -206,17 +206,20 @@ contract DebtSwap is Ownable, ReentrancyGuard {
             require(successTo, "protocol switchTo failed");
         }
 
+        uint256 amountToRepay = decoded.amount + flashloanFeeOriginal;
+
         if (decoded.fromAsset != decoded.toAsset) {
             swapByParaswap(
                 decoded.toAsset,
+                decoded.fromAsset,
                 amountTotal,
+                amountToRepay,
                 decoded.paraswapParams.swapData
             );
         }
 
         // repay flashloan
-        IERC20 fromToken = IERC20(decoded.fromAsset);
-        fromToken.safeTransfer(address(msg.sender), decoded.amount + flashloanFeeOriginal);
+        IERC20(decoded.fromAsset).safeTransfer(address(msg.sender), amountToRepay);
 
         if (protocolFee > 0 && feeBeneficiary != address(0)) {
             IERC20(decoded.toAsset).safeTransfer(feeBeneficiary, protocolFeeAmount);
@@ -252,16 +255,20 @@ contract DebtSwap is Ownable, ReentrancyGuard {
     }
 
     function swapByParaswap(
-        address asset,
+        address srcAsset,
+        address dstAsset,
         uint256 amount,
+        uint256 minAmountOut,
         bytes memory _txParams
     ) internal {
-        TransferHelper.safeApprove(asset, paraswapTokenTransferProxy, amount);
+        TransferHelper.safeApprove(srcAsset, paraswapTokenTransferProxy, amount);
         (bool success, ) = paraswapRouter.call(_txParams);
         require(success, "Token swap by paraSwap failed");
 
+        require(IERC20(dstAsset).balanceOf(address(this)) >= minAmountOut, "Insufficient token balance after swap");
+
         //remove approval
-        IERC20(asset).approve(paraswapTokenTransferProxy, 0);
+        IERC20(srcAsset).approve(paraswapTokenTransferProxy, 0);
     }
 
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {

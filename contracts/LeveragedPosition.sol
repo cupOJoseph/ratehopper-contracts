@@ -10,6 +10,7 @@ import {IProtocolHandler} from "./interfaces/IProtocolHandler.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Types.sol";
+import "./dependencies/TransferHelper.sol";
 
 contract LeveragedPosition is Ownable, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
@@ -149,15 +150,19 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         );
         require(successBorrow, "Borrow failed");
 
+        uint256 amountToRepay = flashloanBorrowAmount + totalFee;
+
         swapByParaswap(
-            decoded.debtAsset,
-            amountInMax,
-            decoded.paraswapParams.swapData
+                decoded.debtAsset,
+                decoded.collateralAsset,
+                amountInMax,
+                amountToRepay,
+                decoded.paraswapParams.swapData
         );
 
         // repay flashloan
         IERC20 collateralToken = IERC20(decoded.collateralAsset);
-        collateralToken.safeTransfer(msg.sender, flashloanBorrowAmount + totalFee);
+        collateralToken.safeTransfer(msg.sender, amountToRepay);
 
         // transfer dust amount back to user
         uint256 remainingCollateralBalance = IERC20(decoded.collateralAsset).balanceOf(address(this));
@@ -184,12 +189,20 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         );
     }
 
-    function swapByParaswap(address asset, uint256 amount, bytes memory _txParams) internal {
-        IERC20(asset).approve(paraswapTokenTransferProxy, amount);
-        (bool success, bytes memory returnData) = paraswapRouter.call(_txParams);
-        require(success, "Token swap failed");
+    function swapByParaswap(
+        address srcAsset,
+        address dstAsset,
+        uint256 amount,
+        uint256 minAmountOut,
+        bytes memory _txParams
+    ) internal {
+        TransferHelper.safeApprove(srcAsset, paraswapTokenTransferProxy, amount);
+        (bool success, ) = paraswapRouter.call(_txParams);
+        require(success, "Token swap by paraSwap failed");
+
+        require(IERC20(dstAsset).balanceOf(address(this)) >= minAmountOut, "Insufficient token balance after swap");
 
         //remove approval
-        IERC20(asset).approve(paraswapTokenTransferProxy, 0);
+        IERC20(srcAsset).approve(paraswapTokenTransferProxy, 0);
     }
 }
