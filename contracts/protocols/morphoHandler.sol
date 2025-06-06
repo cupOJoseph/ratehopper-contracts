@@ -90,6 +90,10 @@ contract MorphoHandler is BaseProtocolHandler {
 
         uint256 currentBalance = IERC20(collateralAssets[0].asset).balanceOf(address(this));
         require(currentBalance > 0, "No collateral balance available");
+        require(
+                currentBalance < (collateralAssets[0].amount * 101) / 100,
+                "Current balance is more than collateral amount + buffer"
+            );
 
         TransferHelper.safeApprove(marketParams.collateralToken, address(morpho), currentBalance);
         morpho.supplyCollateral(marketParams, currentBalance, onBehalfOf, "");

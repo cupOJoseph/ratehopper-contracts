@@ -90,7 +90,11 @@ contract AaveV3Handler is BaseProtocolHandler {
             require(reserveData.aTokenAddress != address(0), "Asset not supported by Aave");
             
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
-            require(currentBalance >= collateralAssets[i].amount, "Insufficient contract balance");
+            require(currentBalance > 0, "No collateral balance available");
+            require(
+                currentBalance < (collateralAssets[i].amount * 101) / 100,
+                "Current balance is more than collateral amount + buffer"
+            );
         
 
             TransferHelper.safeApprove(collateralAssets[i].asset, address(aaveV3Pool), currentBalance);

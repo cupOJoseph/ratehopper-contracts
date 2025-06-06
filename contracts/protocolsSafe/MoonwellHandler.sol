@@ -141,6 +141,10 @@ contract MoonwellHandler is BaseProtocolHandler {
             address collateralContract = getMContract(collateralAssets[i].asset);
             // use balanceOf() because collateral amount is slightly decreased when switching from Fluid
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
+            require(
+                currentBalance < (collateralAssets[i].amount * 101) / 100,
+                "Current balance is more than collateral amount + buffer"
+            );
 
             IERC20(collateralAssets[i].asset).transfer(onBehalfOf, currentBalance);
 

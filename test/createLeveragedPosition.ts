@@ -155,7 +155,7 @@ describe("Create leveraged position", function () {
     }
 
     describe("on Aave", function () {
-        it.only("with cbETH collateral", async function () {
+        it("with cbETH collateral", async function () {
             await createLeveragedPosition(cbETH_ETH_POOL, Protocols.AAVE_V3);
         });
 
