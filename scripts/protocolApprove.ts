@@ -8,7 +8,7 @@ import aaveDebtTokenJson from "../externalAbi/aaveV3/aaveDebtToken.json";
 dotenv.config();
 import aaveProtocolDataProviderAbi from "../externalAbi/aaveV3/aaveProtocolDataProvider.json";
 import aaveV3PoolJson from "../externalAbi/aaveV3/aaveV3Pool.json";
-const debtSwapContractAddress = "0xbc6928382109a321227ddbc4385dc3061443da35";
+const debtSwapContractAddress = "0x7c60013D3ad4C4696F80f56FF42f806c6fB11e69";
 const provider = new ethers.JsonRpcProvider("https://base.llamarpc.com");
 const signer = new ethers.Wallet(process.env.MY_SAFE_OWNER_KEY!, provider);
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
@@ -24,8 +24,9 @@ async function main() {
 async function compound() {
     const USDC_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
     const USDbC_COMET_ADDRESS = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
-    const comet = new ethers.Contract(USDbC_COMET_ADDRESS, cometAbi, signer);
+    const comet = new ethers.Contract(USDC_COMET_ADDRESS, cometAbi, signer);
     const tx = await comet.allow(debtSwapContractAddress, true);
+    // const tx = await comet.allow(debtSwapContractAddress, false);
     await tx.wait();
     console.log("Successfully approved DebtSwap contract for Compound");
 }

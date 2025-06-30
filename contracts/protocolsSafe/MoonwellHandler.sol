@@ -16,9 +16,9 @@ contract MoonwellHandler is BaseProtocolHandler {
     address public immutable COMPTROLLER;
     ProtocolRegistry public immutable registry;
 
-    constructor(address _comptroller, address _registry, address _UNISWAP_V3_FACTORY) BaseProtocolHandler(_UNISWAP_V3_FACTORY) {
+    constructor(address _comptroller, address _UNISWAP_V3_FACTORY, address _REGISTRY_ADDRESS) BaseProtocolHandler(_UNISWAP_V3_FACTORY) {
         COMPTROLLER = _comptroller;
-        registry = ProtocolRegistry(_registry);
+        registry = ProtocolRegistry(_REGISTRY_ADDRESS);
     }
 
     error TokenNotRegistered();
