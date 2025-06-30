@@ -68,8 +68,8 @@ export async function deployHandlers() {
     const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
     const moonwellHandler = await MoonwellHandler.deploy(
         COMPTROLLER_ADDRESS,
-        registryAddress,
         UNISWAP_V3_FACTORY_ADRESS,
+        registryAddress,
     );
     await moonwellHandler.waitForDeployment();
     console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());

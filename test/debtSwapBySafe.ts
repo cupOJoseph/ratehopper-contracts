@@ -196,7 +196,8 @@ describe("Safe wallet should debtSwap", function () {
 
             await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDbC_ADDRESS, Protocols.AAVE_V3, Protocols.AAVE_V3);
         });
-        it("Compound from USDC to USDbC", async function () {
+        // USDbC is not available on Compound anymore
+        it.skip("Compound from USDC to USDbC", async function () {
             await supplyAndBorrow(Protocols.COMPOUND);
             await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDbC_ADDRESS, Protocols.COMPOUND, Protocols.COMPOUND);
         });
