@@ -4,12 +4,14 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "test": "npx hardhat test",
-        "trace": "npx hardhat test --v",
-        "fulltrace": "npx hardhat test --vvv",
+        "test": "node --max-old-space-size=12288 --expose-gc --optimize-for-size ./node_modules/.bin/hardhat test",
+        "test:memory": "node --max-old-space-size=4096 ./node_modules/.bin/hardhat test",
+        "test:single": "node --max-old-space-size=4096 ./node_modules/.bin/hardhat test --grep",
+        "trace": "node --max-old-space-size=8192 ./node_modules/.bin/hardhat test --v",
+        "fulltrace": "node --max-old-space-size=8192 ./node_modules/.bin/hardhat test --vvv",
         "compile": "npx hardhat compile",
         "size": "npx hardhat size-contracts",
-        "coverage": "npx hardhat coverage",
+        "coverage": "node --max-old-space-size=12288 ./node_modules/.bin/hardhat coverage",
         "clean": "npx hardhat clean",
         "run-script": "ts-node scripts/paraswap.ts"
     },

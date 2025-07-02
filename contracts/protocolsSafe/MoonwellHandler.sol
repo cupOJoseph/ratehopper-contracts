@@ -111,10 +111,16 @@ contract MoonwellHandler is BaseProtocolHandler {
 
             require(successWithdraw, "Redeem transaction failed");
 
+            uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(onBehalfOf);
+            require(
+                currentBalance < (collateralAssets[i].amount * 101) / 100,
+                "Current balance is more than collateral amount + buffer"
+            );
+
             bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
                 collateralAssets[i].asset,
                 0,
-                abi.encodeCall(IERC20.transfer, (address(this), collateralAssets[i].amount)),
+                abi.encodeCall(IERC20.transfer, (address(this), currentBalance)),
                 ISafe.Operation.Call
             );
 

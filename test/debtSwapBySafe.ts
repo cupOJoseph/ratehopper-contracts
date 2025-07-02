@@ -55,6 +55,9 @@ export const eip1193Provider: Eip1193Provider = {
 export const safeAddress = "0x2f9054Eb6209bb5B94399115117044E4f150B2De";
 
 describe("Safe wallet should debtSwap", function () {
+    // Increase timeout for memory-intensive operations
+    this.timeout(300000); // 5 minutes
+
     const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);
     let safeWallet;
     let safeModuleContract;
@@ -85,6 +88,16 @@ describe("Safe wallet should debtSwap", function () {
 
         console.log("Modules:", await safeWallet.getModules());
     }
+
+    this.afterEach(async () => {
+        // Force garbage collection to free memory
+        if (global.gc) {
+            global.gc();
+        }
+
+        // Small delay to allow cleanup
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    });
 
     async function sendCollateralToSafe() {
         const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, signer);
@@ -125,10 +138,10 @@ describe("Safe wallet should debtSwap", function () {
         console.log(`Supplied and borrowed on protocol: ${protocol}`);
 
         const tokenBalance = await tokenContract.balanceOf(safeAddress);
-        console.log("Token Balance on Safe:", ethers.formatUnits(tokenBalance, 6));
+        console.log("Token Balance on Safe:", ethers.formatUnits(tokenBalance, decimals));
 
         const userTokenBalance = await tokenContract.balanceOf(TEST_ADDRESS);
-        console.log("Token Balance on user:", ethers.formatUnits(userTokenBalance, 6));
+        console.log("Token Balance on user:", ethers.formatUnits(userTokenBalance, decimals));
     }
 
     async function supplyAndBorrowOnFluid() {
