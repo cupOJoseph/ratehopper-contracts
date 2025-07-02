@@ -11,9 +11,11 @@ import {
     DAI_ADDRESS,
     DAI_USDC_POOL,
     DEFAULT_SUPPLY_AMOUNT,
+    EURC_ADDRESS,
     Protocols,
     sUSDS_ADDRESS,
     TEST_ADDRESS,
+    TEST_FEE_BENEFICIARY_ADDRESS,
     USDbC_ADDRESS,
     USDC_ADDRESS,
     USDC_hyUSD_POOL,
@@ -28,7 +30,12 @@ import { MaxUint256 } from "ethers";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { approve, formatAmount, fundETH, getDecimals, getParaswapData, protocolHelperMap } from "./utils";
 import { mcbETH, mContractAddressMap } from "./protocols/moonwell";
-import { FLUID_cbBTC_sUSDS_VAULT, FLUID_cbETH_USDC_VAULT, FluidHelper } from "./protocols/fluid";
+import {
+    FLUID_cbBTC_sUSDS_VAULT,
+    FLUID_cbETH_EURC_VAULT,
+    FLUID_cbETH_USDC_VAULT,
+    FluidHelper,
+} from "./protocols/fluid";
 import { cometAddressMap, USDC_COMET_ADDRESS } from "./protocols/compound";
 import { marketParamsMap, MORPHO_ADDRESS, morphoMarket1Id, morphoMarket2Id } from "./protocols/morpho";
 
@@ -235,6 +242,21 @@ describe("Safe wallet should debtSwap", function () {
                 cbBTC_ADDRESS,
             );
         });
+
+        it("In Fluid from USDC to EURC with cbETH collateral", async function () {
+            await supplyAndBorrowOnFluid();
+            await executeDebtSwap(
+                USDC_hyUSD_POOL,
+                USDC_ADDRESS,
+                EURC_ADDRESS,
+                Protocols.FLUID,
+                Protocols.FLUID,
+                cbETH_ADDRESS,
+                {
+                    fluidVaultAddress: FLUID_cbETH_EURC_VAULT,
+                },
+            );
+        });
     });
 
     it("from Compound to Moonwell", async function () {
@@ -299,6 +321,21 @@ describe("Safe wallet should debtSwap", function () {
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.AAVE_V3, Protocols.MOONWELL);
     });
 
+    it("from Aave to Moonwell with protocol fee", async function () {
+        // set protocol fee
+        const signers = await ethers.getSigners();
+        const contractByOwner = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress, signers[0]);
+        const setTx = await contractByOwner.setProtocolFee(10);
+        await setTx.wait();
+
+        const setFeeBeneficiaryTx = await contractByOwner.setFeeBeneficiary(TEST_FEE_BENEFICIARY_ADDRESS);
+        await setFeeBeneficiaryTx.wait();
+
+        await supplyAndBorrow(Protocols.AAVE_V3);
+
+        await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.AAVE_V3, Protocols.MOONWELL);
+    });
+
     it("Set executor address and Call executeDebtSwap by executor", async function () {
         const safeModuleAddress = await safeModuleContract.getAddress();
         const [_, wallet2] = await ethers.getSigners();
@@ -341,6 +378,20 @@ describe("Safe wallet should debtSwap", function () {
                 },
             ),
         ).to.be.revertedWith("Caller is not authorized");
+    });
+
+    it("revert if flashloan pool is not uniswap v3 pool", async function () {
+        await supplyAndBorrow(Protocols.MOONWELL);
+
+        await expect(
+            executeDebtSwap(
+                USDC_ADDRESS, // Using USDC contract address which doesn't have token0() function
+                USDC_ADDRESS,
+                USDC_ADDRESS,
+                Protocols.MOONWELL,
+                Protocols.AAVE_V3,
+            ),
+        ).to.be.revertedWith("Invalid flashloan pool address");
     });
 
     // it.only("Should setProtocolHandler and revert when calling executeDebtSwap with wrong handler address", async function () {
@@ -388,6 +439,7 @@ describe("Safe wallet should debtSwap", function () {
             useMaxAmount?: boolean;
             anotherCollateralTokenAddress?: string;
             executor?: HardhatEthersSigner;
+            fluidVaultAddress?: string;
         } = { useMaxAmount: true },
     ) {
         const FromHelper = protocolHelperMap.get(fromProtocol)!;
@@ -534,8 +586,7 @@ describe("Safe wallet should debtSwap", function () {
                 toExtraData = toHelper.encodeExtraData(options!.morphoToMarketId!, borrowShares);
                 break;
             case Protocols.FLUID:
-                const vaultAddress =
-                    collateralTokenAddress == cbETH_ADDRESS ? FLUID_cbETH_USDC_VAULT : FLUID_cbBTC_sUSDS_VAULT;
+                const vaultAddress = options.fluidVaultAddress || FLUID_cbETH_USDC_VAULT;
                 toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(["address", "uint256"], [vaultAddress, 0]);
                 break;
         }

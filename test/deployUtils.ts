@@ -6,6 +6,7 @@ import {
     cbBTC_ADDRESS,
     cbETH_ADDRESS,
     DAI_ADDRESS,
+    EURC_ADDRESS,
     MAI_ADDRESS,
     PARASWAP_ROUTER_ADDRESS,
     PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS,
@@ -13,6 +14,7 @@ import {
     UNISWAP_V3_FACTORY_ADRESS,
     USDbC_ADDRESS,
     USDC_ADDRESS,
+    USDS_ADDRESS,
     WETH_ADDRESS,
 } from "./constants";
 import { MORPHO_ADDRESS } from "./protocols/morpho";
@@ -97,6 +99,8 @@ export async function deployHandlers() {
         WETH_ADDRESS,
         cbBTC_ADDRESS,
         cbETH_ADDRESS,
+        USDS_ADDRESS,
+        EURC_ADDRESS,
     ];
 
     const registryWhitelistTx = await protocolRegistry.addToWhitelistBatch(whitelistTokens);

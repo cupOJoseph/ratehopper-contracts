@@ -105,12 +105,12 @@ contract CompoundHandler is BaseProtocolHandler {
         address asset,
         uint256 amount,
         address onBehalfOf,
-        bytes calldata /* extraData */
+        bytes calldata  extraData
     ) external override onlyUniswapV3Pool {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
-        address cContract = getCContract(asset);
-        require(cContract != address(0), "Token not registered");
+        address cContract = abi.decode(extraData, (address));
+        require(cContract != address(0), "Invalid comet address");
 
         TransferHelper.safeApprove(asset, address(cContract), amount);
         // supply collateral
@@ -121,7 +121,7 @@ contract CompoundHandler is BaseProtocolHandler {
         address asset,
         uint256 amount,
         address onBehalfOf,
-        bytes calldata /* extraData */
+        bytes calldata extraData
     ) external override onlyUniswapV3Pool {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         

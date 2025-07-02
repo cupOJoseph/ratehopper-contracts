@@ -119,12 +119,19 @@ contract FluidSafeHandler is BaseProtocolHandler {
 
         (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
-        IERC20(collateralAssets[0].asset).transfer(onBehalfOf, collateralAssets[0].amount);
+        // use balanceOf() because collateral amount is slightly decreased when switching from Fluid
+        uint256 currentBalance = IERC20(collateralAssets[0].asset).balanceOf(address(this));
+        require(
+                currentBalance < (collateralAssets[0].amount * 101) / 100,
+                "Current balance is more than collateral amount + buffer"
+            );
+
+        IERC20(collateralAssets[0].asset).transfer(onBehalfOf, currentBalance);
 
         bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
             collateralAssets[0].asset,
             0,
-            abi.encodeCall(IERC20.approve, (address(vaultAddress), collateralAssets[0].amount)),
+            abi.encodeCall(IERC20.approve, (address(vaultAddress), currentBalance)),
             ISafe.Operation.Call
         );
         require(successApprove, "Approval failed");
@@ -132,7 +139,7 @@ contract FluidSafeHandler is BaseProtocolHandler {
         (bool successSupply, bytes memory returnData) = ISafe(onBehalfOf).execTransactionFromModuleReturnData(
             vaultAddress,
             0,
-            abi.encodeCall(IFluidVault.operate, (nftId, int256(collateralAssets[0].amount), 0, onBehalfOf)),
+            abi.encodeCall(IFluidVault.operate, (nftId, int256(currentBalance), 0, onBehalfOf)),
             ISafe.Operation.Call
         );
         require(successSupply, "Fluid supply failed");

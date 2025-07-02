@@ -23,6 +23,8 @@ import {
     TEST_FEE_BENEFICIARY_ADDRESS,
     MAI_ADDRESS,
     MAI_USDC_POOL,
+    USDS_ADDRESS,
+    cbBTC_ADDRESS,
 } from "./constants";
 
 import { AaveV3Helper } from "./protocols/aaveV3";
@@ -122,70 +124,19 @@ describe("DebtSwap should switch", function () {
     // compound USDbC is no longer supported
     // https://www.tally.xyz/gov/compound/proposal/428?govId=eip155:1:0x309a862bbC1A00e45506cB8A802D1ff10004c8C0
     describe.skip("In Compound", function () {
-        it("from USDbC to USDC, cbETH Collateral", async function () {
-            await compoundHelper.supply(USDbC_COMET_ADDRESS, cbETH_ADDRESS);
-            await compoundHelper.borrow(USDbC_ADDRESS);
-
-            await executeDebtSwap(ETH_USDbC_POOL, USDbC_ADDRESS, USDC_ADDRESS, Protocols.COMPOUND, Protocols.COMPOUND);
-        });
-
-        it("from USDC to USDbC, WETH Collateral", async function () {
-            await wrapETH(DEFAULT_SUPPLY_AMOUNT, impersonatedSigner);
-            await compoundHelper.supply(USDC_COMET_ADDRESS, WETH_ADDRESS);
+        // failed with cbBTC Collateral Amount Exceeds Supply Cap error
+        it("from USDC to USDS, cbBTC Collateral", async function () {
+            await compoundHelper.supply(USDC_COMET_ADDRESS, cbBTC_ADDRESS, "0.00002", 8);
             await compoundHelper.borrow(USDC_ADDRESS);
 
             await executeDebtSwap(
                 USDC_hyUSD_POOL,
                 USDC_ADDRESS,
-                USDbC_ADDRESS,
+                USDS_ADDRESS,
                 Protocols.COMPOUND,
                 Protocols.COMPOUND,
-                WETH_ADDRESS,
+                cbBTC_ADDRESS,
             );
-        });
-
-        it("from USDbC to USDC, WETH Collateral", async function () {
-            await wrapETH(DEFAULT_SUPPLY_AMOUNT, impersonatedSigner);
-            await compoundHelper.supply(USDbC_COMET_ADDRESS, WETH_ADDRESS);
-            await compoundHelper.borrow(USDbC_ADDRESS);
-
-            await executeDebtSwap(
-                ETH_USDbC_POOL,
-                USDbC_ADDRESS,
-                USDC_ADDRESS,
-                Protocols.COMPOUND,
-                Protocols.COMPOUND,
-                WETH_ADDRESS,
-            );
-        });
-
-        it("from USDC to USDbC, Multiple Collaterals(cbETH and WETH)", async function () {
-            await wrapETH(DEFAULT_SUPPLY_AMOUNT, impersonatedSigner);
-            await compoundHelper.supply(USDC_COMET_ADDRESS, WETH_ADDRESS);
-            await compoundHelper.supply(USDC_COMET_ADDRESS, cbETH_ADDRESS);
-            await compoundHelper.borrow(USDC_ADDRESS);
-
-            await executeDebtSwap(
-                USDC_hyUSD_POOL,
-                USDC_ADDRESS,
-                USDbC_ADDRESS,
-                Protocols.COMPOUND,
-                Protocols.COMPOUND,
-                cbETH_ADDRESS,
-                {
-                    anotherCollateralTokenAddress: WETH_ADDRESS,
-                },
-            );
-
-            const WETHAmountInUSDC = await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS, WETH_ADDRESS);
-            console.log("WETH collateralAmountInUSDC:", ethers.formatEther(WETHAmountInUSDC));
-            const WETHAmountInUSDbC = await compoundHelper.getCollateralAmount(USDbC_COMET_ADDRESS, WETH_ADDRESS);
-            console.log("WETH collateralAmountInUSDbC:", ethers.formatEther(WETHAmountInUSDbC));
-
-            const cbETHAmountInUSDC = await compoundHelper.getCollateralAmount(USDC_COMET_ADDRESS, cbETH_ADDRESS);
-            console.log("cbETH collateralAmountInUSDC:", ethers.formatEther(cbETHAmountInUSDC));
-            const cbETHAmountInUSDbC = await compoundHelper.getCollateralAmount(USDbC_COMET_ADDRESS, cbETH_ADDRESS);
-            console.log("cbETH collateralAmountInUSDbC:", ethers.formatEther(cbETHAmountInUSDbC));
         });
     });
 
@@ -494,13 +445,13 @@ describe("DebtSwap should switch", function () {
 
             await expect(
                 executeDebtSwap(
-                    "0x1e88f23864a8FE784eB152967AccDb394D3b88AD",
+                    USDC_ADDRESS, // Using USDC contract address which doesn't have token0() function
                     USDC_ADDRESS,
                     USDC_ADDRESS,
                     Protocols.AAVE_V3,
                     Protocols.COMPOUND,
                 ),
-            ).to.be.reverted;
+            ).to.be.revertedWith("Invalid flashloan pool address");
         });
 
         it("if non-owner call setProtocolFee()", async function () {
