@@ -534,6 +534,307 @@ describe("DebtSwap should switch", function () {
                 ),
             ).to.be.reverted;
         });
+
+        it("if flashloan pool is zero address", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    zeroAddress,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if fromTokenAddress is zero address", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    zeroAddress,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if toTokenAddress is zero address", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    zeroAddress,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if collateralArray is empty", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if collateralArray contains zero address", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: zeroAddress, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if collateralArray contains zero amount", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: 0n }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if debtAmount is zero", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    0n,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if fromProtocol is invalid (out of range)", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    99, // Invalid protocol number
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if toProtocol is invalid (out of range)", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    99, // Invalid protocol number
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if fromTokenAddress is not a valid ERC20 token", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    "0x1234567890123456789012345678901234567890", // Invalid token address
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if toTokenAddress is not a valid ERC20 token", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    "0x1234567890123456789012345678901234567890", // Invalid token address
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if collateralArray asset is not a valid ERC20 token", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [
+                        {
+                            asset: "0x1234567890123456789012345678901234567890",
+                            amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
+                        },
+                    ],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if paraswapData has excessively large srcAmount", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: MaxUint256, swapData: "0x12345678" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if collateralArray has mixed valid and invalid assets", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [
+                        { asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) },
+                        { asset: zeroAddress, amount: ethers.parseEther("0.1") },
+                    ],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if collateralArray has excessively large amount", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: MaxUint256 }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if user has no debt to swap", async function () {
+            const signers = await ethers.getSigners();
+            const freshSigner = signers[2]; // Use a different signer with no positions
+            const contractByFreshSigner = await ethers.getContractAt("DebtSwap", deployedContractAddress, freshSigner);
+
+            await expect(
+                contractByFreshSigner.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    USDC_ADDRESS,
+                    USDC_ADDRESS,
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
+
+        it("if same fromProtocol and toProtocol but different invalid tokens", async function () {
+            await expect(
+                myContract.executeDebtSwap(
+                    USDC_hyUSD_POOL,
+                    Protocols.AAVE_V3,
+                    Protocols.AAVE_V3,
+                    "0x1111111111111111111111111111111111111111",
+                    "0x2222222222222222222222222222222222222222",
+                    MaxUint256,
+                    [{ asset: cbETH_ADDRESS, amount: ethers.parseEther(DEFAULT_SUPPLY_AMOUNT) }],
+                    "0x",
+                    "0x",
+                    { srcAmount: 0n, swapData: "0x" },
+                ),
+            ).to.be.reverted;
+        });
     });
 
     describe("Fuzz testing", function () {

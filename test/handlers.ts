@@ -7,10 +7,14 @@ import { deployHandlers, deployMaliciousUniswapV3Pool } from "./deployUtils";
 describe("Handler contracts should", function () {
     let aaveV3Handler;
     let compoundHandler;
+    let moonwellHandler;
+    let fluidHandler;
+    let morphoHandler;
     let protocolRegistry;
 
     this.beforeEach(async () => {
-        ({ aaveV3Handler, compoundHandler, protocolRegistry } = await loadFixture(deployHandlers));
+        ({ aaveV3Handler, compoundHandler, moonwellHandler, fluidHandler, morphoHandler, protocolRegistry } =
+            await loadFixture(deployHandlers));
     });
 
     it("revert when calling directly with default signer", async function () {
@@ -36,6 +40,19 @@ describe("Handler contracts should", function () {
 
         await expect(compoundHandlerWithSigner1.borrow(USDC_ADDRESS, ethers.parseUnits("1", 6), TEST_ADDRESS, "0x")).to
             .be.reverted;
+    });
+
+    it("MoonwellHandler should revert when calling borrow directly with default signer", async function () {
+        await expect(moonwellHandler.borrow(USDC_ADDRESS, ethers.parseUnits("1", 6), TEST_ADDRESS, "0x")).to.be
+            .reverted;
+    });
+
+    it("FluidHandler should revert when calling borrow directly with default signer", async function () {
+        await expect(fluidHandler.borrow(USDC_ADDRESS, ethers.parseUnits("1", 6), TEST_ADDRESS, "0x")).to.be.reverted;
+    });
+
+    it("MorphoHandler should revert when calling borrow directly with default signer", async function () {
+        await expect(morphoHandler.borrow(USDC_ADDRESS, ethers.parseUnits("1", 6), TEST_ADDRESS, "0x")).to.be.reverted;
     });
 
     describe("Malicious contract security tests", function () {

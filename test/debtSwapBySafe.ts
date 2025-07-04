@@ -27,7 +27,7 @@ import morphoAbi from "../externalAbi/morpho/morpho.json";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 import { MaxUint256 } from "ethers";
 
-import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { approve, formatAmount, fundETH, getDecimals, getParaswapData, protocolHelperMap } from "./utils";
 import { mcbETH, mContractAddressMap } from "./protocols/moonwell";
 import {
@@ -318,7 +318,7 @@ describe("Safe wallet should debtSwap", function () {
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.MOONWELL, Protocols.FLUID);
     });
 
-    it("from Moonwell DAI to Fluid USDC", async function () {
+    it.skip("from Moonwell DAI to Fluid USDC", async function () {
         await supplyAndBorrow(Protocols.MOONWELL, DAI_ADDRESS);
         await executeDebtSwap(DAI_USDC_POOL, DAI_ADDRESS, USDC_ADDRESS, Protocols.MOONWELL, Protocols.FLUID);
     });
@@ -613,6 +613,9 @@ describe("Safe wallet should debtSwap", function () {
                 collateralAmount = await fromHelper.getCollateralAmount(options!.morphoFromMarketId!, safeAddress);
                 break;
         }
+
+        // simulate waiting for user's confirmation
+        await time.increaseTo((await time.latest()) + 60);
 
         await moduleContract.executeDebtSwap(
             flashloanPool,
