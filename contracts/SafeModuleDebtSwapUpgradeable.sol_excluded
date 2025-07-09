@@ -18,7 +18,7 @@ contract SafeModuleDebtSwapUpgradeable is Initializable, OwnableUpgradeable, UUP
     using GPv2SafeERC20 for IERC20;
     uint8 public protocolFee;
     address public feeBeneficiary;
-    address public executor;
+    address public operator;
     mapping(Protocol => address) public protocolHandlers;
 
     struct FlashCallbackData {
@@ -44,8 +44,8 @@ contract SafeModuleDebtSwapUpgradeable is Initializable, OwnableUpgradeable, UUP
         uint256 amount
     );
 
-    modifier onlyOwnerOrExecutor(address onBehalfOf) {
-        if (msg.sender == executor) {
+    modifier onlyOwnerOroperator(address onBehalfOf) {
+        if (msg.sender == operator) {
             _;
             return;
         }
@@ -61,7 +61,7 @@ contract SafeModuleDebtSwapUpgradeable is Initializable, OwnableUpgradeable, UUP
     }
 
     /**
-     * @dev Initializes the contract with protocol handlers and sets the executor
+     * @dev Initializes the contract with protocol handlers and sets the operator
      * @param protocols Array of protocols to register
      * @param handlers Array of handler addresses corresponding to protocols
      */
@@ -77,7 +77,7 @@ contract SafeModuleDebtSwapUpgradeable is Initializable, OwnableUpgradeable, UUP
             protocolHandlers[protocols[i]] = handlers[i];
         }
 
-        executor = msg.sender;
+        operator = msg.sender;
     }
 
     function setProtocolFee(uint8 _fee) public onlyOwner {
@@ -90,9 +90,9 @@ contract SafeModuleDebtSwapUpgradeable is Initializable, OwnableUpgradeable, UUP
         feeBeneficiary = _feeBeneficiary;
     }
 
-    function setExecutor(address _executor) public onlyOwner {
-        require(_executor != address(0), "_executor cannot be zero address");
-        executor = _executor;
+    function setoperator(address _operator) public onlyOwner {
+        require(_operator != address(0), "_operator cannot be zero address");
+        operator = _operator;
     }
 
 
@@ -109,7 +109,7 @@ contract SafeModuleDebtSwapUpgradeable is Initializable, OwnableUpgradeable, UUP
         address _onBehalfOf,
         bytes[2] calldata _extraData,
         ParaswapParams calldata _paraswapParams
-    ) public onlyOwnerOrExecutor(_onBehalfOf) {
+    ) public onlyOwnerOroperator(_onBehalfOf) {
         require(_fromDebtAsset != address(0), "Invalid from asset address");
         require(_toDebtAsset != address(0), "Invalid to asset address");
         require(_amount > 0, "_amount cannot be zero");

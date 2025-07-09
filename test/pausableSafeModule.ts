@@ -9,15 +9,15 @@ describe("SafeModuleDebtSwap Pausable", function () {
     let safeModuleContract: any;
     let owner: any;
     let user: any;
-    let executor: any;
+    let operator: any;
     let pauser: any;
 
     beforeEach(async function () {
         safeModuleContract = await loadFixture(deploySafeContractFixture);
 
-        [owner, user, executor, pauser] = await ethers.getSigners();
+        [owner, user, operator, pauser] = await ethers.getSigners();
 
-        await safeModuleContract.setExecutor(executor.address);
+        await safeModuleContract.setoperator(operator.address);
     });
 
     describe("Pause functionality", function () {
@@ -72,7 +72,7 @@ describe("SafeModuleDebtSwap Pausable", function () {
             const mockSafeAddress = owner.address;
             await expect(
                 safeModuleContract
-                    .connect(executor)
+                    .connect(operator)
                     .executeDebtSwap(
                         USDC_hyUSD_POOL,
                         Protocols.AAVE_V3,

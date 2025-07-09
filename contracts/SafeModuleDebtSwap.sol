@@ -21,7 +21,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
     using GPv2SafeERC20 for IERC20;
     uint8 public protocolFee;
     address public feeBeneficiary;
-    address public executor;
+    address public operator;
     address public pauser;
     address public uniswapV3Factory;
     address public paraswapTokenTransferProxy;
@@ -54,11 +54,11 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
 
     event ProtocolFeeSet(uint8 oldFee, uint8 newFee);
 
-    modifier onlyOwnerOrExecutor(address onBehalfOf) {
+    modifier onlyOwnerOroperator(address onBehalfOf) {
         require(onBehalfOf != address(0), "onBehalfOf cannot be zero address");
         
-        // Check if caller is any owner of the Safe or executor
-        require(msg.sender == executor || ISafe(onBehalfOf).isOwner(msg.sender), "Caller is not authorized");
+        // Check if caller is any owner of the Safe or operator
+        require(msg.sender == operator || ISafe(onBehalfOf).isOwner(msg.sender), "Caller is not authorized");
         _;
     }
 
@@ -80,7 +80,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
             protocolHandlers[protocols[i]] = handlers[i];
         }
 
-        executor = msg.sender;
+        operator = msg.sender;
         pauser = _pauser;
         uniswapV3Factory = _uniswapV3Factory;
     }
@@ -99,9 +99,9 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         emit FeeBeneficiarySet(oldBeneficiary, _feeBeneficiary);
     }
 
-    function setExecutor(address _executor) public onlyOwner {
-        require(_executor != address(0), "_executor cannot be zero address");
-        executor = _executor;
+    function setoperator(address _operator) public onlyOwner {
+        require(_operator != address(0), "_operator cannot be zero address");
+        operator = _operator;
     }
 
     function setParaswapAddresses(address _paraswapTokenTransferProxy, address _paraswapRouter) external onlyOwner {
@@ -122,7 +122,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         address _onBehalfOf,
         bytes[2] calldata _extraData,
         ParaswapParams calldata _paraswapParams
-    ) public onlyOwnerOrExecutor(_onBehalfOf) whenNotPaused {
+    ) public onlyOwnerOroperator(_onBehalfOf) whenNotPaused {
         require(_fromDebtAsset != address(0), "Invalid from asset address");
         require(_toDebtAsset != address(0), "Invalid to asset address");
         require(_amount > 0, "_amount cannot be zero");

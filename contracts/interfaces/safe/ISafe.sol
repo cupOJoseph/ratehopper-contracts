@@ -49,7 +49,7 @@ interface ISafe {
     function checkSignatures(bytes32 dataHash, bytes memory data, bytes memory signatures) external view;
 
     function checkNSignatures(
-        address executor,
+        address operator,
         bytes32 dataHash,
         bytes memory /* data */,
         bytes memory signatures,

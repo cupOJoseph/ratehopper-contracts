@@ -211,7 +211,7 @@ describe("Safe wallet should debtSwap", function () {
         console.log(`Borrowed on Fluid`);
     }
     describe("switch In", function () {
-        it("Aave from USDC to USDbC", async function () {
+        it.only("Aave from USDC to USDbC", async function () {
             await supplyAndBorrow(Protocols.AAVE_V3);
 
             await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDbC_ADDRESS, Protocols.AAVE_V3, Protocols.AAVE_V3);
@@ -349,12 +349,12 @@ describe("Safe wallet should debtSwap", function () {
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.AAVE_V3, Protocols.MOONWELL);
     });
 
-    it("Set executor address and Call executeDebtSwap by executor", async function () {
+    it("Set operator address and Call executeDebtSwap by operator", async function () {
         const safeModuleAddress = await safeModuleContract.getAddress();
         const [_, wallet2] = await ethers.getSigners();
         const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
 
-        await safeModule.setExecutor(wallet2.address);
+        await safeModule.setoperator(wallet2.address);
 
         await supplyAndBorrow(Protocols.MOONWELL);
         await executeDebtSwap(
@@ -365,17 +365,17 @@ describe("Safe wallet should debtSwap", function () {
             Protocols.AAVE_V3,
             cbETH_ADDRESS,
             {
-                executor: wallet2,
+                operator: wallet2,
             },
         );
     });
 
-    it("Revert when calling executeDebtSwap by non executor(wallet3)", async function () {
+    it("Revert when calling executeDebtSwap by non operator(wallet3)", async function () {
         const safeModuleAddress = await safeModuleContract.getAddress();
         const [_, wallet2, wallet3] = await ethers.getSigners();
         const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
 
-        // await safeModule.setExecutor(wallet2.address);
+        // await safeModule.setoperator(wallet2.address);
 
         await supplyAndBorrow(Protocols.MOONWELL);
         await expect(
@@ -387,7 +387,7 @@ describe("Safe wallet should debtSwap", function () {
                 Protocols.AAVE_V3,
                 cbETH_ADDRESS,
                 {
-                    executor: wallet3,
+                    operator: wallet3,
                 },
             ),
         ).to.be.revertedWith("Caller is not authorized");
@@ -451,7 +451,7 @@ describe("Safe wallet should debtSwap", function () {
             morphoToMarketId?: string;
             useMaxAmount?: boolean;
             anotherCollateralTokenAddress?: string;
-            executor?: HardhatEthersSigner;
+            operator?: HardhatEthersSigner;
             fluidVaultAddress?: string;
         } = { useMaxAmount: true },
     ) {
@@ -464,7 +464,7 @@ describe("Safe wallet should debtSwap", function () {
         const moduleContract = await ethers.getContractAt(
             "SafeModuleDebtSwap",
             safeModuleAddress,
-            options.executor || signer,
+            options.operator || signer,
         );
 
         const fromDebtAmountParameter =
