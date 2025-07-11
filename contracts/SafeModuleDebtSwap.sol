@@ -54,6 +54,8 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
 
     event ProtocolFeeSet(uint8 oldFee, uint8 newFee);
 
+    event EmergencyWithdrawn(address indexed token, uint256 amount, address indexed to);
+
     modifier onlyOwnerOroperator(address onBehalfOf) {
         require(onBehalfOf != address(0), "onBehalfOf cannot be zero address");
         
@@ -306,6 +308,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(amount <= balance, "Insufficient balance");
         IERC20(token).safeTransfer(owner(), amount);
+        emit EmergencyWithdrawn(token, amount, owner());
     }
 
     /**

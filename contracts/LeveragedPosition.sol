@@ -42,6 +42,12 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         address debtAsset
     );
 
+    event FeeBeneficiarySet(address indexed oldBeneficiary, address indexed newBeneficiary);
+
+    event ProtocolFeeSet(uint8 oldFee, uint8 newFee);
+
+    event EmergencyWithdrawn(address indexed token, uint256 amount, address indexed to);
+
     constructor(address _uniswapV3Factory, Protocol[] memory protocols, address[] memory handlers) Ownable(msg.sender) {
         require(protocols.length == handlers.length, "Protocols and handlers length mismatch");
         uniswapV3Factory = _uniswapV3Factory;
@@ -54,12 +60,16 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
 
     function setProtocolFee(uint8 _fee) public onlyOwner {
         require(_fee <= 100, "_fee cannot be greater than 1%");
+        uint8 oldFee = protocolFee;
         protocolFee = _fee;
+        emit ProtocolFeeSet(oldFee, _fee);
     }
 
     function setFeeBeneficiary(address _feeBeneficiary) public onlyOwner {
         require(_feeBeneficiary != address(0), "_feeBeneficiary cannot be zero address");
+        address oldBeneficiary = feeBeneficiary;
         feeBeneficiary = _feeBeneficiary;
+        emit FeeBeneficiarySet(oldBeneficiary, _feeBeneficiary);
     }
 
     function setParaswapAddresses(address _paraswapTokenTransferProxy, address _paraswapRouter) external onlyOwner {
@@ -205,4 +215,13 @@ contract LeveragedPosition is Ownable, ReentrancyGuard {
         //remove approval
         IERC20(srcAsset).approve(paraswapTokenTransferProxy, 0);
     }
+
+    function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
+        require(token != address(0), "Invalid token address");
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        require(amount <= balance, "Insufficient balance");
+        IERC20(token).safeTransfer(owner(), amount);
+        emit EmergencyWithdrawn(token, amount, owner());
+    }
+
 }
