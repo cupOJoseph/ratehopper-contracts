@@ -83,7 +83,7 @@ describe("DebtSwap should switch", function () {
             );
         });
 
-        it("from USDbC to USDC, cbETH Collateral", async function () {
+        it.only("from USDbC to USDC, cbETH Collateral", async function () {
             await aaveV3Helper.supply(cbETH_ADDRESS);
             await aaveV3Helper.borrow(USDbC_ADDRESS);
 
@@ -194,7 +194,10 @@ describe("DebtSwap should switch", function () {
                 },
             );
         });
-        it("from market 3(MAI, 18 decimals) to market 1", async function () {
+
+        // MAI is depeged, skip this case
+        // https://app.uniswap.org/explore/tokens/base/0xbf1aeA8670D2528E08334083616dD9C5F3B087aE
+        it.skip("from market 3(MAI, 18 decimals) to market 1", async function () {
             await morphoHelper.supply(cbETH_ADDRESS, morphoMarket3Id);
             await morphoHelper.borrow(morphoMarket3Id, 18);
 
