@@ -270,7 +270,7 @@ contract DebtSwap is Ownable, ReentrancyGuard {
         require(IERC20(dstAsset).balanceOf(address(this)) >= minAmountOut, "Insufficient token balance after swap");
 
         //remove approval
-        IERC20(srcAsset).approve(paraswapTokenTransferProxy, 0);
+        TransferHelper.safeApprove(srcAsset, paraswapTokenTransferProxy, 0);
     }
 
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {

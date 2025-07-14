@@ -10,8 +10,9 @@ import "../dependencies/TransferHelper.sol";
 import {SharesMathLib} from "../dependencies/morpho/SharesMathLib.sol";
 import "./BaseProtocolHandler.sol";
 import "../ProtocolRegistry.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract MorphoHandler is BaseProtocolHandler {
+contract MorphoHandler is BaseProtocolHandler, ReentrancyGuard {
     using MarketParamsLib for MarketParams;
     using GPv2SafeERC20 for IERC20;
     using SharesMathLib for uint256;
@@ -44,7 +45,7 @@ contract MorphoHandler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool nonReentrant {
         switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
         switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
@@ -69,6 +70,7 @@ contract MorphoHandler is BaseProtocolHandler {
         TransferHelper.safeApprove(fromAsset, address(morpho), amount);
         morpho.repay(marketParams, 0, borrowShares, onBehalfOf, "");
         morpho.withdrawCollateral(marketParams, collateralAssets[0].amount, onBehalfOf, address(this));
+        TransferHelper.safeApprove(fromAsset, address(morpho), 0);
     }
 
     function switchTo(
@@ -99,18 +101,20 @@ contract MorphoHandler is BaseProtocolHandler {
         morpho.supplyCollateral(marketParams, currentBalance, onBehalfOf, "");
 
         morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
+        TransferHelper.safeApprove(marketParams.collateralToken, address(morpho), 0);
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override onlyUniswapV3Pool {
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
 
         TransferHelper.safeApprove(asset, address(morpho), amount);
         morpho.supplyCollateral(marketParams, amount, onBehalfOf, "");
+        TransferHelper.safeApprove(asset, address(morpho), 0);
     }
 
-    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override onlyUniswapV3Pool {
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
@@ -118,12 +122,13 @@ contract MorphoHandler is BaseProtocolHandler {
         morpho.borrow(marketParams, amount, 0, onBehalfOf, address(this));
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public onlyUniswapV3Pool {
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         (MarketParams memory marketParams, ) = abi.decode(extraData, (MarketParams, uint256));
 
         TransferHelper.safeApprove(asset, address(morpho), amount);
         morpho.repay(marketParams, amount, 0, onBehalfOf, "");
+        TransferHelper.safeApprove(asset, address(morpho), 0);
     }
 }

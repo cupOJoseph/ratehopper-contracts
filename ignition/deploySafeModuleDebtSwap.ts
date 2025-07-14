@@ -2,7 +2,7 @@ import hre from "hardhat";
 import { ethers } from "hardhat";
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 import { getCTokenMappingArrays, getMTokenMappingArrays } from "../contractAddresses";
-import { PARASWAP_ROUTER_ADDRESS, PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, UNISWAP_V3_FACTORY_ADRESS } from "./constants";
+import { PARASWAP_V6_CONTRACT_ADDRESS, UNISWAP_V3_FACTORY_ADRESS } from "./constants";
 
 const PAUSER_ADDRESS = "0x9E073c36F63BF1c611026fdA1fF6007A81932231";
 const FLUID_VAULT_RESOLVER = "0x79B3102173EB84E6BCa182C7440AfCa5A41aBcF8";
@@ -89,7 +89,7 @@ async function main() {
         await safeModuleDebtSwap.waitForDeployment();
         console.log(`SafeModuleDebtSwap deployed to: ${await safeModuleDebtSwap.getAddress()}`);
 
-        safeModuleDebtSwap.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+        safeModuleDebtSwap.setParaswapAddresses(PARASWAP_V6_CONTRACT_ADDRESS, PARASWAP_V6_CONTRACT_ADDRESS);
     } catch (error) {
         console.error("Deployment error:", error);
     }

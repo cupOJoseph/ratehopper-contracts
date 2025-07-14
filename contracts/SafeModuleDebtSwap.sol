@@ -299,7 +299,7 @@ contract SafeModuleDebtSwap is Ownable, ReentrancyGuard, Pausable {
         require(IERC20(dstAsset).balanceOf(address(this)) >= minAmountOut, "Insufficient token balance after swap");
 
         //remove approval
-        IERC20(srcAsset).approve(paraswapTokenTransferProxy, 0);
+        TransferHelper.safeApprove(srcAsset, paraswapTokenTransferProxy, 0);
     }
 
 

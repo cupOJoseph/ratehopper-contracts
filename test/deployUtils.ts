@@ -8,14 +8,15 @@ import {
     DAI_ADDRESS,
     EURC_ADDRESS,
     MAI_ADDRESS,
-    PARASWAP_ROUTER_ADDRESS,
-    PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS,
+    PARASWAP_V6_CONTRACT_ADDRESS,
     Protocols,
+    sUSDS_ADDRESS,
     UNISWAP_V3_FACTORY_ADRESS,
     USDbC_ADDRESS,
     USDC_ADDRESS,
     USDS_ADDRESS,
     WETH_ADDRESS,
+    wstETH_ADDRESS,
 } from "./constants";
 import { MORPHO_ADDRESS } from "./protocols/morpho";
 import { COMPTROLLER_ADDRESS, mcbETH, mDAI, mUSDC } from "./protocols/moonwell";
@@ -101,6 +102,8 @@ export async function deployHandlers() {
         cbETH_ADDRESS,
         USDS_ADDRESS,
         EURC_ADDRESS,
+        sUSDS_ADDRESS,
+        wstETH_ADDRESS,
     ];
 
     const registryWhitelistTx = await protocolRegistry.addToWhitelistBatch(whitelistTokens);
@@ -130,7 +133,7 @@ export async function deployDebtSwapContractWithMaliciousHandlerFixture() {
     );
     console.log("DebtSwapMalicious deployed to:", await debtSwapMalicious.getAddress());
 
-    debtSwapMalicious.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+    debtSwapMalicious.setParaswapAddresses(PARASWAP_V6_CONTRACT_ADDRESS, PARASWAP_V6_CONTRACT_ADDRESS);
 
     return debtSwapMalicious;
 }
@@ -150,7 +153,7 @@ export async function deployDebtSwapContractFixture() {
     await debtSwap.waitForDeployment();
     console.log("DebtSwap deployed to:", await debtSwap.getAddress());
 
-    await debtSwap.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+    await debtSwap.setParaswapAddresses(PARASWAP_V6_CONTRACT_ADDRESS, PARASWAP_V6_CONTRACT_ADDRESS);
 
     return debtSwap;
 }
@@ -177,7 +180,7 @@ export async function deployLeveragedPositionContractFixture() {
 
     console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
 
-    await leveragedPosition.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+    await leveragedPosition.setParaswapAddresses(PARASWAP_V6_CONTRACT_ADDRESS, PARASWAP_V6_CONTRACT_ADDRESS);
 
     return leveragedPosition;
 }
@@ -203,7 +206,7 @@ export async function deploySafeContractFixture() {
 
     console.log("SafeModule deployed to:", await safeModule.getAddress());
 
-    await safeModule.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+    await safeModule.setParaswapAddresses(PARASWAP_V6_CONTRACT_ADDRESS, PARASWAP_V6_CONTRACT_ADDRESS);
 
     return safeModule;
 }

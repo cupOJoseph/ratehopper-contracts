@@ -21,6 +21,8 @@ export const FLUID_cbETH_USDC_VAULT = "0x40d9b8417e6e1dcd358f04e3328bced061018a8
 export const FLUID_cbBTC_sUSDS_VAULT = "0xf2c8f54447cbd591c396b0dd7ac15faf552d0fa4";
 export const FLUID_cbBTC_USDC_VAULT = "0x4045720a33193b4fe66c94dfbc8d37b0b4d9b469";
 export const FLUID_cbETH_EURC_VAULT = "0xf55b8e9f0c51ace009f4b41d03321675d4c643b3";
+export const FLUID_wstETH_USDC_VAULT = "0xbec491fef7b4f666b270f9d5e5c3f443cbf20991";
+export const FLUID_wstETH_sUSDS_VAULT = "0xbc345229c1b52e4c30530c614bb487323ba38da5";
 
 export const fluidVaultMap = new Map<string, string>([
     // https://fluid.instadapp.io/vaults/8453/6
@@ -55,8 +57,7 @@ export class FluidHelper {
         return positions[0][positionIndex];
     }
 
-    async getDebtAmount(tokenAddress: string, userAddress?: string): Promise<bigint> {
-        const vaultAddress = fluidVaultMap.get(tokenAddress)!;
+    async getDebtAmount(vaultAddress: string, userAddress?: string): Promise<bigint> {
         const position = await this.getPosition(vaultAddress, userAddress || TEST_ADDRESS);
         if (!position) return BigInt(0);
 

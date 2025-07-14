@@ -7,8 +7,9 @@ import {ProtocolRegistry} from "../ProtocolRegistry.sol";
 import {CollateralAsset} from "../Types.sol";
 import "../dependencies/TransferHelper.sol";
 import "./BaseProtocolHandler.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract CompoundHandler is BaseProtocolHandler {
+contract CompoundHandler is BaseProtocolHandler, ReentrancyGuard {
     ProtocolRegistry public immutable registry;
     
     constructor(address _registry, address _uniswapV3Factory) BaseProtocolHandler(_uniswapV3Factory) {
@@ -40,7 +41,7 @@ contract CompoundHandler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool nonReentrant {
         switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
         switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
@@ -61,6 +62,7 @@ contract CompoundHandler is BaseProtocolHandler {
 
         TransferHelper.safeApprove(fromAsset, address(cContract), amount);
         fromComet.supplyTo(onBehalfOf, fromAsset, amount);
+        TransferHelper.safeApprove(fromAsset, address(cContract), 0);
 
         _validateCollateralAssets(collateralAssets);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
@@ -95,6 +97,7 @@ contract CompoundHandler is BaseProtocolHandler {
 
             // supply collateral
             toComet.supplyTo(onBehalfOf, collateralAssets[i].asset, currentBalance);
+            TransferHelper.safeApprove(collateralAssets[i].asset, address(cContract), 0);
         }
 
         // borrow
@@ -106,7 +109,7 @@ contract CompoundHandler is BaseProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         bytes calldata  extraData
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         address cContract = abi.decode(extraData, (address));
@@ -115,6 +118,7 @@ contract CompoundHandler is BaseProtocolHandler {
         TransferHelper.safeApprove(asset, address(cContract), amount);
         // supply collateral
         IComet(cContract).supplyTo(onBehalfOf, asset, amount);
+        TransferHelper.safeApprove(asset, address(cContract), 0);
     }
 
     function borrow(
@@ -122,7 +126,7 @@ contract CompoundHandler is BaseProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         bytes calldata extraData
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         address cContract = getCContract(asset);
@@ -137,7 +141,7 @@ contract CompoundHandler is BaseProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         bytes calldata /* extraData */
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         address cContract = getCContract(asset);
@@ -146,5 +150,6 @@ contract CompoundHandler is BaseProtocolHandler {
         TransferHelper.safeApprove(asset, address(cContract), amount);
         IComet toComet = IComet(cContract);
         toComet.supplyTo(onBehalfOf, asset, amount);
+        TransferHelper.safeApprove(asset, address(cContract), 0);
     }
 }

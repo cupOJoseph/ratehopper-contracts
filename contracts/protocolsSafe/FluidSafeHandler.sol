@@ -13,8 +13,9 @@ import "../interfaces/IProtocolHandler.sol";
 import {Structs} from "../dependencies/fluid/structs.sol";
 import "../protocols/BaseProtocolHandler.sol";
 import "../ProtocolRegistry.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract FluidSafeHandler is BaseProtocolHandler {
+contract FluidSafeHandler is BaseProtocolHandler, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
 
     address public immutable FLUID_VAULT_RESOLVER;
@@ -55,7 +56,7 @@ contract FluidSafeHandler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
-    ) external override onlyUniswapV3Pool {        
+    ) external override onlyUniswapV3Pool nonReentrant {        
         switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
         switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
@@ -161,7 +162,7 @@ contract FluidSafeHandler is BaseProtocolHandler {
         require(successBorrow, "Fluid borrow failed");
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override onlyUniswapV3Pool {
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
@@ -198,7 +199,7 @@ contract FluidSafeHandler is BaseProtocolHandler {
         require(successRepay, "Repay failed");
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external onlyUniswapV3Pool {
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
@@ -221,7 +222,7 @@ contract FluidSafeHandler is BaseProtocolHandler {
         require(successSupply, "Fluid supply failed");
     }
 
-    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external onlyUniswapV3Pool {
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));

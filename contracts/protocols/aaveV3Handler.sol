@@ -9,8 +9,9 @@ import {IAaveProtocolDataProvider} from "../interfaces/aaveV3/IAaveProtocolDataP
 import "../dependencies/TransferHelper.sol";
 import "./BaseProtocolHandler.sol";
 import "../ProtocolRegistry.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract AaveV3Handler is BaseProtocolHandler {
+contract AaveV3Handler is BaseProtocolHandler, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
 
     IPoolV3 public immutable aaveV3Pool;
@@ -43,9 +44,12 @@ contract AaveV3Handler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
-    ) external override onlyUniswapV3Pool {
-        repay(address(fromAsset), amount, onBehalfOf, fromExtraData);
+    ) external override onlyUniswapV3Pool nonReentrant {
+        TransferHelper.safeApprove(fromAsset, address(aaveV3Pool), amount);
+        aaveV3Pool.repay(fromAsset, amount, 2, onBehalfOf);
+
         aaveV3Pool.borrow(address(toAsset), amountTotal, 2, 0, onBehalfOf);
+        TransferHelper.safeApprove(fromAsset, address(aaveV3Pool), 0);
     }
 
     function switchFrom(
@@ -54,11 +58,13 @@ contract AaveV3Handler is BaseProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool nonReentrant {
         _validateCollateralAssets(collateralAssets);
         require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
 
-        repay(address(fromAsset), amount, onBehalfOf, extraData);
+        TransferHelper.safeApprove(fromAsset, address(aaveV3Pool), amount);
+        aaveV3Pool.repay(fromAsset, amount, 2, onBehalfOf);
+        TransferHelper.safeApprove(fromAsset, address(aaveV3Pool), 0);
 
         for (uint256 i = 0; i < collateralAssets.length; i++) {
             require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
@@ -77,7 +83,7 @@ contract AaveV3Handler is BaseProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool nonReentrant {
         _validateCollateralAssets(collateralAssets);
         
         require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
@@ -99,22 +105,24 @@ contract AaveV3Handler is BaseProtocolHandler {
 
             TransferHelper.safeApprove(collateralAssets[i].asset, address(aaveV3Pool), currentBalance);
             aaveV3Pool.supply(collateralAssets[i].asset, currentBalance, onBehalfOf, 0);
+            IERC20(collateralAssets[i].asset).approve(address(aaveV3Pool), 0);
         }
         
         aaveV3Pool.borrow(toAsset, amount, 2, 0, onBehalfOf);
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override onlyUniswapV3Pool {
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override onlyUniswapV3Pool nonReentrant {
         TransferHelper.safeApprove(asset, address(aaveV3Pool), amount);
         aaveV3Pool.supply(asset, amount, onBehalfOf, 0);
     }
 
-    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override onlyUniswapV3Pool {
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external override onlyUniswapV3Pool nonReentrant {
         aaveV3Pool.borrow(asset, amount, 2, 0, onBehalfOf);
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public onlyUniswapV3Pool {
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public onlyUniswapV3Pool nonReentrant {
         TransferHelper.safeApprove(asset, address(aaveV3Pool), amount);
         aaveV3Pool.repay(asset, amount, 2, onBehalfOf);
+        TransferHelper.safeApprove(asset, address(aaveV3Pool), 0);
     }
 }

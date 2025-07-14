@@ -9,8 +9,9 @@ import "../Types.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import {ProtocolRegistry} from "../ProtocolRegistry.sol";
 import "../protocols/BaseProtocolHandler.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract MoonwellHandler is BaseProtocolHandler {
+contract MoonwellHandler is BaseProtocolHandler, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
 
     address public immutable COMPTROLLER;
@@ -47,7 +48,7 @@ contract MoonwellHandler is BaseProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* fromExtraData */,
         bytes calldata /* toExtraData */
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
         require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
 
@@ -86,7 +87,7 @@ contract MoonwellHandler is BaseProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
         _validateCollateralAssets(collateralAssets);
    
@@ -134,7 +135,7 @@ contract MoonwellHandler is BaseProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) external override onlyUniswapV3Pool {
+    ) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
         _validateCollateralAssets(collateralAssets);
 
@@ -203,7 +204,7 @@ contract MoonwellHandler is BaseProtocolHandler {
         require(successTransfer, "Transfer transaction failed");
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external onlyUniswapV3Pool {
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         address mContract = getMContract(asset);
@@ -242,7 +243,7 @@ contract MoonwellHandler is BaseProtocolHandler {
         require(successEnterMarkets, "Enter markets transaction failed");
     }
 
-    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external onlyUniswapV3Pool {
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         address mContract = getMContract(asset);
@@ -267,7 +268,7 @@ contract MoonwellHandler is BaseProtocolHandler {
         require(successTransfer, "Transfer transaction failed");
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) public override onlyUniswapV3Pool {
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) public override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
         address mContract = getMContract(asset);

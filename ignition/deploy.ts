@@ -1,7 +1,7 @@
 import hre from "hardhat";
 import { ethers } from "hardhat";
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
-import { PARASWAP_ROUTER_ADDRESS, PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, UNISWAP_V3_FACTORY_ADRESS } from "./constants";
+import { PARASWAP_V6_CONTRACT_ADDRESS, UNISWAP_V3_FACTORY_ADRESS } from "./constants";
 import { getCTokenMappingArrays, getMTokenMappingArrays } from "../contractAddresses";
 
 // Define constants directly in this file to avoid importing from test files
@@ -152,7 +152,7 @@ async function main() {
 
         console.log(`DebtSwap deployed to: ${await debtSwap.getAddress()}`);
 
-        await debtSwap.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+        await debtSwap.setParaswapAddresses(PARASWAP_V6_CONTRACT_ADDRESS, PARASWAP_V6_CONTRACT_ADDRESS);
         console.log("Paraswap addresses set");
     } catch (error) {
         console.error("Deployment error:", error);
