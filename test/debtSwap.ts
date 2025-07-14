@@ -83,7 +83,7 @@ describe("DebtSwap should switch", function () {
             );
         });
 
-        it.only("from USDbC to USDC, cbETH Collateral", async function () {
+        it("from USDbC to USDC, cbETH Collateral", async function () {
             await aaveV3Helper.supply(cbETH_ADDRESS);
             await aaveV3Helper.borrow(USDbC_ADDRESS);
 
