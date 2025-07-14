@@ -1,11 +1,8 @@
-import { zeroAddress } from "viem";
 import { ethers } from "hardhat";
-import { MaxInt256, ZeroAddress } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
 import Safe, { Eip1193Provider, RequestArguments } from "@safe-global/protocol-kit";
 import {
-    AAVE_V3_POOL_ADDRESS,
     cbBTC_ADDRESS,
     cbETH_ADDRESS,
     DAI_ADDRESS,
@@ -19,26 +16,17 @@ import {
     USDbC_ADDRESS,
     USDC_ADDRESS,
     USDC_hyUSD_POOL,
-    WETH_ADDRESS,
 } from "./constants";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import cometAbi from "../externalAbi/compound/comet.json";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 import { MaxUint256 } from "ethers";
-
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
-import { approve, formatAmount, fundETH, getDecimals, getParaswapData, protocolHelperMap } from "./utils";
-import { mcbETH, mContractAddressMap } from "./protocols/moonwell";
-import {
-    FLUID_cbBTC_sUSDS_VAULT,
-    FLUID_cbETH_EURC_VAULT,
-    FLUID_cbETH_USDC_VAULT,
-    FluidHelper,
-} from "./protocols/fluid";
-import { cometAddressMap, USDC_COMET_ADDRESS } from "./protocols/compound";
-import { marketParamsMap, MORPHO_ADDRESS, morphoMarket1Id, morphoMarket2Id } from "./protocols/morpho";
-
+import { fundETH, getDecimals, getParaswapData, protocolHelperMap } from "./utils";
+import { FLUID_cbETH_EURC_VAULT, FLUID_cbETH_USDC_VAULT, FluidHelper } from "./protocols/fluid";
+import { cometAddressMap } from "./protocols/compound";
+import { MORPHO_ADDRESS, morphoMarket1Id, morphoMarket2Id } from "./protocols/morpho";
 import FluidVaultAbi from "../externalAbi/fluid/fluidVaultT1.json";
 import aaveDebtTokenJson from "../externalAbi/aaveV3/aaveDebtToken.json";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
@@ -79,10 +67,7 @@ describe("Safe wallet should debtSwap", function () {
     });
 
     async function enableSafeModule() {
-        const enableModuleTx = await safeWallet.createEnableModuleTx(
-            safeModuleAddress,
-            // options // Optional
-        );
+        const enableModuleTx = await safeWallet.createEnableModuleTx(safeModuleAddress);
         const safeTxHash = await safeWallet.executeTransaction(enableModuleTx);
         console.log("Safe enable module transaction");
 
@@ -95,7 +80,6 @@ describe("Safe wallet should debtSwap", function () {
             global.gc();
         }
 
-        // Small delay to allow cleanup
         await new Promise((resolve) => setTimeout(resolve, 100));
     });
 
@@ -103,16 +87,12 @@ describe("Safe wallet should debtSwap", function () {
         const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, signer);
         const tx = await cbETHContract.transfer(safeAddress, ethers.parseEther("0.001"));
         await tx.wait();
-        // const balance = await cbETHContract.balanceOf(safeAddress);
-        // console.log(`Balance:`, ethers.formatEther(balance), "cbETH");
     }
 
     async function supplyAndBorrow(protocol: Protocols, debtTokenAddress = USDC_ADDRESS) {
         await sendCollateralToSafe();
         const Helper = protocolHelperMap.get(protocol)!;
         const helper = new Helper(signer);
-
-        const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, signer);
 
         const protocolCallData = await helper.getSupplyAndBorrowTxdata(debtTokenAddress);
 
@@ -407,38 +387,6 @@ describe("Safe wallet should debtSwap", function () {
         ).to.be.revertedWith("Invalid flashloan pool address");
     });
 
-    // it.only("Should setProtocolHandler and revert when calling executeDebtSwap with wrong handler address", async function () {
-    //     const safeModuleAddress = await safeModuleContract.getAddress();
-    //     const [_, wallet2, wallet3] = await ethers.getSigners();
-    //     const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
-
-    //     await safeModule.setProtocolHandler(Protocols.AAVE_V3, WETH_ADDRESS);
-    //     const handlerAddress = await safeModule.getHandler(Protocols.AAVE_V3);
-    //     console.log(handlerAddress);
-
-    //     await supplyAndBorrow(Protocols.MOONWELL);
-    //     await expect(
-    //         executeDebtSwap(
-    //             USDC_hyUSD_POOL,
-    //             USDC_ADDRESS,
-    //             USDC_ADDRESS,
-    //             Protocols.MOONWELL,
-    //             Protocols.AAVE_V3,
-    //             cbETH_ADDRESS,
-    //         ),
-    //     ).to.be.reverted;
-    // });
-
-    // it("Should revert setProtocolHandler() by non-owner", async function () {
-    //     const safeModuleAddress = await safeModuleContract.getAddress();
-    //     const [_, wallet2, wallet3] = await ethers.getSigners();
-    //     const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress, wallet3);
-
-    //     await expect(safeModule.setProtocolHandler(Protocols.MORPHO, WETH_ADDRESS)).to.be.revertedWith(
-    //         "Ownable: caller is not the owner",
-    //     );
-    // });
-
     async function executeDebtSwap(
         flashloanPool: string,
         fromTokenAddress: string,
@@ -589,10 +537,9 @@ describe("Safe wallet should debtSwap", function () {
                 console.log("Safe transaction: Compound allow");
                 break;
             case Protocols.MORPHO:
-                // TODO: refactor this
-                if (fromProtocol != Protocols.MORPHO) {
-                    await morphoAuthorizeTxBySafe();
-                }
+                // If fromProtocol is not Morpho, authorize Morpho
+                const shouldAuthorizeMorpho = fromProtocol !== Protocols.MORPHO;
+                if (shouldAuthorizeMorpho) await morphoAuthorizeTxBySafe();
 
                 const borrowShares = await toHelper.getBorrowShares(options!.morphoToMarketId!, safeAddress);
 
