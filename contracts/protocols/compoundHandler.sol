@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IProtocolHandler} from "../interfaces/IProtocolHandler.sol";
 import {IComet} from "../interfaces/compound/IComet.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import {ProtocolRegistry} from "../ProtocolRegistry.sol";
 import {CollateralAsset} from "../Types.sol";
 import "../dependencies/TransferHelper.sol";
+import "./BaseProtocolHandler.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract CompoundHandler is IProtocolHandler {
-    ProtocolRegistry public immutable REGISTRY;
-
-    constructor(address _registry) {
-        REGISTRY = ProtocolRegistry(_registry);
+contract CompoundHandler is BaseProtocolHandler, ReentrancyGuard {
+    ProtocolRegistry public immutable registry;
+    
+    constructor(address _registry, address _uniswapV3Factory) BaseProtocolHandler(_uniswapV3Factory) {
+        registry = ProtocolRegistry(_registry);
     }
 
     function getCContract(address token) internal view returns (address) {
-        return REGISTRY.getCContract(token);
+        return registry.getCContract(token);
     }
 
     function getDebtAmount(
@@ -40,7 +41,7 @@ contract CompoundHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
-    ) external override {
+    ) external override onlyUniswapV3Pool nonReentrant {
         switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
         switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
@@ -51,7 +52,9 @@ contract CompoundHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) public override {
+    ) public override onlyUniswapV3Pool {       
+        require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
+ 
         address cContract = getCContract(fromAsset);
         require(cContract != address(0), "Token not registered");
 
@@ -59,10 +62,11 @@ contract CompoundHandler is IProtocolHandler {
 
         TransferHelper.safeApprove(fromAsset, address(cContract), amount);
         fromComet.supplyTo(onBehalfOf, fromAsset, amount);
+        TransferHelper.safeApprove(fromAsset, address(cContract), 0);
 
-        // withdraw collateral
+        _validateCollateralAssets(collateralAssets);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
-            require(collateralAssets[i].amount > 0, "Invalid collateral amount");
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
             fromComet.withdrawFrom(onBehalfOf, address(this), collateralAssets[i].asset, collateralAssets[i].amount);
         }
     }
@@ -73,17 +77,27 @@ contract CompoundHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) public override {
+    ) public override onlyUniswapV3Pool {        
+        require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
+        
         address cContract = getCContract(toAsset);
         require(cContract != address(0), "Token not registered");
 
         IComet toComet = IComet(cContract);
+        
+        _validateCollateralAssets(collateralAssets);
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
+            require(
+                currentBalance < (collateralAssets[i].amount * 101) / 100,
+                "Current balance is more than collateral amount + buffer"
+            );
             TransferHelper.safeApprove(collateralAssets[i].asset, address(cContract), currentBalance);
 
             // supply collateral
             toComet.supplyTo(onBehalfOf, collateralAssets[i].asset, currentBalance);
+            TransferHelper.safeApprove(collateralAssets[i].asset, address(cContract), 0);
         }
 
         // borrow
@@ -94,22 +108,27 @@ contract CompoundHandler is IProtocolHandler {
         address asset,
         uint256 amount,
         address onBehalfOf,
-        bytes calldata /* extraData */
-    ) external override {
-        address cContract = getCContract(asset);
-        require(cContract != address(0), "Token not registered");
+        bytes calldata  extraData
+    ) external override onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
+        address cContract = abi.decode(extraData, (address));
+        require(cContract != address(0), "Invalid comet address");
 
         TransferHelper.safeApprove(asset, address(cContract), amount);
         // supply collateral
         IComet(cContract).supplyTo(onBehalfOf, asset, amount);
+        TransferHelper.safeApprove(asset, address(cContract), 0);
     }
 
     function borrow(
         address asset,
         uint256 amount,
         address onBehalfOf,
-        bytes calldata /* extraData */
-    ) external override {
+        bytes calldata extraData
+    ) external override onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         address cContract = getCContract(asset);
         require(cContract != address(0), "Token not registered");
 
@@ -122,12 +141,15 @@ contract CompoundHandler is IProtocolHandler {
         uint256 amount,
         address onBehalfOf,
         bytes calldata /* extraData */
-    ) external override {
+    ) external override onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         address cContract = getCContract(asset);
         require(cContract != address(0), "Token not registered");
 
         TransferHelper.safeApprove(asset, address(cContract), amount);
         IComet toComet = IComet(cContract);
         toComet.supplyTo(onBehalfOf, asset, amount);
+        TransferHelper.safeApprove(asset, address(cContract), 0);
     }
 }

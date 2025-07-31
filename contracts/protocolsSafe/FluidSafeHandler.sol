@@ -11,14 +11,19 @@ import "../interfaces/fluid/IFluidVault.sol";
 import "../interfaces/fluid/IFluidVaultResolver.sol";
 import "../interfaces/IProtocolHandler.sol";
 import {Structs} from "../dependencies/fluid/structs.sol";
+import "../protocols/BaseProtocolHandler.sol";
+import "../ProtocolRegistry.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract FluidSafeHandler is IProtocolHandler {
+contract FluidSafeHandler is BaseProtocolHandler, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
 
     address public immutable FLUID_VAULT_RESOLVER;
+    ProtocolRegistry public immutable registry;
 
-    constructor(address _fluidVaultResolver) {
+    constructor(address _fluidVaultResolver, address _UNISWAP_V3_FACTORY, address _REGISTRY_ADDRESS) BaseProtocolHandler(_UNISWAP_V3_FACTORY) {
         FLUID_VAULT_RESOLVER = _fluidVaultResolver;
+        registry = ProtocolRegistry(_REGISTRY_ADDRESS);
     }
 
     function getDebtAmount(
@@ -51,7 +56,7 @@ contract FluidSafeHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata fromExtraData,
         bytes calldata toExtraData
-    ) external override {
+    ) external override onlyUniswapV3Pool nonReentrant {        
         switchFrom(fromAsset, amount, onBehalfOf, collateralAssets, fromExtraData);
         switchTo(toAsset, amountTotal, onBehalfOf, collateralAssets, toExtraData);
     }
@@ -62,7 +67,13 @@ contract FluidSafeHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
-    ) public override {
+    ) public override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
+        _validateCollateralAssets(collateralAssets);
+        for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
+        }
+
         (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
         IERC20(fromAsset).transfer(onBehalfOf, amount);
@@ -100,15 +111,28 @@ contract FluidSafeHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata extraData
-    ) public override {
+    ) public override onlyUniswapV3Pool {
+        require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
+        _validateCollateralAssets(collateralAssets);
+        for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
+        }
+
         (address vaultAddress, uint256 nftId) = abi.decode(extraData, (address, uint256));
 
-        IERC20(collateralAssets[0].asset).transfer(onBehalfOf, collateralAssets[0].amount);
+        // use balanceOf() because collateral amount is slightly decreased when switching from Fluid
+        uint256 currentBalance = IERC20(collateralAssets[0].asset).balanceOf(address(this));
+        require(
+                currentBalance < (collateralAssets[0].amount * 101) / 100,
+                "Current balance is more than collateral amount + buffer"
+            );
+
+        IERC20(collateralAssets[0].asset).transfer(onBehalfOf, currentBalance);
 
         bool successApprove = ISafe(onBehalfOf).execTransactionFromModule(
             collateralAssets[0].asset,
             0,
-            abi.encodeCall(IERC20.approve, (address(vaultAddress), collateralAssets[0].amount)),
+            abi.encodeCall(IERC20.approve, (address(vaultAddress), currentBalance)),
             ISafe.Operation.Call
         );
         require(successApprove, "Approval failed");
@@ -116,7 +140,7 @@ contract FluidSafeHandler is IProtocolHandler {
         (bool successSupply, bytes memory returnData) = ISafe(onBehalfOf).execTransactionFromModuleReturnData(
             vaultAddress,
             0,
-            abi.encodeCall(IFluidVault.operate, (nftId, int256(collateralAssets[0].amount), 0, onBehalfOf)),
+            abi.encodeCall(IFluidVault.operate, (nftId, int256(currentBalance), 0, onBehalfOf)),
             ISafe.Operation.Call
         );
         require(successSupply, "Fluid supply failed");
@@ -138,7 +162,9 @@ contract FluidSafeHandler is IProtocolHandler {
         require(successBorrow, "Fluid borrow failed");
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override {
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) public override onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
 
         IERC20(asset).transfer(onBehalfOf, amount);
@@ -173,7 +199,9 @@ contract FluidSafeHandler is IProtocolHandler {
         require(successRepay, "Repay failed");
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
         IERC20(asset).transfer(onBehalfOf, amount);
 
@@ -194,7 +222,9 @@ contract FluidSafeHandler is IProtocolHandler {
         require(successSupply, "Fluid supply failed");
     }
 
-    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external {
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata extraData) external onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         (address vaultAddress, ) = abi.decode(extraData, (address, uint256));
 
         IFluidVaultResolver resolver = IFluidVaultResolver(FLUID_VAULT_RESOLVER);

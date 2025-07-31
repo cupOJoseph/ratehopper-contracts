@@ -9,26 +9,21 @@ describe("SafeModuleDebtSwap Pausable", function () {
     let safeModuleContract: any;
     let owner: any;
     let user: any;
-    let executor: any;
+    let operator: any;
     let pauser: any;
 
     beforeEach(async function () {
         safeModuleContract = await loadFixture(deploySafeContractFixture);
 
-        [owner, user, executor, pauser] = await ethers.getSigners();
+        [owner, user, operator, pauser] = await ethers.getSigners();
 
-        await safeModuleContract.setExecutor(executor.address);
+        await safeModuleContract.setoperator(operator.address);
     });
 
     describe("Pause functionality", function () {
         it("Should allow pauser to pause the contract", async function () {
-            expect(await safeModuleContract.pauser()).to.equal(pauser);
+            expect(await safeModuleContract.pauser()).to.equal(pauser.address);
             expect(await safeModuleContract.paused()).to.equal(false);
-
-            await owner.sendTransaction({
-                to: pauser,
-                value: ethers.parseEther("1.0"),
-            });
 
             await safeModuleContract.connect(pauser).pause();
 
@@ -36,11 +31,6 @@ describe("SafeModuleDebtSwap Pausable", function () {
         });
 
         it("Should allow pauser to unpause the contract", async function () {
-            await owner.sendTransaction({
-                to: pauser,
-                value: ethers.parseEther("1.0"),
-            });
-
             await safeModuleContract.connect(pauser).pause();
             expect(await safeModuleContract.paused()).to.equal(true);
 
@@ -61,11 +51,6 @@ describe("SafeModuleDebtSwap Pausable", function () {
         });
 
         it("Should not allow non-pauser to unpause the contract", async function () {
-            await owner.sendTransaction({
-                to: pauser,
-                value: ethers.parseEther("1.0"),
-            });
-
             await safeModuleContract.connect(pauser).pause();
 
             await expect(safeModuleContract.connect(user).unpause()).to.be.revertedWith(
@@ -80,11 +65,6 @@ describe("SafeModuleDebtSwap Pausable", function () {
 
     describe("Function behavior when paused", function () {
         beforeEach(async function () {
-            await owner.sendTransaction({
-                to: pauser,
-                value: ethers.parseEther("1.0"),
-            });
-
             await safeModuleContract.connect(pauser).pause();
         });
 
@@ -92,7 +72,7 @@ describe("SafeModuleDebtSwap Pausable", function () {
             const mockSafeAddress = owner.address;
             await expect(
                 safeModuleContract
-                    .connect(executor)
+                    .connect(operator)
                     .executeDebtSwap(
                         USDC_hyUSD_POOL,
                         Protocols.AAVE_V3,
@@ -100,13 +80,11 @@ describe("SafeModuleDebtSwap Pausable", function () {
                         USDC_ADDRESS,
                         DAI_ADDRESS,
                         ethers.parseUnits("100", 6),
-                        0,
                         [],
                         mockSafeAddress,
                         ["0x", "0x"],
                         {
-                            tokenTransferProxy: ethers.ZeroAddress,
-                            router: ethers.ZeroAddress,
+                            srcAmount: 0,
                             swapData: "0x",
                         },
                     ),

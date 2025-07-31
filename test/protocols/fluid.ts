@@ -3,11 +3,13 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { Contract, MaxUint256 } from "ethers";
 import fluidAbi from "../../externalAbi/fluid/fluidVaultT1.json";
 import fluidVaultResolverAbi from "../../externalAbi/fluid/fluidVaultResolver.json";
-import { approve, formatAmount } from "../utils";
+import { formatAmount } from "../utils";
+import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import {
     cbBTC_ADDRESS,
     cbETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
+    EURC_ADDRESS,
     sUSDS_ADDRESS,
     TEST_ADDRESS,
     USDbC_ADDRESS,
@@ -16,8 +18,11 @@ import {
 
 export const FLUID_VAULT_RESOLVER = "0x79B3102173EB84E6BCa182C7440AfCa5A41aBcF8";
 export const FLUID_cbETH_USDC_VAULT = "0x40d9b8417e6e1dcd358f04e3328bced061018a82";
-export const FLUID_cbBTC_sUSDS_VAULT = "0xF2c8F54447cbd591C396b0Dd7ac15FAF552d0FA4";
-export const FLUID_cbBTC_USDC_VAULT = "0x4045720a33193b4Fe66c94DFbc8D37B0b4D9B469";
+export const FLUID_cbBTC_sUSDS_VAULT = "0xf2c8f54447cbd591c396b0dd7ac15faf552d0fa4";
+export const FLUID_cbBTC_USDC_VAULT = "0x4045720a33193b4fe66c94dfbc8d37b0b4d9b469";
+export const FLUID_cbETH_EURC_VAULT = "0xf55b8e9f0c51ace009f4b41d03321675d4c643b3";
+export const FLUID_wstETH_USDC_VAULT = "0xbec491fef7b4f666b270f9d5e5c3f443cbf20991";
+export const FLUID_wstETH_sUSDS_VAULT = "0xbc345229c1b52e4c30530c614bb487323ba38da5";
 
 export const fluidVaultMap = new Map<string, string>([
     // https://fluid.instadapp.io/vaults/8453/6
@@ -28,7 +33,15 @@ export const fluidVaultMap = new Map<string, string>([
     [cbETH_ADDRESS, FLUID_cbETH_USDC_VAULT],
     // https://fluid.instadapp.io/vaults/8453/7
     [cbBTC_ADDRESS, FLUID_cbBTC_USDC_VAULT],
+    [EURC_ADDRESS, FLUID_cbETH_EURC_VAULT],
 ]);
+
+async function approve(tokenAddress: string, spenderAddress: string, signer: any) {
+    const token = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+    const approveTx = await token.approve(spenderAddress, MaxUint256);
+    await approveTx.wait();
+    console.log("approve:" + tokenAddress + "token to " + spenderAddress);
+}
 
 export class FluidHelper {
     constructor(private signer: HardhatEthersSigner | any) {}
@@ -44,9 +57,8 @@ export class FluidHelper {
         return positions[0][positionIndex];
     }
 
-    async getDebtAmount(tokenAddress: string, userAddress: string): Promise<bigint> {
-        const vaultAddress = fluidVaultMap.get(tokenAddress)!;
-        const position = await this.getPosition(vaultAddress, userAddress);
+    async getDebtAmount(vaultAddress: string, userAddress?: string): Promise<bigint> {
+        const position = await this.getPosition(vaultAddress, userAddress || TEST_ADDRESS);
         if (!position) return BigInt(0);
 
         const debtAmount = position[10];
@@ -55,17 +67,17 @@ export class FluidHelper {
     }
 
     // INFO: https://docs.fluid.instadapp.io/integrate/vault-user-positions.html
-    async getCollateralAmount(tokenAddress: string, userAddress: string): Promise<bigint> {
+    async getCollateralAmount(tokenAddress: string, userAddress?: string): Promise<bigint> {
         const vaultAddress = fluidVaultMap.get(tokenAddress)!;
-        const position = await this.getPosition(vaultAddress, userAddress);
+        const position = await this.getPosition(vaultAddress, userAddress || TEST_ADDRESS);
         if (!position) return BigInt(0);
         const collateralAmount = position[9];
         console.log("collateralAmount:", collateralAmount + " on vault: " + vaultAddress);
         return collateralAmount;
     }
 
-    async getNftId(vaultAddress: string, userAddress: string): Promise<bigint> {
-        const position = await this.getPosition(vaultAddress, userAddress);
+    async getNftId(vaultAddress: string, userAddress?: string): Promise<bigint> {
+        const position = await this.getPosition(vaultAddress, userAddress || TEST_ADDRESS);
         if (!position) return BigInt(0);
         const nftId = position[0];
         console.log("nftId:", nftId + " on vault: " + vaultAddress);

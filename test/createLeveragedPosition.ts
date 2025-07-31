@@ -23,7 +23,6 @@ import {
     USDC_hyUSD_POOL,
 } from "./constants";
 
-import { MaxUint256 } from "ethers";
 import { AaveV3Helper } from "./protocols/aaveV3";
 import { cometAddressMap, CompoundHelper } from "./protocols/compound";
 import {
@@ -35,7 +34,6 @@ import {
     morphoMarket6Id,
 } from "./protocols/morpho";
 import { deployLeveragedPositionContractFixture } from "./deployUtils";
-import { mcbETH, mContractAddressMap } from "./protocols/moonwell";
 
 describe("Create leveraged position", function () {
     let myContract: LeveragedPosition;
@@ -197,7 +195,8 @@ describe("Create leveraged position", function () {
             await createLeveragedPosition(cbETH_ETH_POOL, Protocols.COMPOUND);
         });
 
-        it("with cbETH collateral and USDbC debt", async function () {
+        // USDbC is no longer available in Compound
+        it.skip("with cbETH collateral and USDbC debt", async function () {
             await createLeveragedPosition(cbETH_ETH_POOL, Protocols.COMPOUND, cbETH_ADDRESS, USDbC_ADDRESS);
         });
 
@@ -251,5 +250,119 @@ describe("Create leveraged position", function () {
                 morphoMarket6Id,
             );
         });
+    });
+
+    describe("Setter Functions", function () {
+        let nonOwnerSigner: HardhatEthersSigner;
+        let ownerSigner: HardhatEthersSigner;
+
+        beforeEach(async function () {
+            // Get a different address for non-owner tests
+            const [owner, nonOwner] = await ethers.getSigners();
+            ownerSigner = owner;
+            nonOwnerSigner = nonOwner;
+
+            // Connect contract with owner for setting tests
+            myContract = await ethers.getContractAt("LeveragedPosition", deployedContractAddress, ownerSigner);
+        });
+
+        describe("setProtocolFee", function () {
+            it("should set valid protocol fee (≤ 100)", async function () {
+                const newFee = 50; // 0.5%
+                await myContract.setProtocolFee(newFee);
+
+                const currentFee = await myContract.protocolFee();
+                expect(currentFee).to.equal(newFee);
+            });
+
+            it("should set protocol fee to maximum allowed value (100)", async function () {
+                const maxFee = 100; // 1%
+                await myContract.setProtocolFee(maxFee);
+
+                const currentFee = await myContract.protocolFee();
+                expect(currentFee).to.equal(maxFee);
+            });
+
+            it("should set protocol fee to minimum value (0)", async function () {
+                const minFee = 0;
+                await myContract.setProtocolFee(minFee);
+
+                const currentFee = await myContract.protocolFee();
+                expect(currentFee).to.equal(minFee);
+            });
+
+            it("should revert when fee is greater than 100", async function () {
+                const invalidFee = 101;
+                await expect(myContract.setProtocolFee(invalidFee)).to.be.revertedWith(
+                    "_fee cannot be greater than 1%",
+                );
+            });
+
+            it("should revert when called by non-owner", async function () {
+                const contractAsNonOwner = await ethers.getContractAt(
+                    "LeveragedPosition",
+                    deployedContractAddress,
+                    nonOwnerSigner,
+                );
+                const newFee = 50;
+
+                await expect(contractAsNonOwner.setProtocolFee(newFee)).to.be.revertedWithCustomError(
+                    myContract,
+                    "OwnableUnauthorizedAccount",
+                );
+            });
+        });
+
+        describe("setFeeBeneficiary", function () {
+            it("should set valid fee beneficiary address", async function () {
+                const newBeneficiary = nonOwnerSigner.address;
+                await myContract.setFeeBeneficiary(newBeneficiary);
+
+                const currentBeneficiary = await myContract.feeBeneficiary();
+                expect(currentBeneficiary).to.equal(newBeneficiary);
+            });
+
+            it("should revert when beneficiary is zero address", async function () {
+                const zeroAddress = ethers.ZeroAddress;
+                await expect(myContract.setFeeBeneficiary(zeroAddress)).to.be.revertedWith(
+                    "_feeBeneficiary cannot be zero address",
+                );
+            });
+
+            it("should revert when called by non-owner", async function () {
+                const contractAsNonOwner = await ethers.getContractAt(
+                    "LeveragedPosition",
+                    deployedContractAddress,
+                    nonOwnerSigner,
+                );
+                const newBeneficiary = ownerSigner.address;
+
+                await expect(contractAsNonOwner.setFeeBeneficiary(newBeneficiary)).to.be.revertedWithCustomError(
+                    myContract,
+                    "OwnableUnauthorizedAccount",
+                );
+            });
+
+            it("should allow owner to change beneficiary multiple times", async function () {
+                const firstBeneficiary = nonOwnerSigner.address;
+                const secondBeneficiary = ownerSigner.address;
+
+                // Set first beneficiary
+                await myContract.setFeeBeneficiary(firstBeneficiary);
+                let currentBeneficiary = await myContract.feeBeneficiary();
+                expect(currentBeneficiary).to.equal(firstBeneficiary);
+
+                // Change to second beneficiary
+                await myContract.setFeeBeneficiary(secondBeneficiary);
+                currentBeneficiary = await myContract.feeBeneficiary();
+                expect(currentBeneficiary).to.equal(secondBeneficiary);
+            });
+        });
+    });
+
+    it("revert if flashloan pool is not uniswap v3 pool", async function () {
+        await expect(
+            createLeveragedPosition(USDC_ADDRESS, Protocols.MORPHO, USDC_ADDRESS, WETH_ADDRESS, 1, 2, morphoMarket6Id),
+        ).to.be.revertedWith("Invalid flashloan pool address");
     });
 });

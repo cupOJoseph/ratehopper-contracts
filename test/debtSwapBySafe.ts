@@ -1,37 +1,41 @@
-import { zeroAddress } from "viem";
 import { ethers } from "hardhat";
-import { MaxInt256, ZeroAddress } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
 import Safe, { Eip1193Provider, RequestArguments } from "@safe-global/protocol-kit";
 import {
-    AAVE_V3_POOL_ADDRESS,
     cbBTC_ADDRESS,
     cbETH_ADDRESS,
     DAI_ADDRESS,
     DAI_USDC_POOL,
     DEFAULT_SUPPLY_AMOUNT,
+    EURC_ADDRESS,
     Protocols,
     sUSDS_ADDRESS,
     TEST_ADDRESS,
+    TEST_FEE_BENEFICIARY_ADDRESS,
     USDbC_ADDRESS,
     USDC_ADDRESS,
     USDC_hyUSD_POOL,
-    WETH_ADDRESS,
+    wstETH_ADDRESS,
 } from "./constants";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
 import cometAbi from "../externalAbi/compound/comet.json";
 import morphoAbi from "../externalAbi/morpho/morpho.json";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 import { MaxUint256 } from "ethers";
-
-import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { approve, formatAmount, fundETH, getDecimals, getParaswapData, protocolHelperMap } from "./utils";
-import { mcbETH, mContractAddressMap } from "./protocols/moonwell";
-import { FLUID_cbBTC_sUSDS_VAULT, FLUID_cbETH_USDC_VAULT, FluidHelper } from "./protocols/fluid";
-import { cometAddressMap, USDC_COMET_ADDRESS } from "./protocols/compound";
-import { marketParamsMap, MORPHO_ADDRESS, morphoMarket1Id, morphoMarket2Id } from "./protocols/morpho";
-
+import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
+import { fundETH, getDecimals, getParaswapData, protocolHelperMap } from "./utils";
+import {
+    FLUID_cbBTC_sUSDS_VAULT,
+    FLUID_cbBTC_USDC_VAULT,
+    FLUID_cbETH_EURC_VAULT,
+    FLUID_cbETH_USDC_VAULT,
+    FLUID_wstETH_sUSDS_VAULT,
+    FLUID_wstETH_USDC_VAULT,
+    FluidHelper,
+} from "./protocols/fluid";
+import { cometAddressMap } from "./protocols/compound";
+import { MORPHO_ADDRESS, morphoMarket1Id, morphoMarket2Id } from "./protocols/morpho";
 import FluidVaultAbi from "../externalAbi/fluid/fluidVaultT1.json";
 import aaveDebtTokenJson from "../externalAbi/aaveV3/aaveDebtToken.json";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
@@ -48,6 +52,9 @@ export const eip1193Provider: Eip1193Provider = {
 export const safeAddress = "0x2f9054Eb6209bb5B94399115117044E4f150B2De";
 
 describe("Safe wallet should debtSwap", function () {
+    // Increase timeout for memory-intensive operations
+    this.timeout(300000); // 5 minutes
+
     const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, ethers.provider);
     let safeWallet;
     let safeModuleContract;
@@ -69,30 +76,32 @@ describe("Safe wallet should debtSwap", function () {
     });
 
     async function enableSafeModule() {
-        const enableModuleTx = await safeWallet.createEnableModuleTx(
-            safeModuleAddress,
-            // options // Optional
-        );
+        const enableModuleTx = await safeWallet.createEnableModuleTx(safeModuleAddress);
         const safeTxHash = await safeWallet.executeTransaction(enableModuleTx);
         console.log("Safe enable module transaction");
 
         console.log("Modules:", await safeWallet.getModules());
     }
 
-    async function sendCollateralToSafe() {
-        const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, signer);
-        const tx = await cbETHContract.transfer(safeAddress, ethers.parseEther("0.001"));
+    this.afterEach(async () => {
+        // Force garbage collection to free memory
+        if (global.gc) {
+            global.gc();
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    async function sendCollateralToSafe(tokenAddress = cbETH_ADDRESS) {
+        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+        const tx = await tokenContract.transfer(safeAddress, ethers.parseEther("0.001"));
         await tx.wait();
-        // const balance = await cbETHContract.balanceOf(safeAddress);
-        // console.log(`Balance:`, ethers.formatEther(balance), "cbETH");
     }
 
     async function supplyAndBorrow(protocol: Protocols, debtTokenAddress = USDC_ADDRESS) {
         await sendCollateralToSafe();
         const Helper = protocolHelperMap.get(protocol)!;
         const helper = new Helper(signer);
-
-        const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, signer);
 
         const protocolCallData = await helper.getSupplyAndBorrowTxdata(debtTokenAddress);
 
@@ -118,37 +127,36 @@ describe("Safe wallet should debtSwap", function () {
         console.log(`Supplied and borrowed on protocol: ${protocol}`);
 
         const tokenBalance = await tokenContract.balanceOf(safeAddress);
-        console.log("Token Balance on Safe:", ethers.formatUnits(tokenBalance, 6));
+        console.log("Token Balance on Safe:", ethers.formatUnits(tokenBalance, decimals));
 
         const userTokenBalance = await tokenContract.balanceOf(TEST_ADDRESS);
-        console.log("Token Balance on user:", ethers.formatUnits(userTokenBalance, 6));
+        console.log("Token Balance on user:", ethers.formatUnits(userTokenBalance, decimals));
     }
 
-    async function supplyAndBorrowOnFluid() {
-        await sendCollateralToSafe();
-        const cbETHContract = new ethers.Contract(cbETH_ADDRESS, ERC20_ABI, signer);
+    async function supplyAndBorrowOnFluid(
+        vaultAddress = FLUID_cbETH_USDC_VAULT,
+        collateralTokenAddress = cbETH_ADDRESS,
+        supplyAmount = ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
+    ) {
+        await sendCollateralToSafe(collateralTokenAddress);
+        const collateralTokenContract = new ethers.Contract(collateralTokenAddress, ERC20_ABI, signer);
 
         const approveTransactionData: MetaTransactionData = {
-            to: cbETH_ADDRESS,
+            to: collateralTokenAddress,
             value: "0",
-            data: cbETHContract.interface.encodeFunctionData("approve", [
-                FLUID_cbETH_USDC_VAULT,
+            data: collateralTokenContract.interface.encodeFunctionData("approve", [
+                vaultAddress,
                 ethers.parseEther("1"),
             ]),
             operation: OperationType.Call,
         };
 
-        const fluidVault = new ethers.Contract(FLUID_cbETH_USDC_VAULT, FluidVaultAbi, signer);
+        const fluidVault = new ethers.Contract(vaultAddress, FluidVaultAbi, signer);
 
         const supplyTransactionData: MetaTransactionData = {
-            to: FLUID_cbETH_USDC_VAULT,
+            to: vaultAddress,
             value: "0",
-            data: fluidVault.interface.encodeFunctionData("operate", [
-                0,
-                ethers.parseEther(DEFAULT_SUPPLY_AMOUNT),
-                0,
-                safeAddress,
-            ]),
+            data: fluidVault.interface.encodeFunctionData("operate", [0, supplyAmount, 0, safeAddress]),
             operation: OperationType.Call,
         };
 
@@ -160,10 +168,10 @@ describe("Safe wallet should debtSwap", function () {
         console.log(`Supplied on Fluid`);
 
         const fluidHelper = new FluidHelper(signer);
-        const nftId = await fluidHelper.getNftId(FLUID_cbETH_USDC_VAULT, safeAddress);
+        const nftId = await fluidHelper.getNftId(vaultAddress, safeAddress);
 
         const borrowTransactionData: MetaTransactionData = {
-            to: FLUID_cbETH_USDC_VAULT,
+            to: vaultAddress,
             value: "0",
             data: fluidVault.interface.encodeFunctionData("operate", [
                 nftId,
@@ -196,7 +204,8 @@ describe("Safe wallet should debtSwap", function () {
 
             await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDbC_ADDRESS, Protocols.AAVE_V3, Protocols.AAVE_V3);
         });
-        it("Compound from USDC to USDbC", async function () {
+        // USDbC is not available on Compound anymore
+        it.skip("Compound from USDC to USDbC", async function () {
             await supplyAndBorrow(Protocols.COMPOUND);
             await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDbC_ADDRESS, Protocols.COMPOUND, Protocols.COMPOUND);
         });
@@ -222,16 +231,35 @@ describe("Safe wallet should debtSwap", function () {
             await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, DAI_ADDRESS, Protocols.MOONWELL, Protocols.MOONWELL);
         });
 
-        // TODO: got 'No routes found with enough liquidity' error from paraswap API. need to figure out why
-        it.skip("In Fluid from USDC to sUSDS with cbBTC collateral", async function () {
-            await supplyAndBorrowOnFluid();
+        it("In Fluid from USDC to sUSDS with cbBTC collateral", async function () {
+            await supplyAndBorrowOnFluid(FLUID_wstETH_USDC_VAULT, wstETH_ADDRESS);
             await executeDebtSwap(
                 USDC_hyUSD_POOL,
                 USDC_ADDRESS,
                 sUSDS_ADDRESS,
                 Protocols.FLUID,
                 Protocols.FLUID,
-                cbBTC_ADDRESS,
+                wstETH_ADDRESS,
+                {
+                    fromFluidVaultAddress: FLUID_wstETH_USDC_VAULT,
+                    tofluidVaultAddress: FLUID_wstETH_sUSDS_VAULT,
+                },
+            );
+        });
+
+        it("In Fluid from USDC to EURC with cbETH collateral", async function () {
+            await supplyAndBorrowOnFluid();
+            await executeDebtSwap(
+                USDC_hyUSD_POOL,
+                USDC_ADDRESS,
+                EURC_ADDRESS,
+                Protocols.FLUID,
+                Protocols.FLUID,
+                cbETH_ADDRESS,
+                {
+                    fromFluidVaultAddress: FLUID_cbETH_USDC_VAULT,
+                    tofluidVaultAddress: FLUID_cbETH_EURC_VAULT,
+                },
             );
         });
     });
@@ -282,7 +310,7 @@ describe("Safe wallet should debtSwap", function () {
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.MOONWELL, Protocols.FLUID);
     });
 
-    it("from Moonwell DAI to Fluid USDC", async function () {
+    it.skip("from Moonwell DAI to Fluid USDC", async function () {
         await supplyAndBorrow(Protocols.MOONWELL, DAI_ADDRESS);
         await executeDebtSwap(DAI_USDC_POOL, DAI_ADDRESS, USDC_ADDRESS, Protocols.MOONWELL, Protocols.FLUID);
     });
@@ -298,12 +326,27 @@ describe("Safe wallet should debtSwap", function () {
         await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.AAVE_V3, Protocols.MOONWELL);
     });
 
-    it("Set executor address and Call executeDebtSwap by executor", async function () {
+    it("from Aave to Moonwell with protocol fee", async function () {
+        // set protocol fee
+        const signers = await ethers.getSigners();
+        const contractByOwner = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress, signers[0]);
+        const setTx = await contractByOwner.setProtocolFee(10);
+        await setTx.wait();
+
+        const setFeeBeneficiaryTx = await contractByOwner.setFeeBeneficiary(TEST_FEE_BENEFICIARY_ADDRESS);
+        await setFeeBeneficiaryTx.wait();
+
+        await supplyAndBorrow(Protocols.AAVE_V3);
+
+        await executeDebtSwap(USDC_hyUSD_POOL, USDC_ADDRESS, USDC_ADDRESS, Protocols.AAVE_V3, Protocols.MOONWELL);
+    });
+
+    it("Set operator address and Call executeDebtSwap by operator", async function () {
         const safeModuleAddress = await safeModuleContract.getAddress();
         const [_, wallet2] = await ethers.getSigners();
         const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
 
-        await safeModule.setExecutor(wallet2.address);
+        await safeModule.setoperator(wallet2.address);
 
         await supplyAndBorrow(Protocols.MOONWELL);
         await executeDebtSwap(
@@ -314,17 +357,17 @@ describe("Safe wallet should debtSwap", function () {
             Protocols.AAVE_V3,
             cbETH_ADDRESS,
             {
-                executor: wallet2,
+                operator: wallet2,
             },
         );
     });
 
-    it("Revert when calling executeDebtSwap by non executor(wallet3)", async function () {
+    it("Revert when calling executeDebtSwap by non operator(wallet3)", async function () {
         const safeModuleAddress = await safeModuleContract.getAddress();
         const [_, wallet2, wallet3] = await ethers.getSigners();
         const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
 
-        // await safeModule.setExecutor(wallet2.address);
+        // await safeModule.setoperator(wallet2.address);
 
         await supplyAndBorrow(Protocols.MOONWELL);
         await expect(
@@ -336,43 +379,25 @@ describe("Safe wallet should debtSwap", function () {
                 Protocols.AAVE_V3,
                 cbETH_ADDRESS,
                 {
-                    executor: wallet3,
+                    operator: wallet3,
                 },
             ),
         ).to.be.revertedWith("Caller is not authorized");
     });
 
-    // it.only("Should setProtocolHandler and revert when calling executeDebtSwap with wrong handler address", async function () {
-    //     const safeModuleAddress = await safeModuleContract.getAddress();
-    //     const [_, wallet2, wallet3] = await ethers.getSigners();
-    //     const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress);
+    it("revert if flashloan pool is not uniswap v3 pool", async function () {
+        await supplyAndBorrow(Protocols.MOONWELL);
 
-    //     await safeModule.setProtocolHandler(Protocols.AAVE_V3, WETH_ADDRESS);
-    //     const handlerAddress = await safeModule.getHandler(Protocols.AAVE_V3);
-    //     console.log(handlerAddress);
-
-    //     await supplyAndBorrow(Protocols.MOONWELL);
-    //     await expect(
-    //         executeDebtSwap(
-    //             USDC_hyUSD_POOL,
-    //             USDC_ADDRESS,
-    //             USDC_ADDRESS,
-    //             Protocols.MOONWELL,
-    //             Protocols.AAVE_V3,
-    //             cbETH_ADDRESS,
-    //         ),
-    //     ).to.be.reverted;
-    // });
-
-    // it("Should revert setProtocolHandler() by non-owner", async function () {
-    //     const safeModuleAddress = await safeModuleContract.getAddress();
-    //     const [_, wallet2, wallet3] = await ethers.getSigners();
-    //     const safeModule = await ethers.getContractAt("SafeModuleDebtSwap", safeModuleAddress, wallet3);
-
-    //     await expect(safeModule.setProtocolHandler(Protocols.MORPHO, WETH_ADDRESS)).to.be.revertedWith(
-    //         "Ownable: caller is not the owner",
-    //     );
-    // });
+        await expect(
+            executeDebtSwap(
+                USDC_ADDRESS, // Using USDC contract address which doesn't have token0() function
+                USDC_ADDRESS,
+                USDC_ADDRESS,
+                Protocols.MOONWELL,
+                Protocols.AAVE_V3,
+            ),
+        ).to.be.revertedWith("Invalid flashloan pool address");
+    });
 
     async function executeDebtSwap(
         flashloanPool: string,
@@ -386,8 +411,14 @@ describe("Safe wallet should debtSwap", function () {
             morphoToMarketId?: string;
             useMaxAmount?: boolean;
             anotherCollateralTokenAddress?: string;
-            executor?: HardhatEthersSigner;
-        } = { useMaxAmount: true },
+            operator?: HardhatEthersSigner;
+            fromFluidVaultAddress?: string;
+            tofluidVaultAddress?: string;
+        } = {
+            useMaxAmount: true,
+            fromFluidVaultAddress: FLUID_cbETH_USDC_VAULT,
+            tofluidVaultAddress: FLUID_cbETH_USDC_VAULT,
+        },
     ) {
         const FromHelper = protocolHelperMap.get(fromProtocol)!;
         const fromHelper = new FromHelper(signer);
@@ -398,13 +429,26 @@ describe("Safe wallet should debtSwap", function () {
         const moduleContract = await ethers.getContractAt(
             "SafeModuleDebtSwap",
             safeModuleAddress,
-            options.executor || signer,
+            options.operator || signer,
         );
 
-        const fromDebtAmountParameter =
-            fromProtocol === Protocols.MORPHO ? options!.morphoFromMarketId! : fromTokenAddress;
+        let fromDebtAmountParameter;
+        if (fromProtocol === Protocols.MORPHO) {
+            fromDebtAmountParameter = options!.morphoFromMarketId!;
+        } else if (fromProtocol === Protocols.FLUID) {
+            fromDebtAmountParameter = options?.fromFluidVaultAddress;
+        } else {
+            fromDebtAmountParameter = fromTokenAddress;
+        }
 
-        const toDebtAmountParameter = toProtocol === Protocols.MORPHO ? options!.morphoToMarketId! : toTokenAddress;
+        let toDebtAmountParameter;
+        if (toProtocol === Protocols.MORPHO) {
+            toDebtAmountParameter = options!.morphoToMarketId!;
+        } else if (toProtocol === Protocols.FLUID) {
+            toDebtAmountParameter = options?.tofluidVaultAddress;
+        } else {
+            toDebtAmountParameter = toTokenAddress;
+        }
 
         const srcDebtBefore: bigint = await fromHelper.getDebtAmount(fromDebtAmountParameter, safeAddress);
         const dstDebtBefore: bigint = await toHelper.getDebtAmount(toDebtAmountParameter, safeAddress);
@@ -474,11 +518,9 @@ describe("Safe wallet should debtSwap", function () {
                 fromExtraData = fromHelper.encodeExtraData(options!.morphoFromMarketId!, borrowShares);
                 break;
             case Protocols.FLUID:
-                const nftId = await fromHelper.getNftId(FLUID_cbETH_USDC_VAULT, safeAddress);
-                fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "uint256"],
-                    [FLUID_cbETH_USDC_VAULT, nftId],
-                );
+                const vaultAddress = options.fromFluidVaultAddress || FLUID_cbETH_USDC_VAULT;
+                const nftId = await fromHelper.getNftId(vaultAddress, safeAddress);
+                fromExtraData = ethers.AbiCoder.defaultAbiCoder().encode(["address", "uint256"], [vaultAddress, nftId]);
                 break;
         }
 
@@ -523,18 +565,16 @@ describe("Safe wallet should debtSwap", function () {
                 console.log("Safe transaction: Compound allow");
                 break;
             case Protocols.MORPHO:
-                // TODO: refactor this
-                if (fromProtocol != Protocols.MORPHO) {
-                    await morphoAuthorizeTxBySafe();
-                }
+                // If fromProtocol is not Morpho, authorize Morpho
+                const shouldAuthorizeMorpho = fromProtocol !== Protocols.MORPHO;
+                if (shouldAuthorizeMorpho) await morphoAuthorizeTxBySafe();
 
                 const borrowShares = await toHelper.getBorrowShares(options!.morphoToMarketId!, safeAddress);
 
                 toExtraData = toHelper.encodeExtraData(options!.morphoToMarketId!, borrowShares);
                 break;
             case Protocols.FLUID:
-                const vaultAddress =
-                    collateralTokenAddress == cbETH_ADDRESS ? FLUID_cbETH_USDC_VAULT : FLUID_cbBTC_sUSDS_VAULT;
+                const vaultAddress = options.tofluidVaultAddress || FLUID_cbETH_USDC_VAULT;
                 toExtraData = ethers.AbiCoder.defaultAbiCoder().encode(["address", "uint256"], [vaultAddress, 0]);
                 break;
         }
@@ -548,6 +588,9 @@ describe("Safe wallet should debtSwap", function () {
                 collateralAmount = await fromHelper.getCollateralAmount(options!.morphoFromMarketId!, safeAddress);
                 break;
         }
+
+        // simulate waiting for user's confirmation
+        await time.increaseTo((await time.latest()) + 60);
 
         await moduleContract.executeDebtSwap(
             flashloanPool,

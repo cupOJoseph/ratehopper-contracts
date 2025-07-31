@@ -5,11 +5,13 @@ import cometAbi from "../../externalAbi/compound/comet.json";
 import { approve, defaultProvider, formatAmount } from "../utils";
 import {
     AERO_ADDRESS,
+    cbBTC_ADDRESS,
     cbETH_ADDRESS,
     DEFAULT_SUPPLY_AMOUNT,
     TEST_ADDRESS,
     USDbC_ADDRESS,
     USDC_ADDRESS,
+    USDS_ADDRESS,
     WETH_ADDRESS,
 } from "../constants";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
@@ -19,12 +21,14 @@ export const USDC_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
 export const USDbC_COMET_ADDRESS = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
 export const WETH_COMET_ADDRESS = "0x46e6b214b524310239732D51387075E0e70970bf";
 export const AERO_COMET_ADDRESS = "0x784efeB622244d2348d4F2522f8860B96fbEcE89";
+export const USDS_COMET_ADDRESS = "0x2c776041CCFe903071AF44aa147368a9c8EEA518";
 
 export const cometAddressMap = new Map<string, string>([
     [USDC_ADDRESS, USDC_COMET_ADDRESS],
     [USDbC_ADDRESS, USDbC_COMET_ADDRESS],
     [WETH_ADDRESS, WETH_COMET_ADDRESS],
     [AERO_ADDRESS, AERO_COMET_ADDRESS],
+    [USDS_ADDRESS, USDS_COMET_ADDRESS],
 ]);
 
 export class CompoundHelper {
@@ -47,9 +51,9 @@ export class CompoundHelper {
         return response.balance;
     }
 
-    async supply(cometAddress: string, collateralTokenAddress: string) {
+    async supply(cometAddress: string, collateralTokenAddress: string, amount = DEFAULT_SUPPLY_AMOUNT, decimals = 18) {
         await approve(collateralTokenAddress, cometAddress, this.signer);
-        const supplyAmount = ethers.parseEther(DEFAULT_SUPPLY_AMOUNT);
+        const supplyAmount = ethers.parseUnits(amount, decimals);
         const comet = new ethers.Contract(cometAddress, cometAbi, this.signer);
 
         const tx = await comet.supply(collateralTokenAddress, supplyAmount);

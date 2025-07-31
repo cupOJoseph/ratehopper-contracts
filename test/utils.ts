@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import { Protocols, WETH_ADDRESS } from "./constants";
 import { abi as ERC20_ABI } from "@openzeppelin/contracts/build/contracts/ERC20.json";
-import { ethers, MaxUint256 } from "ethers";
+import { MaxUint256 } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import WETH_ABI from "../externalAbi/weth.json";
 
@@ -16,8 +16,8 @@ export const protocolHelperMap = new Map<Protocols, any>([
     [Protocols.AAVE_V3, AaveV3Helper],
     [Protocols.COMPOUND, CompoundHelper],
     [Protocols.MORPHO, MorphoHelper],
-    [Protocols.MOONWELL, MoonwellHelper],
     [Protocols.FLUID, FluidHelper],
+    [Protocols.MOONWELL, MoonwellHelper],
 ]);
 
 export const defaultProvider = new ethers.JsonRpcProvider("https://base.llamarpc.com");
@@ -92,6 +92,7 @@ export async function getParaswapData(
         userAddress: contractAddress,
         // exclude Uniswap V3 to avoid conflict with flashloan pool. More sophisticated mechanism should be implemented
         excludeDEXS: "UniswapV3",
+        version: 6.2,
     };
 
     try {

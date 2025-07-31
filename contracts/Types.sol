@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 enum Protocol {
-    COMPOUND,
     AAVE_V3,
+    COMPOUND,
     MORPHO,
     FLUID,
     MOONWELL

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IProtocolHandler.sol";
 import "../interfaces/safe/ISafe.sol";
 import "../interfaces/moonwell/IMToken.sol";
 import {IComptroller} from "../interfaces/moonwell/Comptroller.sol";
@@ -9,22 +8,24 @@ import {GPv2SafeERC20} from "../dependencies/GPv2SafeERC20.sol";
 import "../Types.sol";
 import {IERC20} from "../dependencies/IERC20.sol";
 import {ProtocolRegistry} from "../ProtocolRegistry.sol";
+import "../protocols/BaseProtocolHandler.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract MoonwellHandler is IProtocolHandler {
+contract MoonwellHandler is BaseProtocolHandler, ReentrancyGuard {
     using GPv2SafeERC20 for IERC20;
 
     address public immutable COMPTROLLER;
-    ProtocolRegistry public immutable REGISTRY;
+    ProtocolRegistry public immutable registry;
 
-    constructor(address _comptroller, address _registry) {
+    constructor(address _comptroller, address _UNISWAP_V3_FACTORY, address _REGISTRY_ADDRESS) BaseProtocolHandler(_UNISWAP_V3_FACTORY) {
         COMPTROLLER = _comptroller;
-        REGISTRY = ProtocolRegistry(_registry);
+        registry = ProtocolRegistry(_REGISTRY_ADDRESS);
     }
 
     error TokenNotRegistered();
 
     function getMContract(address token) internal view returns (address) {
-        return REGISTRY.getMContract(token);
+        return registry.getMContract(token);
     }
 
     function getDebtAmount(
@@ -47,7 +48,10 @@ contract MoonwellHandler is IProtocolHandler {
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* fromExtraData */,
         bytes calldata /* toExtraData */
-    ) external override {
+    ) external override onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
+        require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
+
         address fromContract = getMContract(fromAsset);
         address toContract = getMContract(toAsset);
 
@@ -83,7 +87,10 @@ contract MoonwellHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) external override {
+    ) external override onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(fromAsset), "From asset is not whitelisted");
+        _validateCollateralAssets(collateralAssets);
+   
         address fromContract = getMContract(fromAsset);
 
         if (fromContract == address(0)) revert TokenNotRegistered();
@@ -92,6 +99,7 @@ contract MoonwellHandler is IProtocolHandler {
         IMToken(fromContract).repayBorrowBehalf(onBehalfOf, amount);
 
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
             address mTokenAddress = getMContract(collateralAssets[i].asset);
             if (mTokenAddress == address(0)) revert TokenNotRegistered();
 
@@ -104,10 +112,16 @@ contract MoonwellHandler is IProtocolHandler {
 
             require(successWithdraw, "Redeem transaction failed");
 
+            uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(onBehalfOf);
+            require(
+                currentBalance < (collateralAssets[i].amount * 101) / 100,
+                "Current balance is more than collateral amount + buffer"
+            );
+
             bool successTransfer = ISafe(onBehalfOf).execTransactionFromModule(
                 collateralAssets[i].asset,
                 0,
-                abi.encodeCall(IERC20.transfer, (address(this), collateralAssets[i].amount)),
+                abi.encodeCall(IERC20.transfer, (address(this), currentBalance)),
                 ISafe.Operation.Call
             );
 
@@ -121,14 +135,23 @@ contract MoonwellHandler is IProtocolHandler {
         address onBehalfOf,
         CollateralAsset[] memory collateralAssets,
         bytes calldata /* extraData */
-    ) external override {
+    ) external override onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(toAsset), "To asset is not whitelisted");
+        _validateCollateralAssets(collateralAssets);
+
         address toContract = getMContract(toAsset);
         if (toContract == address(0)) revert TokenNotRegistered();
 
         for (uint256 i = 0; i < collateralAssets.length; i++) {
+            require(registry.isWhitelisted(collateralAssets[i].asset), "Collateral asset is not whitelisted");
+            
             address collateralContract = getMContract(collateralAssets[i].asset);
             // use balanceOf() because collateral amount is slightly decreased when switching from Fluid
             uint256 currentBalance = IERC20(collateralAssets[i].asset).balanceOf(address(this));
+            require(
+                currentBalance < (collateralAssets[i].amount * 101) / 100,
+                "Current balance is more than collateral amount + buffer"
+            );
 
             IERC20(collateralAssets[i].asset).transfer(onBehalfOf, currentBalance);
 
@@ -181,7 +204,9 @@ contract MoonwellHandler is IProtocolHandler {
         require(successTransfer, "Transfer transaction failed");
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external {
+    function supply(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         address mContract = getMContract(asset);
         if (mContract == address(0)) revert TokenNotRegistered();
 
@@ -218,7 +243,9 @@ contract MoonwellHandler is IProtocolHandler {
         require(successEnterMarkets, "Enter markets transaction failed");
     }
 
-    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external {
+    function borrow(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) external onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         address mContract = getMContract(asset);
         if (mContract == address(0)) revert TokenNotRegistered();
 
@@ -241,7 +268,9 @@ contract MoonwellHandler is IProtocolHandler {
         require(successTransfer, "Transfer transaction failed");
     }
 
-    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) public override {
+    function repay(address asset, uint256 amount, address onBehalfOf, bytes calldata /* extraData */) public override onlyUniswapV3Pool nonReentrant {
+        require(registry.isWhitelisted(asset), "Asset is not whitelisted");
+        
         address mContract = getMContract(asset);
         if (mContract == address(0)) revert TokenNotRegistered();
 

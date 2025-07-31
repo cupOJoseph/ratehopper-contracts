@@ -3,13 +3,20 @@ import { ethers } from "hardhat";
 import {
     AAVE_V3_DATA_PROVIDER_ADDRESS,
     AAVE_V3_POOL_ADDRESS,
+    cbBTC_ADDRESS,
     cbETH_ADDRESS,
     DAI_ADDRESS,
-    PARASWAP_ROUTER_ADDRESS,
-    PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS,
+    EURC_ADDRESS,
+    MAI_ADDRESS,
+    PARASWAP_V6_CONTRACT_ADDRESS,
     Protocols,
+    sUSDS_ADDRESS,
     UNISWAP_V3_FACTORY_ADRESS,
+    USDbC_ADDRESS,
     USDC_ADDRESS,
+    USDS_ADDRESS,
+    WETH_ADDRESS,
+    wstETH_ADDRESS,
 } from "./constants";
 import { MORPHO_ADDRESS } from "./protocols/morpho";
 import { COMPTROLLER_ADDRESS, mcbETH, mDAI, mUSDC } from "./protocols/moonwell";
@@ -25,34 +32,82 @@ async function deployMaliciousContract() {
     return maliciousContract;
 }
 
-async function deployHandlers() {
+export async function deployMaliciousUniswapV3Pool(targetHandler: string) {
+    const MaliciousUniswapV3Pool = await hre.ethers.getContractFactory("MaliciousUniswapV3Pool");
+    const maliciousPool = await MaliciousUniswapV3Pool.deploy(
+        USDC_ADDRESS, // token0
+        DAI_ADDRESS, // token1
+        3000, // fee (0.3%)
+        targetHandler, // target handler address
+        await getGasOptions(),
+    );
+    await maliciousPool.waitForDeployment();
+    console.log("MaliciousUniswapV3Pool deployed to:", await maliciousPool.getAddress());
+    return maliciousPool;
+}
+
+export async function deployHandlers() {
+    const protocolRegistry = await deployProtocolRegistry();
+    const registryAddress = await protocolRegistry.getAddress();
+
+    const gasOptions = await getGasOptions();
+
     const AaveV3Handler = await hre.ethers.getContractFactory("AaveV3Handler");
     const aaveV3Handler = await AaveV3Handler.deploy(
         AAVE_V3_POOL_ADDRESS,
         AAVE_V3_DATA_PROVIDER_ADDRESS,
-        await getGasOptions(),
+        UNISWAP_V3_FACTORY_ADRESS,
+        registryAddress,
+        gasOptions,
     );
+    await aaveV3Handler.waitForDeployment();
     console.log("AaveV3Handler deployed to:", await aaveV3Handler.getAddress());
 
-    const protocolRegistry = await deployProtocolRegistry();
-    const registryAddress = await protocolRegistry.getAddress();
-
     const CompoundHandler = await hre.ethers.getContractFactory("CompoundHandler");
-    const compoundHandler = await CompoundHandler.deploy(registryAddress, await getGasOptions());
+    const compoundHandler = await CompoundHandler.deploy(registryAddress, UNISWAP_V3_FACTORY_ADRESS, gasOptions);
     await compoundHandler.waitForDeployment();
     console.log("CompoundHandler deployed to:", await compoundHandler.getAddress());
 
     const MoonwellHandler = await hre.ethers.getContractFactory("MoonwellHandler");
-    const moonwellHandler = await MoonwellHandler.deploy(COMPTROLLER_ADDRESS, registryAddress, await getGasOptions());
+    const moonwellHandler = await MoonwellHandler.deploy(
+        COMPTROLLER_ADDRESS,
+        UNISWAP_V3_FACTORY_ADRESS,
+        registryAddress,
+    );
+    await moonwellHandler.waitForDeployment();
     console.log("MoonwellHandler deployed to:", await moonwellHandler.getAddress());
 
     const FluidHandler = await hre.ethers.getContractFactory("FluidSafeHandler");
-    const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER, await getGasOptions());
+    const fluidHandler = await FluidHandler.deploy(FLUID_VAULT_RESOLVER, UNISWAP_V3_FACTORY_ADRESS, registryAddress);
+    await fluidHandler.waitForDeployment();
     console.log("FluidHandler deployed to:", await fluidHandler.getAddress());
 
     const MorphoHandler = await hre.ethers.getContractFactory("MorphoHandler");
-    const morphoHandler = await MorphoHandler.deploy(MORPHO_ADDRESS, await getGasOptions());
+    const morphoHandler = await MorphoHandler.deploy(
+        MORPHO_ADDRESS,
+        UNISWAP_V3_FACTORY_ADRESS,
+        registryAddress,
+        gasOptions,
+    );
+    await morphoHandler.waitForDeployment();
     console.log("MorphoHandler deployed to:", await morphoHandler.getAddress());
+
+    const whitelistTokens = [
+        USDC_ADDRESS,
+        DAI_ADDRESS,
+        USDbC_ADDRESS,
+        MAI_ADDRESS,
+        WETH_ADDRESS,
+        cbBTC_ADDRESS,
+        cbETH_ADDRESS,
+        USDS_ADDRESS,
+        EURC_ADDRESS,
+        sUSDS_ADDRESS,
+        wstETH_ADDRESS,
+    ];
+
+    const registryWhitelistTx = await protocolRegistry.addToWhitelistBatch(whitelistTokens);
+    await registryWhitelistTx.wait();
 
     return {
         aaveV3Handler,
@@ -60,6 +115,7 @@ async function deployHandlers() {
         moonwellHandler,
         fluidHandler,
         morphoHandler,
+        protocolRegistry,
     };
 }
 
@@ -77,7 +133,7 @@ export async function deployDebtSwapContractWithMaliciousHandlerFixture() {
     );
     console.log("DebtSwapMalicious deployed to:", await debtSwapMalicious.getAddress());
 
-    debtSwapMalicious.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+    debtSwapMalicious.setParaswapAddresses(PARASWAP_V6_CONTRACT_ADDRESS, PARASWAP_V6_CONTRACT_ADDRESS);
 
     return debtSwapMalicious;
 }
@@ -94,9 +150,10 @@ export async function deployDebtSwapContractFixture() {
         [aaveV3Handler.getAddress(), compoundHandler.getAddress(), morphoHandler.getAddress()],
         await getGasOptions(),
     );
+    await debtSwap.waitForDeployment();
     console.log("DebtSwap deployed to:", await debtSwap.getAddress());
 
-    debtSwap.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+    await debtSwap.setParaswapAddresses(PARASWAP_V6_CONTRACT_ADDRESS, PARASWAP_V6_CONTRACT_ADDRESS);
 
     return debtSwap;
 }
@@ -123,7 +180,8 @@ export async function deployLeveragedPositionContractFixture() {
 
     console.log("LeveragedPosition deployed to:", await leveragedPosition.getAddress());
 
-    leveragedPosition.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+    await leveragedPosition.setParaswapAddresses(PARASWAP_V6_CONTRACT_ADDRESS, PARASWAP_V6_CONTRACT_ADDRESS);
+
     return leveragedPosition;
 }
 
@@ -148,7 +206,7 @@ export async function deploySafeContractFixture() {
 
     console.log("SafeModule deployed to:", await safeModule.getAddress());
 
-    safeModule.setParaswapAddresses(PARASWAP_TOKEN_TRANSFER_PROXY_ADDRESS, PARASWAP_ROUTER_ADDRESS);
+    await safeModule.setParaswapAddresses(PARASWAP_V6_CONTRACT_ADDRESS, PARASWAP_V6_CONTRACT_ADDRESS);
 
     return safeModule;
 }
