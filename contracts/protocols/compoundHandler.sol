@@ -108,7 +108,7 @@ contract CompoundHandler is BaseProtocolHandler, ReentrancyGuard {
         address asset,
         uint256 amount,
         address onBehalfOf,
-        bytes calldata  extraData
+        bytes calldata extraData
     ) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
@@ -125,7 +125,7 @@ contract CompoundHandler is BaseProtocolHandler, ReentrancyGuard {
         address asset,
         uint256 amount,
         address onBehalfOf,
-        bytes calldata extraData
+        bytes calldata /* extraData */
     ) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
