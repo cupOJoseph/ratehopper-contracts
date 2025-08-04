@@ -108,11 +108,11 @@ contract CompoundHandler is BaseProtocolHandler, ReentrancyGuard {
         address asset,
         uint256 amount,
         address onBehalfOf,
-        bytes calldata /* extraData */
+        bytes calldata extraData
     ) external override onlyUniswapV3Pool nonReentrant {
         require(registry.isWhitelisted(asset), "Asset is not whitelisted");
         
-        address cContract = getCContract(asset);
+        address cContract = abi.decode(extraData, (address));
         require(cContract != address(0), "Invalid comet address");
 
         TransferHelper.safeApprove(asset, address(cContract), amount);
