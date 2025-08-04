@@ -1,16 +1,17 @@
 const hre = require("hardhat");
 
 async function main() {
-    const contractAddress = "0x4c3b238eb2d349095A77c7ef7b842924e5071843";
+    const contractAddress = "0xcDEAEf6A3373d7f844874e42A409133BaFB60649";
+    const UNISWAP_V3_FACTORY_ADRESS = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
 
     // Define the constructor arguments
     const protocols = [0, 1, 2, 3, 4];
     const handlers = [
-        "0x3ea412D1d7D7414693f2355D107dbF40440Ff040", // AaveV3Handler
-        "0x7410abF1e92187A1ded8d615A866541cF92dE74B", // CompoundHandler
-        "0x18c2fB450f34e3089a6E5a9E501aA2692cE5d63e", // MorphoHandler
-        "0xB6e7cDF6Cc57308a1a996704D85C351aBc317f1A", // FluidSafeHandler
-        "0xCAaC42dCab2F28095D02F07A4fF9Db7b508F93fB", // MoonwellHandler
+        "0x7f1be446C938c9046206eCbf803405A0B7741D3f", // AaveV3Handler
+        "0x62AC021A02A631824B5665C6A8657B9c6e0587e6", // CompoundHandler
+        "0xb03B40507829d4Ec4b5681d566eA64CE0264Bf48", // MorphoHandler
+        "0x4DAF0278E9c8933685d10d159b80F13a841C8a50", // FluidHandler
+        "0xaF141AB1eD50144Ff527cF0Ee5595e7D27dAb935", // MoonwellHandler
     ];
 
     console.log("Verifying LeveragedPosition contract...");
@@ -18,7 +19,7 @@ async function main() {
     try {
         await hre.run("verify:verify", {
             address: contractAddress,
-            constructorArguments: [protocols, handlers],
+            constructorArguments: [UNISWAP_V3_FACTORY_ADRESS, protocols, handlers],
         });
         console.log("Verification successful!");
     } catch (error) {
